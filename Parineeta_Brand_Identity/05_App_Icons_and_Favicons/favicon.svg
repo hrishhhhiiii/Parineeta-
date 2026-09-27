@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs>
+<linearGradient id="foil" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#8A5A0B"/><stop offset=".22" stop-color="#D9A93A"/>
+<stop offset=".45" stop-color="#F6E2A0"/><stop offset=".68" stop-color="#C8922A"/>
+<stop offset="1" stop-color="#7C4E08"/></linearGradient>
+<radialGradient id="sun" cx=".44" cy=".38" r=".75">
+<stop offset="0" stop-color="#FCE38A"/><stop offset=".45" stop-color="#F2B632"/>
+<stop offset=".8" stop-color="#D9962A"/><stop offset="1" stop-color="#B87A14"/></radialGradient>
+<radialGradient id="velvet" cx=".5" cy=".45" r=".75">
+<stop offset="0" stop-color="#7A0F1B"/><stop offset=".6" stop-color="#4D050C"/>
+<stop offset="1" stop-color="#2B0307"/></radialGradient>
+<linearGradient id="silk" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#A3111F"/><stop offset=".5" stop-color="#D42636"/>
+<stop offset="1" stop-color="#8B0C18"/></linearGradient>
+</defs><rect width="1024" height="1024" rx="230" fill="#4D050C"/><path d="M747.49 871.29 669.02 836.61V485.08L673.66 558.95Q648.76 505.29 620.89 463.62Q593.02 421.96 563.21 393.25Q533.39 364.55 502.84 349.72Q472.29 334.88 442.84 334.88Q414.54 334.88 389.25 349.67Q363.97 364.45 343.14 391.56Q322.3 418.67 306.81 456.06L272.08 436.89Q284.96 425.87 303.79 418.64Q322.61 411.41 343.89 411.41Q376.56 411.41 397.17 431.89Q417.79 452.37 417.79 489.13Q417.79 508.54 412.83 524.38Q407.88 540.22 399.79 557.91L390.29 540.03L557.27 367.94L634.63 459.7L389.1 709.54L301.99 618.43Q326.39 600.5 343.42 577.94Q360.45 555.38 360.45 528.55Q360.45 514.21 355.2 505.4Q349.95 496.59 340.66 492.14Q331.36 487.7 318.88 487.7Q302.93 487.7 287.69 494.14Q272.46 500.58 257.35 513.52L158.96 428.25Q192.16 368.37 232.82 324.32Q273.47 280.28 320.2 256.42Q366.92 232.56 416.96 232.56Q469.01 232.56 516.97 256.16Q564.93 279.76 606.47 328.42Q648.01 377.08 680.04 451.92L677.16 456.76Q674.13 407.13 671.57 368.51Q669.02 329.88 669.02 292.29V155.34L675.64 152.71L740.96 187.17L748.14 240.15H824.2L865.04 309H754.83V869.22L747.49 871.29Z" fill="#F2CF6E"/></svg>

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>05 Bridal sets</title><link rel="stylesheet" href="concept.css">
+<style>
+.frame { display: grid; grid-template-columns: 1fr 700px; grid-template-rows: 900px; }
+.pic { overflow: hidden; }
+.field { background: var(--sindoor); padding: 96px var(--pad) 80px; display: flex; flex-direction: column; color: #fff3e0; }
+.field .label { color: rgba(255, 243, 224, 0.75); }
+.h2 { font-size: 78px; }
+.h2 .bn { display: block; font-size: 26px; color: var(--gold-2); margin-bottom: 18px; line-height: 1.4; }
+.field .lede { color: rgba(255, 243, 224, 0.85); margin-top: 24px; font-size: 19px; }
+.items { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; }
+.items .tag { color: #fff3e0; border-color: rgba(255, 243, 224, 0.35); }
+.buy { display: flex; align-items: center; gap: 28px; margin-top: 40px; }
+.buy .price { color: #fff3e0; font-size: 34px; }
+.buy .price small { color: rgba(255, 243, 224, 0.75); }
+.others { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255, 243, 224, 0.28); }
+.others div { padding-top: 18px; }
+.others b { display: block; font-family: var(--display); font-weight: 500; font-size: 22px; }
+.others span { font-size: 14px; color: rgba(255, 243, 224, 0.75); }
+.pic { position: relative; }
+.pic::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,0.3); }
+.pager { position: absolute; right: 36px; bottom: 36px; display: flex; gap: 10px; }
+.pager span { width: 48px; height: 48px; border-radius: 999px; background: rgba(21, 5, 7, 0.55); border: 1px solid rgba(255, 243, 224, 0.4); display: grid; place-items: center; }
+.btn--cream { background: #fff3e0; color: var(--sindoor); }
+</style></head>
+<body><div class="frame">
+  <div class="field grain" style="position:relative">
+    <p class="label">Bridal sets · 2 of 4</p>
+    <h2 class="h2"><span class="bn">কনের সাজি</span>Bride's Ritual Set</h2>
+    <p class="lede">Everything the bride carries through the day, painted to match.</p>
+    <div class="items"><span class="tag">Gach Kouto</span><span class="tag">Sindoor Kouto</span><span class="tag">Kunke</span><span class="tag">Darpan</span><span class="tag">Paan Pata</span></div>
+    <div class="buy">
+      <span class="price"><small>from</small>₹2,900</span>
+      <a class="btn btn--cream">Add set to enquiry</a>
+      <a class="link" style="color:#fff3e0;border-color:rgba(255,243,224,.45)">Choose colours<svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
+    </div>
+    <div class="others">
+      <div><b>Shubho Drishti Set</b><span>from ₹1,150</span></div>
+      <div><b>Crown Pair</b><span>from ₹1,990</span></div>
+      <div><b>The Complete Biye</b><span>from ₹8,900</span></div>
+    </div>
+  </div>
+  <div class="pic">
+    <img class="cover" src="../website/public/media/photos/ritual-set-real-1600.webp" alt="" style="object-position:50% 40%">
+    <div class="pager">
+      <span><svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="#fff3e0" stroke-width="1.4"><path d="M13 8H3M7 4 3 8l4 4"/></svg></span>
+      <span><svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="#fff3e0" stroke-width="1.4"><path d="M3 8h10M9 4l4 4-4 4"/></svg></span>
+    </div>
+  </div>
+</div></body></html>

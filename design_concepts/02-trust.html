@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>02 Trust</title><link rel="stylesheet" href="concept.css">
+<style>
+.frame { display: grid; grid-template-columns: 820px 1fr; }
+.photos { position: relative; }
+.big { position: absolute; left: var(--pad); top: 96px; width: 470px; height: 590px; }
+.small1 { position: absolute; left: 598px; top: 96px; width: 222px; height: 280px; }
+.small2 { position: absolute; left: 598px; top: 406px; width: 222px; height: 280px; }
+.cap { position: absolute; left: var(--pad); top: 704px; }
+.copy { padding: 96px var(--pad) 0 110px; display: flex; flex-direction: column; }
+.h2 { font-size: 84px; }
+.lede { margin-top: 30px; font-size: 20px; }
+.facts { margin-top: auto; margin-bottom: 110px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; border-top: 1px solid var(--line-paper); padding-top: 28px; }
+.facts b { display: block; font-family: var(--display); font-weight: 600; font-size: 22px; color: var(--sindoor); margin-bottom: 6px; }
+.facts span { font-size: 15px; color: var(--paper-ink-2); line-height: 1.5; }
+.side { position: absolute; left: 40px; top: 96px; bottom: 214px; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; font-weight: 600; color: var(--paper-ink-2); letter-spacing: 0.08em; display: flex; align-items: center; gap: 14px; }
+.side::before { content: ''; width: 1px; flex: 1; background: var(--line-paper); }
+</style></head>
+<body><div class="frame paper">
+  <div class="photos">
+    <div class="side">Guests at the Katwa studio</div>
+    <div class="photo big"><img class="cover" src="../website/public/media/photos/celeb-with-panels-1600.webp" alt="" style="object-position:50% 30%"></div>
+    <div class="photo small1"><img class="cover" src="../website/public/media/photos/celeb-selfie-800.webp" alt="" style="object-position:40% 50%"></div>
+    <div class="photo small2"><img class="cover" src="../website/public/media/photos/celeb-choosing-800.webp" alt="" style="object-position:55% 50%"></div>
+    <p class="caption cap">Choosing painted panels at the Parineeta studio</p>
+  </div>
+  <div class="copy">
+    <h2 class="h2">Loved by <em style="font-style:italic;color:var(--sindoor)">familiar faces.</em></h2>
+    <p class="lede">Celebrities from Bengal have visited our Katwa studio to choose hand-painted pieces. We are proud to paint for them, and for every family who walks through our door.</p>
+    <div class="facts">
+      <div><b>Painted by hand</b><span>Every piece is made in our studio in Katwa.</span></div>
+      <div><b>Made for you</b><span>Names, dates and portraits painted to order.</span></div>
+      <div><b>Talk to the artists</b><span>Book and plan directly with us on WhatsApp.</span></div>
+    </div>
+  </div>
+</div></body></html>
