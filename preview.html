@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>পরিণীতা | Bengali Wedding Brand Logo Redesign</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Noto+Serif+Bengali:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #120306;
+      --bg-card: #1c060b;
+      --crimson-royal: #6b0c17;
+      --sindoor-red: #c01e2e;
+      --gold-primary: #dfaa44;
+      --gold-gradient: linear-gradient(135deg, #fae08c 0%, #d49a2a 40%, #fdf0b0 70%, #b87b12 100%);
+      --text-gold: #fce7b2;
+      --text-muted: #d8b7b9;
+      --border-gold: rgba(223, 170, 68, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(107, 12, 23, 0.4) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(107, 12, 23, 0.3) 0%, transparent 45%);
+      color: #f7f1e5;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 50px;
+      position: relative;
+    }
+
+    .badge-tag {
+      display: inline-block;
+      padding: 6px 18px;
+      background: rgba(223, 170, 68, 0.15);
+      border: 1px solid var(--border-gold);
+      border-radius: 50px;
+      font-size: 0.85rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #fae08c;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+
+    h1 {
+      font-family: 'Cinzel', serif;
+      font-size: 2.8rem;
+      font-weight: 800;
+      background: var(--gold-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+
+    .bengali-title {
+      font-family: 'Noto Serif Bengali', serif;
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #fff1b8;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      max-width: 650px;
+      margin: 0 auto;
+    }
+
+    /* Comparison Bar */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 30px;
+      margin-bottom: 60px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-gold);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 16px 36px rgba(0,0,0,0.6);
+      transition: transform 0.3s ease, border-color 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(250, 224, 140, 0.8);
+      box-shadow: 0 20px 45px rgba(212, 154, 42, 0.2);
+    }
+
+    .card.featured {
+      border: 2px solid #dfaa44;
+      position: relative;
+    }
+
+    .featured-ribbon {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: var(--gold-gradient);
+      color: #3b050a;
+      font-weight: 800;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      z-index: 10;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    .card-img-wrap {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid rgba(223, 170, 68, 0.2);
+    }
+
+    .card-img-wrap img, .card-img-wrap svg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+
+    .card:hover .card-img-wrap img {
+      transform: scale(1.03);
+    }
+
+    .card-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .card-tag {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #dfaa44;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .card-title {
+      font-size: 1.4rem;
+      color: #ffffff;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .card-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 20px;
+      flex-grow: 1;
+    }
+
+    .features-list {
+      list-style: none;
+      margin-bottom: 20px;
+      font-size: 0.88rem;
+      color: #ebd3d5;
+    }
+
+    .features-list li {
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .features-list li::before {
+      content: "✦";
+      color: #dfaa44;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-gold {
+      background: var(--gold-gradient);
+      color: #380308;
+      border: none;
+    }
+
+    .btn-gold:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 4px 15px rgba(223, 170, 68, 0.4);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: #fae08c;
+      border: 1px solid var(--border-gold);
+    }
+
+    .btn-outline:hover {
+      background: rgba(223, 170, 68, 0.1);
+      border-color: #fae08c;
+    }
+
+    /* Cultural Elements Section */
+    .cultural-section {
+      background: rgba(28, 6, 11, 0.7);
+      border: 1px solid var(--border-gold);
+      border-radius: 24px;
+      padding: 40px;
+      margin-bottom: 60px;
+    }
+
+    .section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.8rem;
+      color: #fff1b8;
+      margin-bottom: 24px;
+      text-align: center;
+      position: relative;
+    }
+
+    .section-title::after {
+      content: "";
+      display: block;
+      width: 60px;
+      height: 3px;
+      background: var(--gold-gradient);
+      margin: 10px auto 0;
+      border-radius: 2px;
+    }
+
+    .motifs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+      margin-top: 30px;
+    }
+
+    .motif-box {
+      background: rgba(18, 3, 6, 0.6);
+      border: 1px solid rgba(223, 170, 68, 0.2);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: left;
+    }
+
+    .motif-box h3 {
+      font-size: 1.15rem;
+      color: #fae08c;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .motif-box p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Mockup Showcase */
+    .mockup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 60px;
+    }
+
+    @media (max-width: 768px) {
+      .mockup-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .mockup-card {
+      background: #180509;
+      border: 1px solid var(--border-gold);
+      border-radius: 20px;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .invitation-card-preview {
+      width: 100%;
+      max-width: 380px;
+      margin: 0 auto;
+      background: radial-gradient(circle, #550711 0%, #300308 100%);
+      border: 3px double #dfaa44;
+      border-radius: 12px;
+      padding: 35px 25px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.7);
+      position: relative;
+    }
+
+    .invitation-card-preview::before {
+      content: "";
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      border: 1px dashed rgba(223, 170, 68, 0.4);
+      pointer-events: none;
+    }
+
+    .palette-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .swatch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0,0,0,0.4);
+      padding: 8px 16px;
+      border-radius: 50px;
+      border: 1px solid rgba(255,255,255,0.1);
+      font-size: 0.85rem;
+    }
+
+    .swatch-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge-tag">Bengali Wedding Theme Redesign</span>
+      <span class="bengali-title">পরিণীতা</span>
+      <h1>PARINEETA LOGO REDESIGN</h1>
+      <p>Luxury bridal branding inspired by traditional Bengali wedding heritage — Shola Mukut, Paan Pata, Shankha-Pola, and Royal Alpana.</p>
+    </header>
+
+    <!-- Design Options -->
+    <div class="comparison-grid">
+      <!-- Option 1: Royal Crest -->
+      <div class="card featured">
+        <span class="featured-ribbon">Most Popular</span>
+        <div class="card-img-wrap">
+          <img src="parineeta_logo_option1_royal_crest.jpg" alt="Option 1: Royal Crest Redesign">
+        </div>
+        <div class="card-body">
+          <div class="card-tag">Concept 01 • Royal Heritage</div>
+          <h2 class="card-title">Royal Medallion Crest</h2>
+          <p class="card-desc">Features the iconic Shola Mukut & Topor at the crest, paired with a traditional red-white Jor cloth tie, Shankha, Pola, and golden betel leaf.</p>
+          <ul class="features-list">
+            <li>Bengali Mukut & Topor regal crest</li>
+            <li>Red & White sacred wedding drape</li>
+            <li>Golden Betel Leaf (Paan) with Chandan</li>
+            <li>Shankha (Conch) & Pola bangles</li>
+          </ul>
+          <a href="parineeta_logo_option1_royal_crest.jpg" download class="btn btn-gold">Download HD Logo</a>
+        </div>
+      </div>
+
+      <!-- Option 2: Lotus & Alpana -->
+      <div class="card">
+        <div class="card-img-wrap">
+          <img src="parineeta_logo_option2_lotus_alpana.jpg" alt="Option 2: Lotus & Alpana Redesign">
+        </div>
+        <div class="card-body">
+          <div class="card-tag">Concept 02 • Haute Minimal</div>
+          <h2 class="card-title">Lotus Alpana & Mukut</h2>
+          <p class="card-desc">Sleek, modern luxury emblem featuring a golden Paan leaf with white bridal chandan kalka, delicate Shola Mukut tiara, and blooming lotus alpana border.</p>
+          <ul class="features-list">
+            <li>Paan Pata with white Chandan Kalka</li>
+            <li>Delicate Shola Mukut tiara emblem</li>
+            <li>Intricate white & gold lotus Alpana frame</li>
+            <li>Perfect for modern wedding stationery</li>
+          </ul>
+          <a href="parineeta_logo_option2_lotus_alpana.jpg" download class="btn btn-outline">Download HD Logo</a>
+        </div>
+      </div>
+
+      <!-- Option 3: Heritage Shankha -->
+      <div class="card">
+        <div class="card-img-wrap">
+          <img src="parineeta_logo_option3_heritage_shankha.jpg" alt="Option 3: Heritage Shankha Crest">
+        </div>
+        <div class="card-body">
+          <div class="card-tag">Concept 03 • Sacred Auspicious</div>
+          <h2 class="card-title">Sacred Shankha & Topor</h2>
+          <p class="card-desc">Crowns the emblem with the sacred wedding conch shell (Shankha), flanked by Mukut, Topor, and Paan leaf with 3D embossed gold foil texture.</p>
+          <ul class="features-list">
+            <li>Sacred wedding Shankha (conch) top</li>
+            <li>Groom Topor & Bridal Mukut duet</li>
+            <li>Embossed metallic gold leaf typography</li>
+            <li>Deep royal crimson velvet backdrop</li>
+          </ul>
+          <a href="parineeta_logo_option3_heritage_shankha.jpg" download class="btn btn-outline">Download HD Logo</a>
+        </div>
+      </div>
+
+      <!-- Scalable Vector SVG -->
+      <div class="card">
+        <div class="card-img-wrap">
+          <img src="parineeta_vector_logo.svg" alt="Scalable Vector SVG Logo">
+        </div>
+        <div class="card-body">
+          <div class="card-tag">Vector Format • Master Asset</div>
+          <h2 class="card-title">Scalable Vector SVG</h2>
+          <p class="card-desc">Infinitely scalable resolution-independent vector file, ideal for large wedding banners, embroidery, laser cutting, flex printing, and digital web apps.</p>
+          <ul class="features-list">
+            <li>100% scalable SVG vector format</li>
+            <li>Custom Bengali typography (Noto Serif / Tiro)</li>
+            <li>Metallic gradient styling</li>
+            <li>Print & digital ready</li>
+          </ul>
+          <a href="parineeta_vector_logo.svg" download class="btn btn-gold">Download SVG Vector</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cultural Story & Iconography -->
+    <div class="cultural-section">
+      <h2 class="section-title">Authentic Bengali Wedding Symbolism</h2>
+      <div class="motifs-grid">
+        <div class="motif-box">
+          <h3>👑 Shola Mukut & Topor</h3>
+          <p>Handcrafted from pure white sholapith (Indian cork). The Mukut crowns the bride like Devi Lakshmi, while the Topor crowns the groom like Lord Shiva.</p>
+        </div>
+        <div class="motif-box">
+          <h3>🍃 Paan Pata (Betel Leaf)</h3>
+          <p>Central to 'Shubho Drishti' (the auspicious first glance), where the bride holds betel leaves in front of her eyes before revealing her face to the groom.</p>
+        </div>
+        <div class="motif-box">
+          <h3>🐚 Shankha & Pola</h3>
+          <p>The timeless wedding bangles: the white Shankha carved from conch shells and red Pola from red coral, signifying good health, love, and marital prosperity.</p>
+        </div>
+        <div class="motif-box">
+          <h3>✨ Alpana & Chandan Kalka</h3>
+          <p>Sacred ritual folk art painted with rice flour and chandan paste on the floor, wedding mandap, and the bride's forehead for divine blessing.</p>
+        </div>
+      </div>
+
+      <!-- Color Palette -->
+      <div style="margin-top: 40px; text-align: center;">
+        <h4 style="color: #fae08c; font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;">Wedding Royal Color Palette</h4>
+        <div class="palette-container">
+          <div class="swatch"><div class="swatch-color" style="background: #4d050c;"></div> Royal Maroon</div>
+          <div class="swatch"><div class="swatch-color" style="background: #c01e2e;"></div> Alta / Sindoor Red</div>
+          <div class="swatch"><div class="swatch-color" style="background: #dfaa44;"></div> Antique Zari Gold</div>
+          <div class="swatch"><div class="swatch-color" style="background: #faf5e8;"></div> Shola Pith White</div>
+          <div class="swatch"><div class="swatch-color" style="background: #fce7b2;"></div> Haldi Yellow</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

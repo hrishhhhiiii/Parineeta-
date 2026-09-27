@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>07 Studio</title><link rel="stylesheet" href="concept.css">
+<style>
+.frame { display: grid; grid-template-columns: 1fr 520px; column-gap: 80px; padding: 0 var(--pad); align-items: center; }
+.desk { position: relative; height: 900px; background: var(--paper-2); margin-left: calc(var(--pad) * -1); }
+.card { position: absolute; left: 190px; top: 110px; width: 420px; height: 588px; background: #6d0b16; border-radius: 3px; box-shadow: 0 30px 60px -24px rgba(42, 10, 15, 0.55), 0 6px 14px -6px rgba(42, 10, 15, 0.4); padding: 18px; transform: rotate(-3deg); }
+.card__in { height: 100%; border: 1.5px solid #d9a441; outline: 1px solid rgba(217, 164, 65, 0.5); outline-offset: -8px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #f7e7c6; }
+.card .bn { font-size: 46px; color: #f0c565; line-height: 1.3; }
+.card .en { font-size: 11px; letter-spacing: 0.3em; color: #e8c983; margin-bottom: 26px; }
+.card .intro { font-family: var(--display); font-style: italic; font-size: 16px; color: #e8c983; }
+.card .name { font-family: var(--display); font-style: italic; font-size: 56px; line-height: 1.05; }
+.card .amp { font-family: var(--display); font-size: 26px; color: #f0c565; }
+.card .date { margin-top: 26px; font-family: var(--display); font-weight: 600; font-size: 19px; }
+.card .place { font-size: 12px; color: #e8c983; margin-top: 4px; }
+.alp { position: absolute; left: 560px; top: 470px; width: 300px; height: 300px; border-radius: 50%; background: #3a0a12; box-shadow: 0 30px 60px -24px rgba(42, 10, 15, 0.6); transform: rotate(6deg); display: grid; place-items: center; }
+.tabs { position: absolute; left: 96px; bottom: 70px; display: flex; gap: 12px; }
+.tabs span { font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line-paper); color: var(--paper-ink-2); }
+.tabs span.on { background: var(--paper-ink); color: var(--paper); border-color: var(--paper-ink); }
+.h2 { font-size: 70px; }
+.lede { margin-top: 24px; }
+.tools { margin-top: 40px; border-top: 1px solid var(--line-paper); }
+.tools div { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 0; border-bottom: 1px solid var(--line-paper); }
+.tools b { font-family: var(--display); font-weight: 600; font-size: 24px; }
+.tools span { font-size: 14px; color: var(--paper-ink-2); }
+.act { margin-top: 36px; display: flex; gap: 26px; align-items: center; }
+</style></head>
+<body><div class="frame paper grain">
+  <div class="desk">
+    <div class="card"><div class="card__in">
+      <span class="bn">শুভ বিবাহ</span><span class="en">SHUBHO BIBAHO</span>
+      <span class="intro">Together with their families</span>
+      <span class="name">Riya</span><span class="amp">&amp;</span><span class="name">Arjun</span>
+      <span class="date">Monday, 4 January 2027</span><span class="place">7:00 pm onwards · Rajbari Hall, Katwa</span>
+    </div></div>
+    <div class="alp"><svg width="250" height="250" viewBox="-100 -100 200 200" fill="none" stroke="#f6eddb" stroke-width="2.4" stroke-linecap="round">
+      <circle r="92" stroke="#d9a441" stroke-width="1.5"/><circle r="12" fill="#e4434f" stroke="none"/>
+      <g id="p"><path d="M0-18 C14-34 14-58 0-76 C-14-58-14-34 0-18Z"/><path d="M0-40 C8-46 8-56 0-62 C-8-56-8-46 0-40Z" fill="#e4434f" stroke="none"/><circle cy="-86" r="3" fill="#d9a441" stroke="none"/></g>
+      <use href="#p" transform="rotate(45)"/><use href="#p" transform="rotate(90)"/><use href="#p" transform="rotate(135)"/><use href="#p" transform="rotate(180)"/><use href="#p" transform="rotate(225)"/><use href="#p" transform="rotate(270)"/><use href="#p" transform="rotate(315)"/>
+    </svg></div>
+    <div class="tabs"><span class="on">Invitation card</span><span>Alpana</span><span>Save the date</span></div>
+  </div>
+  <div>
+    <h2 class="h2">Make it yours, <em>before we paint it.</em></h2>
+    <p class="lede">Type your names and download a Bengali invitation for free, or draw an alpana and watch it repeat around the circle.</p>
+    <div class="tools">
+      <div><b>Invitation studio</b><span>Six looks · free PNG</span></div>
+      <div><b>Alpana studio</b><span>6, 8 or 12-fold symmetry</span></div>
+    </div>
+    <div class="act">
+      <a class="btn btn--ink">Design your card</a>
+      <a class="link">Ask us to print it<svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
+    </div>
+  </div>
+</div></body></html>

@@ -1,0 +1,28 @@
+# Node & Build artifacts
+node_modules/
+*/node_modules/
+dist/
+*/dist/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Large client media & zip archives (>100MB will be rejected by GitHub)
+client real image/
+*.zip
+
+# Backup snapshots
+_snapshots/
+
+# Editor & AI tool metadata
+.claude/
+.vscode/
+.idea/
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.log

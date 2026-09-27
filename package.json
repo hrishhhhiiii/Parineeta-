@@ -1,0 +1,9 @@
+{
+  "name": "parineeta-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix website run dev",
+    "build": "npm --prefix website run build",
+    "preview": "npm --prefix website run preview"
+  }
+}
