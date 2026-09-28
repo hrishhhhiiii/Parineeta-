@@ -1,3 +1,10 @@
+# This repository publishes only the website. Everything else in this folder
+# (brand kit, logo concepts, design files, scripts) stays on this computer, untracked.
+/*
+!/.gitignore
+!/netlify.toml
+!/website/
+
 # Node & Build artifacts
 node_modules/
 */node_modules/
