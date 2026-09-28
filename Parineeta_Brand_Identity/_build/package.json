@@ -1,9 +1,0 @@
-{
-  "name": "parineeta-brand-build",
-  "version": "1.0.0",
-  "description": "Parineeta brand identity SVG to PNG rendering",
-  "main": "build_all.py",
-  "dependencies": {
-    "@resvg/resvg-js": "^2.4.1"
-  }
-}

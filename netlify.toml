@@ -1,0 +1,9 @@
+# Netlify reads this file at the repository root. The site's code lives in website/frontend.
+# Redirects and headers come from website/frontend/public/_redirects and _headers, copied into dist.
+[build]
+  base = "website/frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
