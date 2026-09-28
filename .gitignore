@@ -2,6 +2,7 @@
 # (brand kit, logo concepts, design files, scripts) stays on this computer, untracked.
 /*
 !/.gitignore
+!/.github/
 !/netlify.toml
 !/website/
 
