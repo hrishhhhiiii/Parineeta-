@@ -2,3 +2,8 @@
 .env.local
 node_modules
 dist
+frontend/src/data/published.json
+frontend/public/media/photos/cms/
+.env.*
+!.env.example
+*.pem

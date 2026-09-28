@@ -1,0 +1,102 @@
+# Builds the static site with the latest published admin content and deploys it.
+# Triggers: the admin's Publish (repository_dispatch), a code push to main, a daily keep-alive, or by hand.
+name: publish
+
+on:
+  repository_dispatch:
+    types: [cms-publish]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.event.client_payload.target || 'production' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Ping Supabase so the free project doesn't pause
+        run: curl -fsS "${{ vars.SUPABASE_URL }}/rest/v1/published_content?select=key&limit=1" -H "apikey: ${{ vars.SUPABASE_ANON_KEY }}" > /dev/null
+
+  build-deploy:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ github.event.client_payload.target || 'production' }}
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      JOB_ID: ${{ github.event.client_payload.job_id }}
+      JOB_SECRET: ${{ github.event.client_payload.secret }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      VITE_SITE_URL: ${{ vars.SITE_URL }}
+      VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      VITE_ENQUIRY_URL: ${{ vars.ENQUIRY_URL }}
+      DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET || 'cloudflare' }}
+    steps:
+      - name: Mask the job secret
+        if: env.JOB_SECRET != ''
+        run: echo "::add-mask::$JOB_SECRET"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.client_payload.target == 'staging' && 'staging' || 'main' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: node scripts/mark-job.mjs building
+      - run: npm ci
+        working-directory: frontend
+      - run: node scripts/fetch-content.mjs
+      - run: npm run build
+        working-directory: frontend
+
+      - name: Deploy to Cloudflare Pages
+        if: env.DEPLOY_TARGET == 'cloudflare'
+        id: cf
+        working-directory: frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          out=$(npx --yes wrangler@3 pages deploy dist --project-name "${{ vars.CF_PROJECT }}" --branch "${{ github.event.client_payload.target == 'staging' && 'staging' || 'main' }}" 2>&1 | tee /dev/stderr)
+          echo "url=$(echo "$out" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | tail -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy over SFTP (Hostinger or any shared host)
+        if: env.DEPLOY_TARGET == 'sftp'
+        env:
+          SSH_KEY: ${{ secrets.SFTP_KEY }}
+          HOST: ${{ vars.SFTP_HOST }}
+          PORT: ${{ vars.SFTP_PORT || '22' }}
+          USER: ${{ vars.SFTP_USER }}
+          DIR: ${{ vars.SFTP_DIR }}
+        run: |
+          install -m 600 /dev/null ~/key && printf '%s\n' "$SSH_KEY" > ~/key
+          ssh_="ssh -i $HOME/key -p $PORT -o StrictHostKeyChecking=accept-new $USER@$HOST"
+          $ssh_ "rm -rf '$DIR.next' && mkdir -p '$DIR.next'"
+          rsync -az --delete -e "ssh -i $HOME/key -p $PORT -o StrictHostKeyChecking=accept-new" frontend/dist/ "$USER@$HOST:$DIR.next/"
+          # Swap folders so visitors never see a half-uploaded site; $DIR.prev is the rollback.
+          $ssh_ "rm -rf '$DIR.prev'; if [ -e '$DIR' ]; then mv '$DIR' '$DIR.prev'; fi; mv '$DIR.next' '$DIR'"
+
+      - name: Mark live
+        env:
+          DEPLOY_URL: ${{ steps.cf.outputs.url || vars.SITE_URL }}
+        run: node scripts/mark-job.mjs live
+
+      - name: Mark failed
+        if: failure()
+        run: node scripts/mark-job.mjs failed "The site update failed at step '${{ github.job }}'. Open the run log for details."
