@@ -6,6 +6,8 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const env = {
+  // Nothing published yet → build with the built-in content. A failed or broken fetch still stops the build.
+  CMS_ALLOW_EMPTY: '1',
   ...process.env,
   SUPABASE_URL: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
