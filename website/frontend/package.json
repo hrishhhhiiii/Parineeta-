@@ -17,6 +17,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@clerk/clerk-js": "^6.34.1",
+    "@clerk/ui": "^1.36.0",
     "@phosphor-icons/core": "^2.1.1",
     "@supabase/supabase-js": "^2.117.2",
     "gsap": "^3.15.0",

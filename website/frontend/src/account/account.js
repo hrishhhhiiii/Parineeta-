@@ -1,4 +1,4 @@
-// /track#<token>: one enquiry, no sign-in. /account: optional email sign-in listing all your enquiries.
+// /track#<token>: one enquiry, no sign-in. /account: signed-in customers see all their enquiries (sign-in is on /login).
 import './account.css';
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL;
@@ -37,7 +37,7 @@ function enquiryCard(e) {
     e.items?.length ? h('ul', { class: 'items' }, ...e.items.map((i) => h('li', { text: i }))) : null);
 }
 
-/* ---------- data: plain fetch for tracking; supabase-js loads only for the account view ---------- */
+/* ---------- data: plain fetch for tracking; Clerk and supabase-js load only for the account view ---------- */
 const demoEnquiry = { createdAt: new Date().toISOString(), eventDate: '2026-12-02', items: ['Shola mukut (sindoor)'], status: 'painting', statusNote: 'Your crown is being painted. Ready by 20 Nov.' };
 
 async function trackEnquiry(token) {
@@ -51,21 +51,21 @@ async function trackEnquiry(token) {
   return res.json();
 }
 
-function demoClient() {
-  let user = null;
-  return {
-    auth: {
-      getSession: async () => ({ data: { session: user ? { user } : null } }),
-      signInWithOtp: async ({ email }) => { user = { email }; setTimeout(showAccount, 800); return { error: null }; },
-      signOut: async () => { user = null; },
-    },
-    rpc: async (fn) => ({ data: fn === 'my_enquiries' ? [demoEnquiry] : fn === 'admin_role' ? null : true, error: null }),
-  };
+const demoSession = () => ({
+  user: { email: 'riya@example.com', name: 'Riya' },
+  sb: { rpc: async (fn) => ({ data: fn === 'my_enquiries' ? [demoEnquiry] : fn === 'admin_role' ? null : true, error: null }) },
+  deleteUser: async () => {},
+});
+
+/** The signed-in person and a Supabase client acting as them, or null. Clerk loads only for this view. */
+async function connect() {
+  if (DEMO) return demoSession();
+  const { configured, getClerk, getSupabase, userOf } = await import('../auth/client.js');
+  if (!configured) return null;
+  const clerk = await getClerk();
+  if (!clerk.user) return null;
+  return { clerk, user: userOf(clerk.user), sb: await getSupabase(), deleteUser: () => clerk.user.delete() };
 }
-let sbPromise;
-const client = () => (sbPromise ??= DEMO
-  ? Promise.resolve(demoClient())
-  : import('@supabase/supabase-js').then(({ createClient }) => createClient(URL_, KEY, { auth: { flowType: 'pkce', detectSessionInUrl: true } })));
 
 /* ---------- /track#token ---------- */
 async function showTrack(token) {
@@ -86,60 +86,44 @@ async function showTrack(token) {
 }
 
 /* ---------- /account ---------- */
-function showSignIn(message = '') {
-  const email = h('input', { type: 'email', required: true, autocomplete: 'email', placeholder: 'you@example.com…', spellcheck: 'false', autocapitalize: 'none', name: 'email', 'aria-label': 'Email' });
-  const msg = h('p', { class: 'msg', role: 'status', text: message });
-  const btn = h('button', { type: 'submit', text: 'Email me a sign-in link' });
-  const form = h('form', { class: 'card' }, h('div', { class: 'row' }, email, btn), msg);
-  form.addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-    btn.disabled = true;
-    msg.className = 'msg';
-    msg.textContent = 'Sending…';
-    const sb = await client();
-    const { error } = await sb.auth.signInWithOtp({ email: email.value.trim(), options: { emailRedirectTo: `${location.origin}/account` } });
-    btn.disabled = false;
-    if (error) {
-      msg.className = 'msg is-err';
-      msg.textContent = /rate/i.test(error.message) ? 'Too many tries. Please wait a few minutes.' : 'Could not send the link. Check the address and try again.';
-      return;
-    }
-    msg.textContent = `Check ${email.value.trim()} for a sign-in link.`;
-  });
-  app.replaceChildren(h('h1', { text: 'My enquiries' }),
-    h('p', { class: 'muted', text: 'An account is optional. Sign in with just your email, no password, to see every enquiry you sent with it and how it is going.' }),
-    form, back());
-}
-
 async function showAccount() {
-  const sb = await client();
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return DEMO ? showSignIn() : location.replace('/login.html');
+  const me = await connect();
+  if (!me) return location.replace('/login.html?signin');
+  const { sb } = me;
   const claim = sessionStorage.getItem('claim');
   if (claim) {
     sessionStorage.removeItem('claim');
     await sb.rpc('claim_enquiry', { p_token: claim });
   }
   const [{ data: list, error }, { data: role }] = await Promise.all([sb.rpc('my_enquiries'), sb.rpc('admin_role')]);
-  const out = h('button', { class: 'ghost', type: 'button', text: 'Sign out' });
-  out.addEventListener('click', async () => { await sb.auth.signOut(); DEMO ? showSignIn('Signed out.') : location.replace('/login.html?signout'); });
+  // Clerk's UserButton (Manage account, Sign out) when signed in for real; a plain button in demo mode.
+  const out = me.clerk ? h('div', { class: 'user-btn' }) : h('button', { class: 'ghost', type: 'button', text: 'Sign out', onclick: () => location.replace('/login.html?signout') });
+  const settings = me.clerk ? h('div', { class: 'clerk-profile' }) : null;
   const del = h('button', { class: 'ghost', type: 'button', text: 'Delete my account' });
   del.addEventListener('click', async () => {
     if (!confirm('Delete your account and its enquiries? This cannot be undone.')) return;
     const { error: e } = await sb.rpc('delete_my_account');
     if (e) return alert('Could not delete the account. Please message us and we will do it.');
-    await sb.auth.signOut();
-    DEMO ? showSignIn('Your account was deleted.') : location.replace('/login.html?signout');
+    try { await me.deleteUser(); } catch {
+      return alert('Your enquiries were deleted, but the login could not be removed. Please message us and we will finish it.');
+    }
+    location.replace('/login.html?signout');
   });
   app.replaceChildren(
     h('div', { class: 'top' }, h('h1', { text: 'My orders and enquiries' }), out),
-    h('p', { class: 'muted', text: `Signed in as ${session.user.email}` }),
-    role ? h('p', {}, h('a', { href: '/admin.html', text: role === 'owner' ? 'Open the admin panel →' : 'Open the editor panel →' })) : null,
+    h('p', { class: 'muted', text: `Signed in as ${me.user.email}` }),
+    role ? h('p', {}, h('a', { href: '/admin.html', text: role === 'owner' ? 'Open the admin panel →' : 'Open the editor panel →' })) : '',
     ...[error ? h('p', { class: 'msg is-err', text: 'Could not load your enquiries. Please try again later.' })
       : list?.length ? list.map(enquiryCard)
       : h('div', { class: 'card' }, h('p', { text: 'No enquiries yet for this email.' }),
           h('p', { class: 'muted', text: 'Sent one by WhatsApp without an email? Open its tracking link and press “Save it to an account”.' }))].flat(),
+    settings ? h('h2', { class: 'acc-h2', text: 'Account settings' }) : '',
+    settings || '',
     back(), h('p', {}, del));
+  if (me.clerk) {
+    me.clerk.mountUserButton(out, { customMenuItems: [{ label: 'manageAccount' }, { label: 'signOut' }] });
+    me.clerk.mountUserProfile(settings, { routing: 'hash' });
+  }
 }
 
 if (!DEMO && (!URL_ || !KEY)) {

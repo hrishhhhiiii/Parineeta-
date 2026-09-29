@@ -1,10 +1,9 @@
 import './admin.css';
-import { createClient } from '@supabase/supabase-js';
+import { configured, getClerk, getSupabase, userOf } from '../auth/client.js';
 import { SECTIONS, FILM_OPTIONS } from './schemas.js';
 import { photoSrc } from '../data/site.js';
+import { avatar, profileOf } from '../auth/profile.js';
 
-const URL_ = import.meta.env.VITE_SUPABASE_URL;
-const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const root = document.getElementById('app');
 
 /* ---------- tiny DOM helper ---------- */
@@ -51,6 +50,9 @@ function demoClient() {
   const jobs = [];
   const demoEnquiries = [{ id: 'demo-1', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '+91 98300 00000', email: 'riya@example.com', event_date: '2026-12-02', place: 'Kolkata', items: ['Shola mukut (sindoor)'], note: 'Can you add our names?', status: 'new', status_note: null }];
   const user = { email: 'demo@localhost' };
+  const demoOrders = [{ ref: 'PRN-260929-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi', total: 1450, paid_now: 725, utr: '426512345678',
+    items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], address: 'Patuli, Kolkata', status: 'placed', paid_amount: null, paid_at: null, paid_by: null,
+    sent: [{ at: new Date().toISOString(), kind: 'placed', to: 'customer', channel: 'email', ok: true }, { at: new Date().toISOString(), kind: 'placed', to: 'customer', channel: 'whatsapp', ok: false, error: 'WhatsApp 400: template not approved' }] }];
   const rpcs = {
     get_heads: () => [...heads.values()],
     admin_role: () => 'owner',
@@ -72,29 +74,34 @@ function demoClient() {
     list_revisions: () => [],
     set_enquiry_status: ({ p_id, p_status, p_note }) => Object.assign(demoEnquiries.find((e) => e.id === p_id), { status: p_status, status_note: p_note }),
     delete_enquiry: ({ p_id }) => demoEnquiries.splice(demoEnquiries.findIndex((e) => e.id === p_id), 1),
+    list_orders: () => demoOrders,
   };
   return {
-    auth: {
-      getSession: async () => ({ data: { session: { user } } }),
-      onAuthStateChange: () => {},
-      signOut: async () => location.reload(),
-    },
     rpc: async (name, args) => {
       try { return { data: rpcs[name](args || {}), error: null }; } catch (error) { return { data: null, error }; }
     },
     from: (t) => ({ select: () => ({ order: () => ({ limit: async () => ({ data: t === 'enquiries' ? demoEnquiries : jobs.slice(0, 1), error: null }) }) }) }),
     storage: { from: () => ({ upload: async () => ({ error: new Error('uploads are off in demo mode') }) }) },
+    functions: { invoke: async (_name, { body }) => {
+      const o = demoOrders.find((x) => x.ref === body.ref);
+      if (!body.resend) Object.assign(o, { status: 'paid', paid_amount: body.amount, paid_at: new Date().toISOString(), paid_by: user.email });
+      const at = new Date().toISOString();
+      const sent = ['customer', 'shop'].flatMap((to) => ['email', 'whatsapp'].map((channel) => ({ at, kind: o.status, to, channel, ok: true })));
+      return { data: { status: o.status, paid_amount: o.paid_amount, paid_at: o.paid_at, sent }, error: null };
+    } },
   };
 }
 
 /* ---------- not configured ---------- */
-if (!DEMO && (!URL_ || !KEY)) {
+if (!DEMO && !configured) {
   root.replaceChildren(h('main', { class: 'card card--narrow' },
     h('h1', { text: 'Admin not connected yet' }),
-    h('p', { text: 'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to website/.env (and to the Vercel project settings), then reload. See ADMIN-SETUP.md.' })));
+    h('p', { text: 'Add VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and VITE_CLERK_PUBLISHABLE_KEY to website/frontend/.env (and to the Vercel project settings), then reload. See ADMIN-SETUP.md.' })));
 }
 
-const sb = DEMO ? demoClient() : URL_ && KEY ? createClient(URL_, KEY) : null;
+// Set in start(): the demo store, or a Supabase client that acts as the signed-in Clerk user.
+let sb = DEMO ? demoClient() : null;
+let clerk = null; // set in start(); null in demo mode
 
 /* ---------- state ---------- */
 const ctx = {
@@ -118,7 +125,7 @@ window.addEventListener('beforeunload', (e) => {
   if (ctx.user && anyDirty()) e.preventDefault();
 });
 
-/* ---------- auth: the shared sign-in page at /login.html handles sign-in and passwords ---------- */
+/* ---------- auth: the shared sign-in page at /login.html (Clerk) handles sign-in, sign-out and passwords ---------- */
 const toLogin = (q = '') => location.replace(`/login.html${q}`);
 
 /* ---------- data ---------- */
@@ -565,9 +572,96 @@ function inboxView() {
     h('p', { class: 'muted', text: 'Enquiries sent from the website. Change the status as the order progresses: the customer sees it on their tracking page. Enquiries are deleted automatically after 18 months.' }))), body);
 }
 
+/* ---------- orders and payment receipts (owner) ---------- */
+const ORDERS = '__orders';
+const METHOD = { upi: 'UPI', bank: 'Bank transfer', gateway: 'Payment page', later: 'Pay at shop / on delivery' };
+const rupees = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
+
+/** "Customer: email ✓, whatsapp ✗ · Shop: email ✓" for the latest receipt that went out. */
+function sentLine(sent = []) {
+  if (!sent.length) return 'No receipt sent yet.';
+  const last = sent.at(-1).at;
+  const batch = sent.filter((s) => s.at === last);
+  const part = (to) => {
+    const xs = batch.filter((s) => s.to === to);
+    return xs.length ? `${to === 'customer' ? 'Customer' : 'Shop'}: ${xs.map((s) => `${s.channel} ${s.ok ? '✓' : '✗'}`).join(', ')}` : '';
+  };
+  const failed = batch.filter((s) => !s.ok).map((s) => s.error).filter(Boolean);
+  return `${batch[0].kind === 'paid' ? 'Payment receipt' : 'Order receipt'} sent ${new Date(last).toLocaleString()}. ${[part('customer'), part('shop')].filter(Boolean).join(' · ')}${failed.length ? ` (${failed[0]})` : ''}`;
+}
+
+async function confirmPayment(body) {
+  const { data, error } = await sb.functions.invoke('confirm-payment', { body });
+  if (!error) return data;
+  const detail = await error.context?.json?.().catch(() => null);
+  throw new Error(detail?.error || error.message);
+}
+
+function ordersView() {
+  const body = h('div', {}, h('p', { class: 'loading', text: 'Loading orders…' }));
+  let filter = 'placed';
+  let rows = [];
+  const paint = () => {
+    const list = rows.filter((o) => filter === 'all' || o.status === filter);
+    body.replaceChildren(
+      h('div', { class: 'inbox__tools' },
+        h('select', { class: 'input', 'aria-label': 'Show', onchange: (e) => { filter = e.target.value; paint(); } },
+          ...[['placed', 'Awaiting payment confirmation'], ['paid', 'Paid'], ['all', 'All orders']].map(([v, t]) => h('option', { value: v, text: t, selected: v === filter })))),
+      list.length ? h('div', { class: 'inbox' }, ...list.map(orderCard)) : h('p', { class: 'muted', text: 'No orders here.' }));
+  };
+  const orderCard = (o) => {
+    const digits = String(o.phone || '').replace(/[^\d]/g, '');
+    const apply = (data) => {
+      Object.assign(o, { status: data.status, paid_amount: data.paid_amount, paid_at: data.paid_at, sent: [...(o.sent || []), ...data.sent] });
+      const failed = data.sent.filter((s) => !s.ok).length;
+      if (!data.sent.length) toast('Saved. No receipt was sent: email and WhatsApp are not set up yet.', 'err');
+      else if (failed) toast(`Saved, but ${failed} of ${data.sent.length} receipt messages failed. See the order for details.`, 'err');
+      else toast('Receipt sent to the customer and the shop.');
+      paint();
+    };
+    let actions;
+    if (o.status === 'placed') {
+      const amount = h('input', { class: 'input', type: 'number', min: 1, step: 1, value: o.paid_now || o.total, 'aria-label': `Amount received for ${o.ref}` });
+      const btn = h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: 'Mark as paid and send receipt', onclick: async () => {
+        const amt = Math.round(Number(amount.value));
+        if (!(amt > 0)) return toast('Enter the amount you received.', 'err');
+        if (!confirm(`Only continue if ${rupees(amt)} is in your bank account.\n\nMark ${o.ref} as paid and send the payment receipt to ${o.name} and the shop?`)) return;
+        btn.disabled = true;
+        try { apply(await confirmPayment({ ref: o.ref, amount: amt })); } catch (err) { toast(err.message, 'err'); btn.disabled = false; }
+      } });
+      actions = h('div', { class: 'row' }, h('span', { class: 'muted', text: 'Received ₹' }), amount, btn);
+    } else {
+      const again = h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Send receipt again', onclick: async () => {
+        again.disabled = true;
+        try { apply(await confirmPayment({ ref: o.ref, resend: true })); } catch (err) { toast(err.message, 'err'); again.disabled = false; }
+      } });
+      actions = h('div', { class: 'row' }, h('strong', { text: `Paid ${rupees(o.paid_amount)} on ${new Date(o.paid_at).toLocaleDateString()}` }), o.paid_by ? h('span', { class: 'muted', text: `by ${o.paid_by}` }) : null, again);
+    }
+    return h('article', { class: 'card inbox__item' },
+      h('div', { class: 'inbox__head' }, h('strong', { text: `${o.ref} · ${o.name}` }), h('span', { class: 'muted', text: new Date(o.created_at).toLocaleString() })),
+      h('p', {}, ...[
+        o.phone ? h('a', { href: `tel:${o.phone}`, text: o.phone }) : null,
+        digits.length >= 10 ? h('a', { href: `https://wa.me/${digits.length === 10 ? `91${digits}` : digits}`, target: '_blank', rel: 'noopener', text: 'WhatsApp' }) : null,
+        o.email ? h('a', { href: `mailto:${o.email}`, text: o.email }) : null,
+      ].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
+      h('ul', {}, ...(o.items || []).map((i) => h('li', { text: `${i.qty} × ${i.title}${i.detail ? ` (${i.detail})` : ''}: ${rupees(i.amount)}` }))),
+      h('p', { text: `Total ${rupees(o.total)} · Customer says they paid ${o.method === 'later' ? 'nothing yet' : rupees(o.paid_now)} by ${METHOD[o.method] || o.method}${o.utr ? ` · UTR ${o.utr}` : ''}` }),
+      o.address ? h('p', { class: 'muted', text: `Deliver to: ${o.address}` }) : null,
+      actions,
+      h('p', { class: 'muted', text: sentLine(o.sent) }));
+  };
+  sb.rpc('list_orders').then(({ data, error }) => {
+    if (error) return body.replaceChildren(h('p', { class: 'form-msg', text: `Could not load orders: ${explain(error)}` }));
+    rows = data || [];
+    paint();
+  });
+  return h('div', {}, h('div', { class: 'sec-head' }, h('div', {}, h('h1', { text: 'Orders' }),
+    h('p', { class: 'muted', text: 'Orders placed at checkout. When the money is in your bank account, press Mark as paid: the customer and the shop get a payment receipt by email and WhatsApp.' }))), body);
+}
+
 /* ---------- layout ---------- */
 function render() {
-  if (ctx.section === INBOX && ctx.role !== 'owner') ctx.section = SECTIONS[0].key;
+  if ((ctx.section === INBOX || ctx.section === ORDERS) && ctx.role !== 'owner') ctx.section = SECTIONS[0].key;
   const section = SECTIONS.find((s) => s.key === ctx.section);
   const nav = h('nav', { class: 'side', 'aria-label': 'Sections' },
     ...SECTIONS.map((s) => h('button', {
@@ -577,17 +671,27 @@ function render() {
     ctx.role === 'owner' ? h('button', {
       type: 'button', class: `side__btn side__btn--inbox${ctx.section === INBOX ? ' is-active' : ''}`, 'aria-current': ctx.section === INBOX ? 'page' : null,
       onclick: () => { ctx.section = INBOX; render(); },
-    }, h('span', { 'aria-hidden': 'true', text: '📥' }), h('span', { text: 'Enquiries' })) : null);
+    }, h('span', { 'aria-hidden': 'true', text: '📥' }), h('span', { text: 'Enquiries' })) : null,
+    ctx.role === 'owner' ? h('button', {
+      type: 'button', class: `side__btn side__btn--inbox${ctx.section === ORDERS ? ' is-active' : ''}`, 'aria-current': ctx.section === ORDERS ? 'page' : null,
+      onclick: () => { ctx.section = ORDERS; render(); },
+    }, h('span', { 'aria-hidden': 'true', text: '🧾' }), h('span', { text: 'Orders' })) : null);
 
+  // Clerk's UserButton: Manage account and Sign out (the browser warns first if there are unsaved changes).
+  const userBtn = clerk ? h('div', { class: 'top__user' }) : null;
   const top = h('header', { class: 'top' },
     h('div', { class: 'top__brand' }, h('strong', { text: 'Parineeta' }), h('span', { text: ctx.role === 'owner' ? 'Admin panel' : 'Editor panel' })),
     h('div', { class: 'top__right' },
       h('div', { class: 'pub', id: 'publishbar' }),
       h('a', { class: 'btn btn--ghost btn--sm', href: '/', target: '_blank', rel: 'noopener', text: 'View website ↗' }),
-      h('span', { class: 'top__user', text: ctx.user.email }),
-      h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) { await sb.auth.signOut(); toLogin(); } } })));
+      clerk ? userBtn : h('span', { class: 'top__user', title: ctx.user.email }, avatar(ctx.user, 30), h('span', { class: 'top__name', text: profileOf(ctx.user).name || ctx.user.email })),
+      clerk ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) toLogin('?signout'); } })));
 
-  root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === INBOX ? inboxView() : sectionView(section))));
+  root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === INBOX ? inboxView() : ctx.section === ORDERS ? ordersView() : sectionView(section))));
+  if (clerk) {
+    if (ctx.userBtn) clerk.unmountUserButton(ctx.userBtn);
+    clerk.mountUserButton((ctx.userBtn = userBtn), { showName: true });
+  }
   paintPublishBar();
   if (ctx.recovered) {
     ctx.recovered = false;
@@ -708,11 +812,18 @@ let starting = false;
 async function start() {
   if (starting) return;
   starting = true;
-  const { data: { session } } = await sb.auth.getSession();
+  let user = { email: 'demo@localhost' };
+  if (!DEMO) {
+    clerk = await getClerk();
+    user = userOf(clerk.user);
+    if (user) sb = await getSupabase();
+    // Signing out in another tab closes this one's session too.
+    clerk.addListener(({ user: now }) => { if (!now && ctx.user) toLogin(); });
+  }
   starting = false;
-  if (!session) return toLogin('?signin');
+  if (!user) return toLogin('?signin');
   if (ctx.user && root.querySelector('.shell')) return;
-  ctx.user = session.user;
+  ctx.user = user;
   // Customers who open /admin go to their own page instead.
   const { data: role } = await sb.rpc('admin_role');
   if (!role) return location.replace('/account.html');
@@ -726,7 +837,4 @@ async function start() {
   }
 }
 
-sb?.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') toLogin();
-});
-if (sb) start();
+if (DEMO || configured) start();

@@ -66,3 +66,14 @@ test('social links must be https on the platform domain', () => {
   assert.equal(socialUrlOk('instagram', 'https://instagram.com.evil.net/x'), false);
   assert.equal(socialUrlOk('facebook', 'https://www.instagram.com/x'), false);
 });
+
+import { mergeCarts } from '../frontend/src/ui/store.js';
+
+test('mergeCarts keeps every item once, larger quantity wins, wishlists combine', () => {
+  const laptop = { cart: [{ key: 'topor|||', id: 'topor', qty: 2 }, { key: 'kunke|||', id: 'kunke', qty: 1 }], wish: ['topor'] };
+  const phone = { cart: [{ key: 'topor|||', id: 'topor', qty: 3 }, { key: 'darpan|||', id: 'darpan', qty: 1 }], wish: ['darpan', 'topor'] };
+  const m = mergeCarts(laptop, phone);
+  assert.deepEqual(m.cart.map((l) => `${l.id}:${l.qty}`).sort(), ['darpan:1', 'kunke:1', 'topor:3']);
+  assert.deepEqual(m.wish.sort(), ['darpan', 'topor']);
+  assert.deepEqual(mergeCarts({ cart: [], wish: [] }, {}), { cart: [], wish: [] });
+});

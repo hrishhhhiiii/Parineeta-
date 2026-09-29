@@ -4,9 +4,12 @@ import { h, icon, inr, $ } from './dom.js';
 import { openDialog, closeDialog } from './dialogs.js';
 import { postForm } from './enquiry.js';
 import { toast } from './toast.js';
+import { downloadReceipt, shareReceipt, canShareFiles } from './receipt.js';
 
 const dialog = () => $('#checkout-dialog');
-let ctx = { lines: [], fromCart: false, ref: '' };
+// Saves the order and emails/WhatsApps the receipt to the customer and the shop (backend/functions/place-order).
+const ORDER_URL = import.meta.env.VITE_ORDER_URL;
+let ctx = { lines: [], fromCart: false, ref: '', receipt: null };
 
 const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
 
@@ -166,7 +169,45 @@ function orderMessage(v) {
   return out.join('\n');
 }
 
+function receiptData(v) {
+  const id = dialog().querySelector('input[name="co-method"]:checked')?.value || 'later';
+  const full = dialog().querySelector('input[name="co-amount"]:checked')?.value === 'full';
+  const b = PAYMENTS.bank;
+  const payTo = { upi: `UPI ${PAYMENTS.upi.id}`, bank: `${b.accountName}, account ending ${b.accountNumber.slice(-4)}`, gateway: 'Online payment page' }[id];
+  return {
+    ref: ctx.ref, date: new Date().toISOString(), name: v.name, phone: v.phone, email: v.email, eventDate: v.date, address: v.address,
+    items: ctx.lines.map((l) => {
+      const { p, total: t, styleLabel, comboLabel } = lineInfo(l);
+      return { title: p.en, qty: l.qty, amount: t, detail: [styleLabel, comboLabel, l.custom ? `Personalise: “${l.custom}”` : ''].filter(Boolean).join(', ') };
+    }),
+    total: total(), paidNow: amountNow(), plan: full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`,
+    method: { id, label: methods().find((m) => m.id === id)?.label || '' }, payTo, utr: v.utr,
+  };
+}
+
+async function saveOrder(r) {
+  const note = $('#co-receipt-note');
+  note.textContent = '';
+  if (!ORDER_URL) return;
+  const online = r.method.id !== 'later';
+  note.textContent = online ? 'Sending your receipt…' : '';
+  try {
+    const res = await fetch(ORDER_URL, { method: 'POST', body: JSON.stringify(r), keepalive: true, headers: { 'Content-Type': 'text/plain' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { token, receiptSent } = await res.json();
+    r.token = token;
+    const where = [r.email && `to ${r.email}`, r.phone && 'on WhatsApp'].filter(Boolean).join(' and ');
+    note.textContent = receiptSent
+      ? `Your receipt is on its way${where ? ` ${where}` : ''}. You get another one when we confirm your payment.`
+      : 'Your order is saved. We send you a receipt when your payment is confirmed.';
+  } catch {
+    note.textContent = online ? 'We could not send your receipt just now. Download it below and keep it safe.' : '';
+  }
+}
+
 function done(v) {
+  ctx.receipt = receiptData(v);
+  saveOrder(ctx.receipt);
   try {
     const orders = JSON.parse(localStorage.getItem('parineeta:orders') || '[]');
     orders.unshift({ ref: ctx.ref, date: new Date().toISOString(), lines: ctx.lines, amount: amountNow(), name: v.name });
@@ -217,4 +258,14 @@ export function setupCheckout() {
     }
   });
   $('#co-close').addEventListener('click', () => closeDialog(dialog()));
+  const receiptAction = (btn, fn, fail) => btn.addEventListener('click', async () => {
+    if (!ctx.receipt) return;
+    btn.disabled = true;
+    try { await fn(ctx.receipt); } catch (err) {
+      if (err?.name !== 'AbortError') toast(fail, { iconName: 'x' });
+    } finally { btn.disabled = false; }
+  });
+  receiptAction($('#co-receipt'), downloadReceipt, 'Could not make the receipt. Please take a screenshot instead.');
+  receiptAction($('#co-receipt-share'), shareReceipt, 'Could not share the receipt. Try Download receipt instead.');
+  $('#co-receipt-share').hidden = !canShareFiles();
 }
