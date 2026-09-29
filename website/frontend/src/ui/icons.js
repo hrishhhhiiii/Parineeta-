@@ -46,6 +46,7 @@ import brush from '@phosphor-icons/core/assets/light/paint-brush-light.svg?raw';
 import palette from '@phosphor-icons/core/assets/light/palette-light.svg?raw';
 import textAa from '@phosphor-icons/core/assets/light/text-aa-light.svg?raw';
 import linkSimple from '@phosphor-icons/core/assets/light/link-simple-light.svg?raw';
+import zoomIn from '@phosphor-icons/core/assets/light/magnifying-glass-plus-light.svg?raw';
 
 const ICONS = {
   'light:heart': heart,
@@ -57,6 +58,7 @@ const ICONS = {
   'light:list': list,
   'light:hand-grabbing': grab,
   'light:cube': cube,
+  'light:magnifying-glass-plus': zoomIn,
   'light:squares-four': squares,
   'light:caret-left': caretLeft,
   'light:caret-right': caretRight,

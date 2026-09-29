@@ -1,5 +1,5 @@
 import { PRODUCTS, SETS, STORY, PALETTES, CATEGORIES } from '../data/products.js';
-import { REVIEWS as FILM_REVIEWS, SITE, waLink, photoSrc } from '../data/site.js';
+import { REVIEWS as FILM_REVIEWS, SITE, waLink, photoSrc, photoSrcset, reelSrc, reelPoster } from '../data/site.js';
 import { reviewsFor, ratingSummary, myReviews, saveMyReview } from '../data/reviews.js';
 import { h, icon, inr } from './dom.js';
 import { store, lineInfo, MAX } from './store.js';
@@ -30,6 +30,7 @@ function ensureViewer() {
 
 export function stopProductPage() {
   viewer?.stop();
+  document.querySelector('.ppage__video')?.pause();
 }
 
 /* ---------------- small parts ---------------- */
@@ -55,11 +56,61 @@ function radio(name, value, checked, label, extra) {
     h('span', { class: 'opt__label', text: label }));
 }
 
-function mediaButton(p, ref, i) {
-  const m = describeMedia(ref);
-  return h('button', { type: 'button', class: 'ppage__thumb', 'aria-label': `${ref.type === 'reel' ? 'Play film' : 'View photo'}: ${m.title || p.en}`, onclick: () => openLightbox(p.media, i, { subject: p.en }) },
-    h('img', { src: m.thumb, alt: '', loading: 'lazy', width: 360, height: 640 }),
-    ref.type === 'reel' ? h('span', { class: 'pp__play' }, icon('play', 'fill')) : null);
+/* ---------------- media stage: the shop's real photos and films first, the 3D model last ---------------- */
+function mediaGallery(p) {
+  // Photos lead, then films; the 3D model is the final option (the only one when there is no real media).
+  const real = [...p.media.filter((m) => m.type === 'photo'), ...p.media.filter((m) => m.type === 'reel')];
+  const items = [...real, { type: '3d' }];
+  const stage = h('div', { class: 'ppage__viewer' });
+  const thumbs = h('div', { class: 'ppage__thumbs', role: 'group', 'aria-label': 'Photos and films' });
+  let active = -1;
+
+  const show = (i) => {
+    if (i === active) return;
+    active = i;
+    const it = items[i];
+    stage.querySelector('video')?.pause();
+    if (it.type !== '3d') viewer?.stop();
+    stage.classList.toggle('is-3d', it.type === '3d');
+
+    if (it.type === '3d') {
+      stage.replaceChildren(canvas, h('p', { class: 'stage-hint' }, icon('hand-grabbing'), h('span', { text: 'Drag to rotate' })));
+      ensureViewer().then((v) => {
+        if (cur.p !== p || items[active] !== it || !stage.isConnected) return;
+        v.show(p, cur.style);
+        v.start();
+      });
+    } else if (it.type === 'reel') {
+      const m = describeMedia(it);
+      stage.replaceChildren(h('video', {
+        class: 'ppage__video', src: reelSrc(it.id), poster: reelPoster(it.id), controls: true, playsinline: true, preload: 'metadata',
+        'aria-label': m.title || `${p.en}, film`,
+      }));
+    } else {
+      const m = describeMedia(it);
+      const src = photoSrc(it.id, 1600);
+      stage.replaceChildren(
+        h('img', { class: 'ppage__backdrop', src: photoSrc(it.id, 400), alt: '', 'aria-hidden': 'true' }),
+        h('button', { type: 'button', class: 'ppage__photo', 'aria-label': `Enlarge photo: ${m.title || p.en}`, onclick: () => openLightbox(real, real.indexOf(it), { subject: p.en }) },
+          h('img', { src, srcset: photoSrcset(it.id), sizes: '(max-width: 900px) 100vw, 58vw', alt: m.title || p.en, decoding: 'async' })),
+        h('p', { class: 'stage-hint' }, icon('magnifying-glass-plus'), h('span', { text: 'Tap to enlarge' })));
+    }
+    for (const [j, b] of [...thumbs.children].entries()) b.setAttribute('aria-pressed', String(j === i));
+  };
+
+  thumbs.append(...items.map((it, i) => {
+    if (it.type === '3d') {
+      return h('button', { type: 'button', class: 'ppage__thumb ppage__thumb--3d', 'aria-label': 'View in 3D and try colourways', onclick: () => show(i) },
+        thumbImg(p, cur.style, 'ppage__thumb-render'), h('span', { class: 'ppage__thumb-badge' }, icon('cube'), '3D'));
+    }
+    const m = describeMedia(it);
+    return h('button', { type: 'button', class: 'ppage__thumb', 'aria-label': `${it.type === 'reel' ? 'Film' : 'Photo'}: ${m.title || p.en}`, onclick: () => show(i) },
+      h('img', { src: m.thumb, alt: '', loading: 'lazy', width: 360, height: 640 }),
+      it.type === 'reel' ? h('span', { class: 'pp__play' }, icon('play', 'fill')) : null);
+  }));
+
+  show(0);
+  return { stage, thumbs: items.length > 1 ? thumbs : null, show3d: () => show(items.length - 1) };
 }
 
 /* ---------------- configurator ---------------- */
@@ -89,6 +140,8 @@ function configurator(p) {
   }));
   styles.addEventListener('change', (e) => {
     cur.style = e.target.value;
+    // Colourways are previewed on the 3D model; the photos show the piece as made.
+    refs.show3d?.();
     viewer?.show(p, cur.style);
     paintTotal();
   });
@@ -431,8 +484,8 @@ export function renderProductPage(root, p) {
       if (!reviews.total) setTimeout(reviews.openForm, 500);
     }, text: reviews.total ? `${reviews.avg.toFixed(1)} from ${reviews.total} review${reviews.total > 1 ? 's' : ''}` : 'No reviews yet. Write the first' }));
 
-  const viewerBox = h('div', { class: 'ppage__viewer' }, canvas,
-    h('p', { class: 'stage-hint' }, icon('hand-grabbing'), h('span', { text: 'Drag to rotate' })));
+  const gallery = mediaGallery(p);
+  refs.show3d = gallery.show3d;
 
   root.replaceChildren(
     h('div', { class: 'container' },
@@ -442,8 +495,8 @@ export function renderProductPage(root, p) {
         h('span', { 'aria-current': 'page', text: p.en })),
       h('div', { class: 'ppage__top' },
         h('div', { class: 'ppage__media' },
-          viewerBox,
-          p.media.length ? h('div', { class: 'ppage__thumbs' }, ...p.media.map((m, i) => mediaButton(p, m, i))) : null),
+          gallery.stage,
+          gallery.thumbs),
         h('div', { class: 'ppage__info' },
           h('p', { class: 'pp__bn bn', lang: 'bn', text: p.bn }),
           h('h1', { class: 'ppage__title', id: 'pg-en', tabindex: '-1', text: p.en }),
@@ -459,11 +512,6 @@ export function renderProductPage(root, p) {
   paintTotal();
   paintWish();
   setJsonLd(p, reviews);
-  ensureViewer().then((v) => {
-    if (cur.p !== p || root.hidden) return;
-    v.show(p, cur.style);
-    v.start();
-  });
 }
 
 export function refreshWish() {
