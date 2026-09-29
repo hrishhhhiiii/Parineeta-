@@ -34,6 +34,7 @@ import lotus from '@phosphor-icons/core/assets/light/flower-lotus-light.svg?raw'
 import check from '@phosphor-icons/core/assets/light/check-circle-light.svg?raw';
 import trash from '@phosphor-icons/core/assets/light/trash-light.svg?raw';
 import share from '@phosphor-icons/core/assets/light/share-network-light.svg?raw';
+import receipt from '@phosphor-icons/core/assets/light/receipt-light.svg?raw';
 import shuffle from '@phosphor-icons/core/assets/light/shuffle-light.svg?raw';
 import pauseIcon from '@phosphor-icons/core/assets/light/pause-light.svg?raw';
 import playIcon from '@phosphor-icons/core/assets/light/play-light.svg?raw';
@@ -85,6 +86,7 @@ const ICONS = {
   'light:check-circle': check,
   'light:trash': trash,
   'light:share-network': share,
+  'light:receipt': receipt,
   'light:shuffle': shuffle,
   'light:pause': pauseIcon,
   'light:play': playIcon,

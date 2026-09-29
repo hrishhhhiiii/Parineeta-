@@ -195,3 +195,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .inbox__head strong, .inbox__item a { overflow-wrap: anywhere; }
 .inbox__item .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .inbox__item .row .input { flex: 1 1 180px; }
+
+/* ---------- signed-in user ---------- */
+.top__user { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.top__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch; }
+.avatar { position: relative; display: inline-grid; place-items: center; flex: none; width: var(--size, 30px); height: var(--size, 30px); overflow: hidden; border-radius: 999px; background: linear-gradient(135deg, #e3aa3e, #9b5a1a); color: #1d0a06; font-weight: 700; font-size: calc(var(--size, 30px) * 0.38); line-height: 1; }
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+@media (max-width: 640px) { .top__name { display: none; } }

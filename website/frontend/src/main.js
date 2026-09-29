@@ -34,6 +34,12 @@ applyPublished();
 if (IS_PREVIEW) await receivePreview();
 renderAnnouncement();
 renderCmsContent();
+// Signed-in customers: cart and wishlist follow them across devices. Clerk's cookie is checked first,
+// so guests never download Clerk or supabase-js.
+if (!IS_PREVIEW && /(?:^|;\s*)__client_uat(?:_[\w-]+)?=[1-9]/.test(document.cookie)) {
+  import('./ui/cartSync.js').then((m) => m.startCartSync()).catch(() => {});
+  import('./ui/accountMenu.js').then((m) => m.startAccountMenu()).catch(() => {});
+}
 
 gsap.registerPlugin(ScrollTrigger);
 const reduce = reduceMotion();

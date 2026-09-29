@@ -17,6 +17,11 @@
   Referrer-Policy: no-referrer
   Cache-Control: no-store
 
+/receipt*
+  X-Robots-Tag: noindex
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+
 /account*
   X-Robots-Tag: noindex
   Referrer-Policy: no-referrer

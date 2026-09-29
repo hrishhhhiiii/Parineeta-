@@ -12,7 +12,7 @@ export const SITE = {
  */
 export const PAYMENTS = {
   advancePercent: 50,
-  upi: { id: '', payeeName: 'Parineeta365' }, // e.g. 'parineeta365@okaxis'
+  upi: { id: '9734241918@axl', payeeName: 'Parineeta365' }, // State Bank of India account ending 5983
   bank: { accountName: '', accountNumber: '', ifsc: '', bankName: '' },
   gatewayLink: '', // e.g. 'https://rzp.io/l/parineeta'
   payAtShop: true, // cash or UPI when collecting at the shop, or on delivery

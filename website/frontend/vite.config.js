@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => ({
         admin: resolve(import.meta.dirname, 'admin.html'),
         account: resolve(import.meta.dirname, 'account.html'),
         login: resolve(import.meta.dirname, 'login.html'),
+        receipt: resolve(import.meta.dirname, 'receipt.html'),
       },
     },
   },

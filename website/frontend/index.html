@@ -637,7 +637,12 @@
         <div class="co-done" id="co-done" hidden>
           <p class="co-done__title">Thank you. Order <strong id="co-done-ref"></strong> is on its way to us.</p>
           <p class="field__help">We will confirm the final price, timing and delivery with you on WhatsApp. Keep your order number handy.</p>
-          <button type="button" class="btn btn--gold" id="co-close">Done</button>
+          <p class="field__help" id="co-receipt-note" role="status" aria-live="polite"></p>
+          <div class="co-done__actions">
+            <button type="button" class="btn btn--ghost" id="co-receipt"><i class="ph-light ph-receipt" aria-hidden="true"></i>Download receipt</button>
+            <button type="button" class="btn btn--ghost" id="co-receipt-share" hidden><i class="ph-light ph-share-network" aria-hidden="true"></i>Share receipt</button>
+            <button type="button" class="btn btn--gold" id="co-close">Done</button>
+          </div>
         </div>
       </div>
     </div>

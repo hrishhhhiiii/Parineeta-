@@ -1,5 +1,6 @@
 -- Parineeta: full database setup. Paste all of this into Supabase → SQL Editor → New query → Run.
--- Generated from database/schema.sql + migrations 001–004. Safe to re-run.
+-- Generated from database/schema.sql + migrations 001–007. Safe to re-run.
+-- Set up Clerk in Supabase first (ADMIN-SETUP.md → Sign-in).
 
 
 -- ======== database/schema.sql ========
@@ -678,3 +679,196 @@ grant execute on function public.my_enquiries(), public.claim_enquiry(text), pub
 
 -- Make the owner an 'owner' (can publish).
 update public.admins set role = 'owner' where email = 'owner-login@example.com';
+
+
+-- ======== database/migrations/005_customer_carts.sql ========
+-- Signed-in customers' cart and wishlist, so they follow the person to any device. Run after 001–004.
+-- Each person can only read and write their own row; deleting the login deletes the row.
+create table if not exists public.customer_carts (
+  user_id uuid primary key default auth.uid() references auth.users (id) on delete cascade,
+  cart jsonb not null default '[]' check (jsonb_typeof(cart) = 'array' and jsonb_array_length(cart) <= 100),
+  wish jsonb not null default '[]' check (jsonb_typeof(wish) = 'array' and jsonb_array_length(wish) <= 200),
+  updated_at timestamptz not null default now(),
+  check (pg_column_size(cart) + pg_column_size(wish) < 64000)
+);
+
+alter table public.customer_carts enable row level security;
+
+drop policy if exists own_cart_read on public.customer_carts;
+create policy own_cart_read on public.customer_carts for select to authenticated using (user_id = auth.uid());
+drop policy if exists own_cart_insert on public.customer_carts;
+create policy own_cart_insert on public.customer_carts for insert to authenticated with check (user_id = auth.uid());
+drop policy if exists own_cart_update on public.customer_carts;
+create policy own_cart_update on public.customer_carts for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+revoke all on public.customer_carts from anon, authenticated;
+grant select, insert, update on public.customer_carts to authenticated;
+
+
+-- ======== database/migrations/006_clerk.sql ========
+-- Sign-in moves from Supabase Auth to Clerk. Run after 001–005, once Clerk is added in
+-- Supabase → Authentication → Sign In / Providers → Third-party auth (see ADMIN-SETUP.md).
+-- Clerk ids look like 'user_2abc…', not UUIDs, so auth.uid() can't read them: the signed-in
+-- person is the token's 'sub' claim. Admin roles and "my enquiries" still match on the token's
+-- 'email' claim, which the Clerk session token must include.
+
+create or replace function public.clerk_user_id() returns text
+language sql stable as $$ select nullif(auth.jwt() ->> 'sub', '') $$;
+
+/* ---------- enquiries: customer_id holds a Clerk id ---------- */
+-- Links to old Supabase logins are dropped. Customers still see those enquiries through their
+-- email, and one sent without an email can be claimed again from its tracking link.
+alter table public.enquiries drop constraint if exists enquiries_customer_id_fkey;
+do $$ begin
+  if (select data_type from information_schema.columns
+       where table_schema = 'public' and table_name = 'enquiries' and column_name = 'customer_id') = 'uuid' then
+    alter table public.enquiries alter column customer_id type text using null;
+  end if;
+end $$;
+
+create or replace function public.my_enquiries() returns jsonb
+language sql stable security definer set search_path = public, extensions as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', id, 'createdAt', created_at, 'eventDate', event_date, 'items', items,
+    'status', status, 'statusNote', status_note, 'statusUpdatedAt', status_updated_at) order by created_at desc), '[]')
+  from public.enquiries
+  where public.clerk_user_id() is not null
+    and (customer_id = public.clerk_user_id()
+      or (email is not null and lower(email) = lower(auth.jwt() ->> 'email')));
+$$;
+
+create or replace function public.claim_enquiry(p_token text) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  me text := public.clerk_user_id();
+  n int;
+begin
+  if me is null then raise exception 'NOT_SIGNED_IN'; end if;
+  update public.enquiries set customer_id = me
+   where p_token ~ '^[0-9a-f]{32}$' and track_hash = encode(extensions.digest(p_token, 'sha256'), 'hex')
+     and (customer_id is null or customer_id = me);
+  get diagnostics n = row_count;
+  return n > 0;
+end $$;
+
+-- Deletes the customer's data. The website then deletes the Clerk login itself.
+create or replace function public.delete_my_account() returns void
+language plpgsql security definer set search_path = public as $$
+declare me text := public.clerk_user_id();
+begin
+  if me is null then raise exception 'NOT_SIGNED_IN'; end if;
+  if exists (select 1 from public.admins where lower(email) = lower(auth.jwt() ->> 'email')) then
+    raise exception 'NOT_ALLOWED';
+  end if;
+  delete from public.enquiries where customer_id = me
+     or lower(email) = lower(auth.jwt() ->> 'email');
+  delete from public.customer_carts where user_id = me;
+end $$;
+
+/* ---------- carts: keyed by Clerk id ---------- */
+-- Saved carts belonged to Supabase logins nobody can sign in to any more. Each browser keeps
+-- its own copy and uploads it again on the first Clerk sign-in.
+drop policy if exists own_cart_read on public.customer_carts;
+drop policy if exists own_cart_insert on public.customer_carts;
+drop policy if exists own_cart_update on public.customer_carts;
+alter table public.customer_carts drop constraint if exists customer_carts_user_id_fkey;
+delete from public.customer_carts where user_id::text !~ '^user_';
+alter table public.customer_carts alter column user_id drop default;
+alter table public.customer_carts alter column user_id type text;
+alter table public.customer_carts alter column user_id set default public.clerk_user_id();
+
+create policy own_cart_read on public.customer_carts for select to authenticated using (user_id = public.clerk_user_id());
+create policy own_cart_insert on public.customer_carts for insert to authenticated with check (user_id = public.clerk_user_id());
+create policy own_cart_update on public.customer_carts for update to authenticated
+  using (user_id = public.clerk_user_id()) with check (user_id = public.clerk_user_id());
+
+
+-- ======== database/migrations/007_orders.sql ========
+-- Checkout orders and payment receipts. Run after 001–006.
+-- The place-order function saves each checkout and sends an "awaiting confirmation" receipt;
+-- the owner's "Mark as paid" (confirm-payment function) sends the "payment received" receipt.
+-- Customers open their receipt at /receipt.html#<token>; the token is the only credential.
+
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  ref text not null unique check (ref ~ '^PRN-[0-9]{6}-[A-Z0-9]{4}$'),
+  created_at timestamptz not null default now(),
+  name text not null check (char_length(name) between 1 and 120),
+  phone text check (phone ~ '^\+?[0-9 ]{8,16}$'),
+  email text check (char_length(email) <= 200),
+  method text not null check (method in ('upi', 'bank', 'gateway', 'later')),
+  total int not null check (total >= 0),
+  paid_now int not null check (paid_now >= 0),
+  utr text check (char_length(utr) <= 40),
+  receipt jsonb not null,                                -- the receipt as the customer saw it
+  receipt_token text not null unique check (receipt_token ~ '^[0-9a-f]{32}$'),
+  status text not null default 'placed' check (status in ('placed', 'paid')),
+  paid_amount int check (paid_amount >= 0),
+  paid_at timestamptz,
+  paid_by text,
+  sent jsonb not null default '[]'                       -- every receipt delivery and its result
+);
+create index if not exists orders_created on public.orders (created_at desc);
+
+-- Only the security-definer functions below touch the table.
+alter table public.orders enable row level security;
+revoke all on public.orders from anon, authenticated;
+
+create or replace function public._place_order(p_ip_hash text, p jsonb, p_token text) returns uuid
+language plpgsql security definer set search_path = public, extensions as $$
+declare w timestamptz := date_trunc('hour', now()); n int; total int; id uuid; k text := 'order:' || p_ip_hash;
+begin
+  select coalesce(sum(count), 0) into total from public.enquiry_rate where window_start = w and ip_hash like 'order:%';
+  if total >= 60 then raise exception 'RATE_LIMITED'; end if;
+  insert into public.enquiry_rate values (k, w, 1)
+    on conflict (ip_hash, window_start) do update set count = enquiry_rate.count + 1 returning count into n;
+  if n > 5 then raise exception 'RATE_LIMITED'; end if;
+  insert into public.orders (ref, name, phone, email, method, total, paid_now, utr, receipt, receipt_token)
+  values (p ->> 'ref', p ->> 'name', nullif(p ->> 'phone', ''), nullif(p ->> 'email', ''), p -> 'method' ->> 'id',
+          (p ->> 'total')::int, (p ->> 'paidNow')::int, nullif(p ->> 'utr', ''), p, p_token)
+  returning orders.id into id;
+  return id;
+end $$;
+
+create or replace function public._log_receipt(p_ref text, p_entries jsonb) returns void
+language sql security definer set search_path = public as $$
+  update public.orders set sent = sent || p_entries where ref = p_ref;
+$$;
+
+-- Public receipt page. Returns only what the receipt shows.
+create or replace function public.order_receipt(p_token text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select receipt || jsonb_build_object('status', status, 'paidAmount', paid_amount, 'paidAt', paid_at)
+  from public.orders where p_token ~ '^[0-9a-f]{32}$' and receipt_token = p_token;
+$$;
+
+create or replace function public.list_orders() returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+begin
+  perform public._require('owner');
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'ref', ref, 'created_at', created_at, 'name', name, 'phone', phone, 'email', email, 'method', method,
+      'total', total, 'paid_now', paid_now, 'utr', utr, 'items', receipt -> 'items', 'address', receipt ->> 'address',
+      'status', status, 'paid_amount', paid_amount, 'paid_at', paid_at, 'paid_by', paid_by, 'sent', sent)
+      order by created_at desc), '[]')
+    from (select * from public.orders order by created_at desc limit 500) o);
+end $$;
+
+create or replace function public.mark_order_paid(p_ref text, p_amount int) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare actor text := public._require('owner'); n int;
+begin
+  if p_amount is null or p_amount <= 0 then raise exception 'BAD_AMOUNT' using hint = 'Enter the amount you received.'; end if;
+  update public.orders set status = 'paid', paid_amount = p_amount, paid_at = now(), paid_by = actor
+   where ref = p_ref and status = 'placed';
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'ALREADY_PAID' using hint = 'This order is already marked as paid.'; end if;
+  perform public._log(actor, 'order_paid', null, p_ref, p_amount::text);
+end $$;
+
+revoke execute on function public._place_order(text, jsonb, text), public._log_receipt(text, jsonb) from public, anon, authenticated;
+grant execute on function public._place_order(text, jsonb, text), public._log_receipt(text, jsonb) to service_role;
+revoke execute on function public.list_orders(), public.mark_order_paid(text, int) from public, anon;
+grant execute on function public.list_orders(), public.mark_order_paid(text, int) to authenticated;
+grant execute on function public.order_receipt(text) to anon, authenticated;

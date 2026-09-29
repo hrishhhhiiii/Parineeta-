@@ -15,13 +15,39 @@ try {
 }
 
 const subs = new Set();
-function commit() {
+const localChange = new Set(); // cart sync listens here; not called for changes that came from the server
+function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch {
     /* private mode: keep in memory only */
   }
   subs.forEach((fn) => fn(state));
+}
+function commit() {
+  save();
+  localChange.forEach((fn) => fn(state));
+}
+
+const validLines = (lines) => (Array.isArray(lines) ? lines : []).filter((l) => l && l.key && byId(l.id) && Number.isFinite(l.qty));
+const validWish = (ids) => [...new Set((Array.isArray(ids) ? ids : []).filter((id) => byId(id)))];
+
+/** Signed-in cart sync: replace the contents without counting it as a local edit. */
+export function replaceState(next) {
+  state.cart = validLines(next.cart).map((l) => ({ ...l, qty: Math.max(1, Math.min(MAX_QTY, l.qty)) }));
+  state.wish = validWish(next.wish);
+  save();
+}
+export const onLocalChange = (fn) => localChange.add(fn);
+
+/** Items from both carts; the same line keeps the larger quantity. Wishlists are combined. */
+export function mergeCarts(a, b) {
+  const lines = new Map();
+  for (const l of [...(a.cart || []), ...(b.cart || [])]) {
+    const seen = lines.get(l.key);
+    lines.set(l.key, seen ? { ...seen, qty: Math.max(seen.qty, l.qty) } : { ...l });
+  }
+  return { cart: [...lines.values()], wish: [...new Set([...(a.wish || []), ...(b.wish || [])])] };
 }
 
 export const store = {
