@@ -4,16 +4,20 @@ import { h, icon, inr, $ } from './dom.js';
 import { openDialog, closeDialog } from './dialogs.js';
 import { openEnquiry } from './enquiry.js';
 import { toast } from './toast.js';
-import { openLightbox, describeMedia } from './lightbox.js';
+import { mediaStage } from './mediaStage.js';
 
 let viewer = null;
 let viewerLoading = null;
+let gallery = null;
+// Kept once found: the media stage takes the canvas off the page while a photo or film is showing.
+let canvasEl = null;
+const canvas = () => (canvasEl ||= $('#viewer-canvas'));
 const cur = { p: null, style: null, combo: null, qty: 1 };
 const dialog = () => $('#product-dialog');
 
 function ensureViewer() {
   viewerLoading ||= import('../three/viewer.js').then(({ createViewer }) => {
-    viewer = createViewer($('#viewer-canvas'));
+    viewer = createViewer(canvas());
     return viewer;
   });
   return viewerLoading;
@@ -51,19 +55,11 @@ function render(p) {
   $('#pp-story').textContent = p.story;
   $('#pp-page').href = `#/p/${p.id}`;
 
-  const media = $('#pp-media');
-  media.replaceChildren();
-  if (p.media.length) {
-    media.append(h('p', { class: 'field__label', text: 'From our studio' }));
-    const row = h('div', { class: 'pp__photos' });
-    p.media.forEach((ref, i) => {
-      const m = describeMedia(ref);
-      row.append(h('button', { type: 'button', class: 'pp__photo', 'aria-label': `${ref.type === 'reel' ? 'Play film' : 'View photo'}: ${m.title || p.en}`, onclick: () => openLightbox(p.media, i, { subject: p.en }) },
-        h('img', { src: m.thumb, alt: '', loading: 'lazy', width: 360, height: 640 }),
-        ref.type === 'reel' ? h('span', { class: 'pp__play' }, icon('play', 'fill')) : null));
-    });
-    media.append(row);
-  }
+  // Real photos and films lead the big view; the 3D model is the last thumbnail.
+  const cv = canvas();
+  gallery?.stop();
+  gallery = mediaStage(p, { stage: $('.pp__viewer'), canvas: cv, ensureViewer, viewer: () => viewer, style: () => cur.style, isCurrent: () => cur.p === p && dialog().open });
+  $('#pp-media').replaceChildren(...(gallery.thumbs ? [h('p', { class: 'field__label', text: 'Photos and films from our studio' }), gallery.thumbs] : []));
 
   const styles = $('#pp-styles');
   styles.replaceChildren(...p.styles.map((s) => {
@@ -95,19 +91,16 @@ export function openProduct(id, styleId) {
   render(p);
   openDialog(dialog());
   dialog().querySelector('.sheet__inner').scrollTop = 0;
-  ensureViewer().then((v) => {
-    if (!dialog().open || cur.p !== p) return;
-    v.show(p, cur.style);
-    v.start();
-  });
 }
 
 export function setupProductPanel() {
   const d = dialog();
-  d.addEventListener('close', () => viewer?.stop());
+  d.addEventListener('close', () => gallery?.stop());
 
   $('#pp-styles').addEventListener('change', (e) => {
     cur.style = e.target.value;
+    // Colourways are previewed on the 3D model; the photos show the piece as made.
+    gallery?.show3d();
     viewer?.show(cur.p, cur.style);
     renderTotal();
   });

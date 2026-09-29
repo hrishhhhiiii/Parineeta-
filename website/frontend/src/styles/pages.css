@@ -195,7 +195,17 @@
   object-fit: contain;
   background: #000;
 }
-.ppage__viewer:not(.is-3d) .stage-hint {
+.pp__viewer {
+  overflow: hidden;
+}
+.pp__media .ppage__thumbs {
+  margin: 8px 0 26px;
+}
+.pp__media .ppage__thumb {
+  width: 76px;
+}
+.ppage__viewer:not(.is-3d) .stage-hint,
+.pp__viewer:not(.is-3d) .stage-hint {
   pointer-events: none;
   background: rgba(21, 5, 7, 0.7);
   padding: 6px 12px;
