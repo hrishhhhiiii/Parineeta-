@@ -61,8 +61,10 @@ jobs:
       VITE_ENQUIRY_URL: ${{ vars.ENQUIRY_URL }}
       DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET || 'vercel' }}
     steps:
+      # Runs before checkout, so not in website/ (it doesn't exist yet).
       - name: Mask the job secret
         if: env.JOB_SECRET != ''
+        working-directory: .
         run: echo "::add-mask::$JOB_SECRET"
 
       - uses: actions/checkout@v4

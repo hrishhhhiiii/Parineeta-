@@ -235,7 +235,10 @@ export function setupCheckout() {
     const v = values();
     if (!v) return;
     const url = waLink(orderMessage(v));
-    if (!window.open(url, '_blank', 'noopener')) window.location.href = url;
+    // 'noopener' would make window.open return null, and this tab would follow to WhatsApp too.
+    const win = window.open(url, '_blank');
+    if (win) win.opener = null;
+    else window.location.href = url;
     done(v);
   });
   $('#co-mail').addEventListener('click', async () => {
