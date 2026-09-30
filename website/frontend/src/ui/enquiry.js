@@ -158,8 +158,10 @@ export function setupEnquiry() {
   $('#enq-wa').addEventListener('click', () => {
     const v = formValues();
     const url = waLink(buildMessage(v, logEnquiry(v)));
-    const win = window.open(url, '_blank', 'noopener');
-    if (!win) window.location.href = url;
+    // 'noopener' would make window.open return null, and this tab would follow to WhatsApp too.
+    const win = window.open(url, '_blank');
+    if (win) win.opener = null;
+    else window.location.href = url;
     toast('WhatsApp opened with your enquiry. Just press send.', { iconName: 'whatsapp-logo' });
   });
 
