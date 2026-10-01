@@ -3163,3 +3163,22 @@ dialog.sheet--lightbox::backdrop {
 .yt__play:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .yt figcaption { margin-top: 6px; font-size: 0.875rem; }
 
+/* ---------- signed-in account menu (Clerk UserButton) ---------- */
+.nav__account-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.avatar__role {
+  position: absolute;
+  right: -6px;
+  bottom: -2px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--gold-2, #f3cd74);
+  color: #1d0a06;
+  font: 700 9px/1.4 var(--font-body, system-ui), sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}

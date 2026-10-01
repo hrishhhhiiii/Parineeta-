@@ -5,7 +5,7 @@ The website for Parineeta (পরিণীতা), hand-painted Bengali wedding 
 **Live:** https://parineeta-sable.vercel.app
 
 ## What it does
-- **Customers** browse the products. They add pieces to the cart, then buy by UPI or bank transfer. The order is sent to the shop on WhatsApp. Customers don't need an account.
+- **Customers** browse the products. They add pieces to the cart, then buy by UPI or bank transfer. The order is sent to the shop on WhatsApp and saved in the admin's **Orders**. An account is optional. Customers who create one see their orders and each order's stage at `/account`, and their cart follows them between devices.
 - **The shop** signs in at `/admin` (the **Admin** link at the bottom of every page). Staff edit products, prices, photos and the other page sections, then press **Publish**. The website updates in about 2 minutes.
 
 ## How it fits together
@@ -24,7 +24,7 @@ Admin (/admin) ──save──▶ Supabase (content and photos)
 ## Folders
 | Folder | Holds |
 |---|---|
-| `frontend/` | The website: the storefront (`index.html`), the admin panel (`admin.html`) and staff sign-in (`login.html`) |
+| `frontend/` | The website: the storefront (`index.html`), customer accounts (`account.html`), the admin panel (`admin.html`) and sign-in for everyone (`login.html`) |
 | `scripts/` | Build helpers. They fetch the published content and report Publish progress back to the admin |
 | `database/` | The Supabase database definition. `SETUP_ALL.sql` rebuilds it from scratch and matches the live database |
 
