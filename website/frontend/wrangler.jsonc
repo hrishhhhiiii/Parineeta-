@@ -1,0 +1,13 @@
+// Cloudflare (Workers static assets): serves the built site from dist/. There is no server code.
+// Cloudflare runs `npm run build:site` first (Settings → Builds → Build command), then `npx wrangler deploy`.
+// "name" must match the Worker's name in the Cloudflare dashboard.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "parineeta",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // /admin serves admin.html, and /p/gach-kouto/ serves p/gach-kouto/index.html.
+    "html_handling": "auto-trailing-slash"
+  }
+}
