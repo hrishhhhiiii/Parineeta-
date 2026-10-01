@@ -122,7 +122,7 @@ export function productPages({ site = '' } = {}) {
         await mkdir(dir, { recursive: true });
         await writeFile(join(dir, 'index.html'), productHtml(base.replace(/\s*<link rel="canonical" href="[^"]*" \/>/g, '').replace(/\s*<meta property="og:url" content="[^"]*" \/>/g, ''), p, site));
       }
-      let robots = 'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nDisallow: /track\nDisallow: /login\n';
+      let robots = 'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /login\n';
       if (site) {
         const urls = ['/', ...list.map((p) => `/p/${p.id}/`)];
         const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${site}${u}</loc></url>`).join('\n')}\n</urlset>\n`;

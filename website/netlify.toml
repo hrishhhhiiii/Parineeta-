@@ -1,9 +1,0 @@
-# Netlify: build the site with Vite and publish the built folder (not the raw source).
-# Redirects and headers come from frontend/public/_redirects and frontend/public/_headers, copied into dist.
-[build]
-  base = "frontend"
-  command = "npm run build"
-  publish = "dist"
-
-[build.environment]
-  NODE_VERSION = "22"
