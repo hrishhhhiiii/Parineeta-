@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "cms:schemas": "cd .. && node scripts/cms-schemas.mjs",
     "cms:fetch": "cd .. && node scripts/fetch-content.mjs",
-    "build:vercel": "node ../scripts/vercel-build.mjs"
+    "build:site": "node ../scripts/build-site.mjs"
   },
   "keywords": [],
   "author": "",

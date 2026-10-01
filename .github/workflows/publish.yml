@@ -1,65 +1,55 @@
-# Sends the admin's published content live.
-# Triggers: the admin's Publish (repository_dispatch), a code push to main, a daily keep-alive, or by hand.
+# The admin's Publish button: asks the host (Cloudflare Pages) to rebuild the site with the newly
+# published content, and reports progress back to the admin panel. Code pushes to main are built by
+# the host's own GitHub connection, so they don't come through here.
+# Also pings Supabase daily so the free project never pauses for inactivity.
 #
-# DEPLOY_TARGET (repository or environment variable) picks the host. Default: vercel.
-#   vercel     → Vercel builds the site itself (Git integration on pushes, a deploy hook on Publish).
-#   cloudflare → this job builds and uploads to Cloudflare Pages.
-#   sftp       → this job builds and uploads over SSH (Hostinger or any shared host).
-# The site's code lives in website/, so every step runs from there.
+# GitHub → Settings → Environments → production:
+#   secret   DEPLOY_HOOK         the host's deploy hook (Cloudflare: project → Settings → Builds → Deploy hooks)
+#   variable SUPABASE_URL, SUPABASE_ANON_KEY (or the same values named VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 name: publish
 
 on:
   repository_dispatch:
     types: [cms-publish]
-  push:
-    branches: [main]
-    paths: ['website/**', '.github/workflows/publish.yml']
   schedule:
     - cron: '17 2 * * *'
   workflow_dispatch:
 
 concurrency:
-  group: publish-${{ github.event.client_payload.target || 'production' }}
+  group: publish
   cancel-in-progress: false
 
 permissions:
   contents: read
-
-defaults:
-  run:
-    working-directory: website
 
 jobs:
   keepalive:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     environment: production
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
     steps:
       - name: Ping Supabase so the free project doesn't pause
-        working-directory: .
         run: |
-          if [ -z "${{ vars.SUPABASE_URL }}" ]; then echo "SUPABASE_URL not set yet; skipping"; exit 0; fi
-          curl -fsS "${{ vars.SUPABASE_URL }}/rest/v1/published_content?select=key&limit=1" -H "apikey: ${{ vars.SUPABASE_ANON_KEY }}" > /dev/null
+          if [ -z "$SUPABASE_URL" ]; then echo "::error::Add the SUPABASE_URL and SUPABASE_ANON_KEY variables."; exit 1; fi
+          curl -fsS "$SUPABASE_URL/rest/v1/published_content?select=key&limit=1" -H "apikey: $SUPABASE_ANON_KEY" > /dev/null
 
-  build-deploy:
-    # On Vercel, code pushes are deployed by Vercel's own Git integration, so this job only handles Publish.
-    if: >-
-      github.event_name != 'schedule' &&
-      !(github.event_name == 'push' && (vars.DEPLOY_TARGET || 'vercel') == 'vercel')
+  publish:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: ${{ github.event.client_payload.target || 'production' }}
+    timeout-minutes: 10
+    environment: production
+    defaults:
+      run:
+        working-directory: website
     env:
-      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
       JOB_ID: ${{ github.event.client_payload.job_id }}
       JOB_SECRET: ${{ github.event.client_payload.secret }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      VITE_SITE_URL: ${{ vars.SITE_URL }}
-      VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
-      VITE_ENQUIRY_URL: ${{ vars.ENQUIRY_URL }}
-      DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET || 'vercel' }}
     steps:
       # Runs before checkout, so not in website/ (it doesn't exist yet).
       - name: Mask the job secret
@@ -68,74 +58,30 @@ jobs:
         run: echo "::add-mask::$JOB_SECRET"
 
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.client_payload.target == 'staging' && 'staging' || 'main' }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: website/frontend/package-lock.json
 
       - run: node scripts/mark-job.mjs building
 
-      # ---------- Vercel: Vercel fetches the content and builds; this job only asks it to. ----------
-      - name: Check the published content is readable (so a broken publish fails here, not on Vercel)
-        if: env.DEPLOY_TARGET == 'vercel'
+      - name: Check the published content is readable (so a broken publish fails here, not on the host)
         run: |
           curl -fsS "$SUPABASE_URL/rest/v1/published_content?select=key&limit=1" -H "apikey: $SUPABASE_ANON_KEY" > /dev/null
 
-      - name: Start a Vercel production build
-        if: env.DEPLOY_TARGET == 'vercel'
+      - name: Ask the host to rebuild the site
         env:
-          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+          HOOK: ${{ secrets.DEPLOY_HOOK || secrets.VERCEL_DEPLOY_HOOK }}
         run: |
-          if [ -z "$HOOK" ]; then echo "::error::Add the VERCEL_DEPLOY_HOOK secret (Vercel → Project → Settings → Git → Deploy Hooks)."; exit 1; fi
-          curl -fsS -X POST "$HOOK"
-          echo "Vercel is rebuilding the site; it is usually live within 2 minutes."
-
-      # ---------- Cloudflare Pages / SFTP: this job builds the site and uploads it. ----------
-      - if: env.DEPLOY_TARGET != 'vercel'
-        run: npm ci
-        working-directory: website/frontend
-      - if: env.DEPLOY_TARGET != 'vercel'
-        run: node scripts/fetch-content.mjs
-      - if: env.DEPLOY_TARGET != 'vercel'
-        run: npm run build
-        working-directory: website/frontend
-
-      - name: Deploy to Cloudflare Pages
-        if: env.DEPLOY_TARGET == 'cloudflare'
-        id: cf
-        working-directory: website/frontend
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          out=$(npx --yes wrangler@3 pages deploy dist --project-name "${{ vars.CF_PROJECT }}" --branch "${{ github.event.client_payload.target == 'staging' && 'staging' || 'main' }}" 2>&1 | tee /dev/stderr)
-          echo "url=$(echo "$out" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | tail -1)" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy over SFTP (Hostinger or any shared host)
-        if: env.DEPLOY_TARGET == 'sftp'
-        env:
-          SSH_KEY: ${{ secrets.SFTP_KEY }}
-          HOST: ${{ vars.SFTP_HOST }}
-          PORT: ${{ vars.SFTP_PORT || '22' }}
-          USER: ${{ vars.SFTP_USER }}
-          DIR: ${{ vars.SFTP_DIR }}
-        run: |
-          install -m 600 /dev/null ~/key && printf '%s\n' "$SSH_KEY" > ~/key
-          ssh_="ssh -i $HOME/key -p $PORT -o StrictHostKeyChecking=accept-new $USER@$HOST"
-          $ssh_ "rm -rf '$DIR.next' && mkdir -p '$DIR.next'"
-          rsync -az --delete -e "ssh -i $HOME/key -p $PORT -o StrictHostKeyChecking=accept-new" frontend/dist/ "$USER@$HOST:$DIR.next/"
-          # Swap folders so visitors never see a half-uploaded site; $DIR.prev is the rollback.
-          $ssh_ "rm -rf '$DIR.prev'; if [ -e '$DIR' ]; then mv '$DIR' '$DIR.prev'; fi; mv '$DIR.next' '$DIR'"
+          if [ -z "$HOOK" ]; then echo "::error::Add the DEPLOY_HOOK secret (the host's deploy hook address)."; exit 1; fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "The host is rebuilding the site; it is usually live within 2 minutes."
 
       - name: Mark live
         env:
-          DEPLOY_URL: ${{ steps.cf.outputs.url || vars.SITE_URL }}
+          DEPLOY_URL: ${{ vars.SITE_URL }}
         run: node scripts/mark-job.mjs live
 
       - name: Mark failed
         if: failure()
-        run: node scripts/mark-job.mjs failed "The site update failed at step '${{ github.job }}'. Open the run log for details."
+        run: node scripts/mark-job.mjs failed "The site update failed. Open the run log for details."
