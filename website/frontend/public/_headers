@@ -1,0 +1,21 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/admin*
+  X-Robots-Tag: noindex
+  Cache-Control: no-store
+
+/login*
+  X-Robots-Tag: noindex
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+
+/content-version.json
+  Cache-Control: no-store
