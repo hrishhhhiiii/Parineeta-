@@ -28,6 +28,7 @@ import plus from '@phosphor-icons/core/assets/light/plus-light.svg?raw';
 import chat from '@phosphor-icons/core/assets/light/chat-circle-text-light.svg?raw';
 import send from '@phosphor-icons/core/assets/light/paper-plane-tilt-light.svg?raw';
 import lockSimple from '@phosphor-icons/core/assets/light/lock-simple-light.svg?raw';
+import userCircle from '@phosphor-icons/core/assets/light/user-circle-light.svg?raw';
 import envelope from '@phosphor-icons/core/assets/light/envelope-simple-light.svg?raw';
 import playFill from '@phosphor-icons/core/assets/fill/play-fill.svg?raw';
 import lotus from '@phosphor-icons/core/assets/light/flower-lotus-light.svg?raw';
@@ -52,6 +53,7 @@ import zoomIn from '@phosphor-icons/core/assets/light/magnifying-glass-plus-ligh
 const ICONS = {
   'light:heart': heart,
   'light:lock-simple': lockSimple,
+  'light:user-circle': userCircle,
   'fill:heart': heartFill,
   'light:shopping-bag-open': bag,
   'fill:whatsapp-logo': whatsappFill,

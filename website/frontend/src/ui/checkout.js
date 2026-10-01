@@ -224,6 +224,24 @@ export function openCheckout({ lines, fromCart = false }) {
   $('#co-title-ref').textContent = ctx.ref;
   render();
   openDialog(dialog());
+  fillFromAccount();
+}
+
+// Signed-in customers: fill in their name and account email. The email links the order to
+// their account (/account lists orders by email). Guests never load Clerk.
+async function fillFromAccount() {
+  if (!/(?:^|;\s*)__client_uat(?:_[\w-]+)?=[1-9]/.test(document.cookie)) return;
+  try {
+    const { configured, getClerk } = await import('../auth/client.js');
+    if (!configured) return;
+    const user = (await getClerk()).user;
+    if (!user) return;
+    const set = (id, value) => { const el = $(`#${id}`); if (el && !el.value && value) el.value = value; };
+    set('co-name', user.fullName);
+    set('co-email', user.primaryEmailAddress?.emailAddress);
+  } catch {
+    /* checkout works without it */
+  }
 }
 
 export function setupCheckout() {

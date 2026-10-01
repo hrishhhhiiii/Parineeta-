@@ -25,7 +25,7 @@ const appearance = {
     colorDanger: '#ffb4a8',
     borderRadius: '10px',
   },
-  // Staff accounts are managed by the owner, so Clerk's own "Delete account" is hidden.
+  // Clerk's own "Delete account" is hidden: /account's button also removes the customer's details from their orders first.
   elements: { profileSection__danger: { display: 'none' } },
 };
 
@@ -34,8 +34,8 @@ let clerkPromise;
 export function getClerk() {
   return (clerkPromise ??= (async () => {
     const clerk = new Clerk(PK);
-    // Signing out anywhere (UserButton, UserProfile) lands on /login?signout.
-    await clerk.load({ ui, appearance, signInUrl: '/login.html', afterSignOutUrl: '/login.html?signout' });
+    // Signing out anywhere (UserButton, UserProfile) lands on /login?signout, which also clears this browser's cart.
+    await clerk.load({ ui, appearance, signInUrl: '/login.html', signUpUrl: '/login.html?signup', afterSignOutUrl: '/login.html?signout' });
     return clerk;
   })());
 }
