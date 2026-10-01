@@ -24,30 +24,7 @@ function formValues() {
   return { name: get('name'), phone: get('phone'), email: get('email'), date: get('event_date'), place: get('location'), note: get('note'), bot: f.elements.botcheck?.checked };
 }
 
-// Copies the enquiry into the admin inbox. Fire-and-forget: a CORS "simple" request with keepalive,
-// so it survives the page opening WhatsApp and never delays the customer.
-// The customer's private tracking link: a random token only they get; the database stores its hash.
-const INBOX_URL = import.meta.env.VITE_ENQUIRY_URL;
-function newToken() {
-  const b = crypto.getRandomValues(new Uint8Array(16));
-  return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
-}
-/** Returns the tracking link, or '' when the inbox isn't connected. */
-function logEnquiry(v) {
-  if (!INBOX_URL || v.bot || !v.name) return '';
-  const token = newToken();
-  const body = JSON.stringify({ token, name: v.name, phone: v.phone, email: v.email, eventDate: v.date, place: v.place, note: v.note,
-    items: ctx.lines.map((l, i) => describe(l, i)).concat(ctx.subject && !ctx.lines.length ? [ctx.subject] : []) });
-  try {
-    fetch(INBOX_URL, { method: 'POST', body, keepalive: true, headers: { 'Content-Type': 'text/plain' } }).catch(() => {});
-  } catch {
-    return '';
-  }
-  // In the hash, so the token never reaches server logs or other sites' Referer headers.
-  return `${location.origin}/track#${token}`;
-}
-
-function buildMessage(v, trackUrl = '') {
+function buildMessage(v) {
   const lines = ['Namaskar Parineeta! I found you on your website.'];
   if (ctx.lines.length) {
     lines.push('', 'I would like to enquire about:');
@@ -65,7 +42,6 @@ function buildMessage(v, trackUrl = '') {
     v.note && `Note: ${v.note}`,
   ].filter(Boolean);
   if (extra.length) lines.push('', ...extra);
-  if (trackUrl) lines.push('', `Track this enquiry: ${trackUrl}`);
   return lines.join('\n');
 }
 
@@ -157,7 +133,7 @@ export function openEnquiry({ lines = [], subject = '', fromCart = false } = {})
 export function setupEnquiry() {
   $('#enq-wa').addEventListener('click', () => {
     const v = formValues();
-    const url = waLink(buildMessage(v, logEnquiry(v)));
+    const url = waLink(buildMessage(v));
     // 'noopener' would make window.open return null, and this tab would follow to WhatsApp too.
     const win = window.open(url, '_blank');
     if (win) win.opener = null;
@@ -174,7 +150,6 @@ export function setupEnquiry() {
       return;
     }
     if (v.bot) return;
-    const trackUrl = logEnquiry(v);
     const btn = $('#enq-mail');
     btn.disabled = true;
     status('Sending your enquiry…', 'busy');
@@ -186,17 +161,12 @@ export function setupEnquiry() {
         email: v.email || undefined,
         event_date: v.date,
         location: v.place,
-        message: buildMessage(v, trackUrl),
+        message: buildMessage(v),
       });
       if (ctx.fromCart) store.clear();
       $('#enq-form').reset();
-      if (trackUrl) {
-        status('Thank you. Your enquiry has reached us and we will reply within a day. Keep this link to follow its progress:', 'ok');
-        $('#enq-status').append(' ', h('a', { href: trackUrl, target: '_blank', rel: 'noopener', text: 'Track my enquiry' }));
-      } else {
-        status('Thank you. Your enquiry has reached us and we will reply within a day.', 'ok');
-        setTimeout(() => closeDialog(dialog()), 2200);
-      }
+      status('Thank you. Your enquiry has reached us and we will reply within a day.', 'ok');
+      setTimeout(() => closeDialog(dialog()), 2200);
     } catch {
       status('We could not send that just now. Please try WhatsApp, or call +91 97342 41918.', 'error');
     } finally {

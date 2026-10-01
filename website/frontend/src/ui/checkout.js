@@ -7,8 +7,6 @@ import { toast } from './toast.js';
 import { downloadReceipt, shareReceipt, canShareFiles } from './receipt.js';
 
 const dialog = () => $('#checkout-dialog');
-// Saves the order and emails/WhatsApps the receipt to the customer and the shop (backend/functions/place-order).
-const ORDER_URL = import.meta.env.VITE_ORDER_URL;
 let ctx = { lines: [], fromCart: false, ref: '', receipt: null };
 
 const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
@@ -185,29 +183,8 @@ function receiptData(v) {
   };
 }
 
-async function saveOrder(r) {
-  const note = $('#co-receipt-note');
-  note.textContent = '';
-  if (!ORDER_URL) return;
-  const online = r.method.id !== 'later';
-  note.textContent = online ? 'Sending your receipt…' : '';
-  try {
-    const res = await fetch(ORDER_URL, { method: 'POST', body: JSON.stringify(r), keepalive: true, headers: { 'Content-Type': 'text/plain' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const { token, receiptSent } = await res.json();
-    r.token = token;
-    const where = [r.email && `to ${r.email}`, r.phone && 'on WhatsApp'].filter(Boolean).join(' and ');
-    note.textContent = receiptSent
-      ? `Your receipt is on its way${where ? ` ${where}` : ''}. You get another one when we confirm your payment.`
-      : 'Your order is saved. We send you a receipt when your payment is confirmed.';
-  } catch {
-    note.textContent = online ? 'We could not send your receipt just now. Download it below and keep it safe.' : '';
-  }
-}
-
 function done(v) {
   ctx.receipt = receiptData(v);
-  saveOrder(ctx.receipt);
   try {
     const orders = JSON.parse(localStorage.getItem('parineeta:orders') || '[]');
     orders.unshift({ ref: ctx.ref, date: new Date().toISOString(), lines: ctx.lines, amount: amountNow(), name: v.name });
