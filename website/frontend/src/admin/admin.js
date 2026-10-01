@@ -3,6 +3,7 @@ import { configured, getClerk, getSupabase, userOf } from '../auth/client.js';
 import { SECTIONS, FILM_OPTIONS } from './schemas.js';
 import { photoSrc } from '../data/site.js';
 import { avatar, profileOf } from '../auth/profile.js';
+import { ordersView } from './orders.js';
 
 const root = document.getElementById('app');
 
@@ -49,6 +50,9 @@ function demoClient() {
   let rev = 0;
   const jobs = [];
   const user = { email: 'demo@localhost' };
+  const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
+    total: 1450, paid_now: 725, plan: '50% advance', utr: '426512345678', event_date: '2026-12-02', address: 'Patuli, Kolkata', status: 'placed', suspect: false,
+    items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null }];
   const rpcs = {
     get_heads: () => [...heads.values()],
     admin_role: () => 'owner',
@@ -68,6 +72,9 @@ function demoClient() {
     },
     redeploy: () => rpcs.publish(),
     list_revisions: () => [],
+    list_orders: () => demoOrders,
+    set_order_status: ({ p_ref, p_status, p_amount }) => Object.assign(demoOrders.find((o) => o.ref === p_ref), { status: p_status, suspect: false, ...(p_amount ? { paid_amount: p_amount, paid_at: new Date().toISOString(), paid_by: user.email } : {}) }),
+    delete_order: ({ p_ref }) => demoOrders.splice(demoOrders.findIndex((o) => o.ref === p_ref), 1),
   };
   return {
     rpc: async (name, args) => {
@@ -491,13 +498,19 @@ async function openHistory(section) {
 }
 
 /* ---------- layout ---------- */
+// Owner only: orders from the website's checkout. /admin#orders opens it directly.
+const ORDERS = 'orders';
+
 function render() {
+  if (ctx.section === ORDERS && ctx.role !== 'owner') ctx.section = SECTIONS[0].key;
   const section = SECTIONS.find((s) => s.key === ctx.section);
+  const navBtn = (key, icon, title, extra = null) => h('button', {
+    type: 'button', class: `side__btn${key === ctx.section ? ' is-active' : ''}`, 'aria-current': key === ctx.section ? 'page' : null,
+    onclick: () => { ctx.section = key; ctx.index = 0; history.replaceState(null, '', key === ORDERS ? '#orders' : location.pathname + location.search); render(); },
+  }, h('span', { 'aria-hidden': 'true', text: icon }), h('span', { text: title }), extra);
   const nav = h('nav', { class: 'side', 'aria-label': 'Sections' },
-    ...SECTIONS.map((s) => h('button', {
-      type: 'button', class: `side__btn${s.key === ctx.section ? ' is-active' : ''}`, 'aria-current': s.key === ctx.section ? 'page' : null,
-      onclick: () => { ctx.section = s.key; ctx.index = 0; render(); },
-    }, h('span', { 'aria-hidden': 'true', text: s.icon }), h('span', { text: s.title }), isDirty(s.key) ? h('span', { class: 'dot', title: 'Unsaved changes', text: '●' }) : null)));
+    ctx.role === 'owner' ? navBtn(ORDERS, '🧾', 'Orders') : null,
+    ...SECTIONS.map((s) => navBtn(s.key, s.icon, s.title, isDirty(s.key) ? h('span', { class: 'dot', title: 'Unsaved changes', text: '●' }) : null)));
 
   // Clerk's UserButton: Manage account and Sign out (the browser warns first if there are unsaved changes).
   const userBtn = clerk ? h('div', { class: 'top__user' }) : null;
@@ -509,7 +522,7 @@ function render() {
       clerk ? userBtn : h('span', { class: 'top__user', title: ctx.user.email }, avatar(ctx.user, 30), h('span', { class: 'top__name', text: profileOf(ctx.user).name || ctx.user.email })),
       clerk ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) toLogin('?signout'); } })));
 
-  root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, sectionView(section))));
+  root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === ORDERS ? ordersView(sb, { h, toast, explain }) : sectionView(section))));
   if (clerk) {
     if (ctx.userBtn) clerk.unmountUserButton(ctx.userBtn);
     clerk.mountUserButton((ctx.userBtn = userBtn), { showName: true });
@@ -649,6 +662,7 @@ async function start() {
   // Someone signed in who isn't on the staff list: the sign-in page explains.
   const { data: role } = await sb.rpc('admin_role');
   if (!role) return toLogin();
+  if (location.hash === '#orders') ctx.section = ORDERS;
   root.replaceChildren(h('p', { class: 'loading', text: 'Loading the shop…' }));
   try {
     await loadAll();
