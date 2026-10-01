@@ -18,6 +18,19 @@ if (!env.VITE_SITE_URL && process.env.VERCEL_ENV === 'production' && process.env
   env.VITE_SITE_URL = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
 }
 
+// Catch values pasted with stray characters (e.g. "…" or spaces) before they cause confusing errors.
+const SETTINGS = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY', 'VITE_CLERK_PUBLISHABLE_KEY', 'VITE_SITE_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
+const bad = SETTINGS.filter((k) => env[k] && !/^[\x21-\x7e]+$/.test(env[k]));
+if (bad.length) {
+  console.error(`[build-site] These build variables contain a space or a character like "…": ${bad.join(', ')}.`);
+  console.error('[build-site] Paste the full value again (no "…", no spaces), save, and retry the build.');
+  process.exit(1);
+}
+if (env.VITE_SITE_URL && !/^https:\/\/[^/]+\.[a-z]{2,}$/i.test(env.VITE_SITE_URL)) {
+  console.error(`[build-site] VITE_SITE_URL must look like https://parineeta.example.workers.dev (no slash at the end). Remove it, or fix it and retry.`);
+  process.exit(1);
+}
+
 const run = (cmd, args, cwd) => {
   const r = spawnSync(cmd, args, { cwd, env, stdio: 'inherit', shell: process.platform === 'win32' });
   if (r.status !== 0) process.exit(r.status ?? 1);
