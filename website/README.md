@@ -6,7 +6,7 @@ The website for Parineeta (পরিণীতা), hand-painted Bengali wedding 
 
 ## What it does
 - **Customers** browse the products. They add pieces to the cart, then buy by UPI or bank transfer. The order is sent to the shop on WhatsApp. Customers don't need an account.
-- **The shop** signs in at `/admin`. Staff edit products, prices, photos and the other page sections, then press **Publish**. The website updates in about 2 minutes.
+- **The shop** signs in at `/admin` (the **Admin** link at the bottom of every page). Staff edit products, prices, photos and the other page sections, then press **Publish**. The website updates in about 2 minutes.
 
 ## How it fits together
 ```

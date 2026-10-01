@@ -1727,8 +1727,30 @@ iframe.video {
   font-size: 0.82rem;
   color: var(--ink-3);
 }
+.footer__base {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px 24px;
+}
 .footer__base p {
   margin: 0;
+}
+/* Staff entrance to /admin: present but quiet, so customers don't mistake it for their own sign-in. */
+.footer__admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--ink-3);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 4px;
+}
+.footer__admin:hover {
+  color: var(--gold-2);
+  text-decoration-color: currentColor;
 }
 @media (max-width: 800px) {
   .footer__grid {
@@ -3141,22 +3163,3 @@ dialog.sheet--lightbox::backdrop {
 .yt__play:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .yt figcaption { margin-top: 6px; font-size: 0.875rem; }
 
-/* ---------- signed-in account menu (Clerk UserButton) ---------- */
-.nav__account-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.avatar__role {
-  position: absolute;
-  right: -6px;
-  bottom: -2px;
-  padding: 1px 5px;
-  border-radius: 999px;
-  background: var(--gold-2, #f3cd74);
-  color: #1d0a06;
-  font: 700 9px/1.4 var(--font-body, system-ui), sans-serif;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  pointer-events: none;
-}
