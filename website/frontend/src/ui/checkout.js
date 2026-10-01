@@ -7,7 +7,25 @@ import { toast } from './toast.js';
 import { downloadReceipt, shareReceipt, canShareFiles } from './receipt.js';
 
 const dialog = () => $('#checkout-dialog');
-let ctx = { lines: [], fromCart: false, ref: '', receipt: null };
+let ctx = { lines: [], fromCart: false, ref: '', requestId: '', receipt: null };
+
+// Every order is also saved for the shop's admin panel (Orders). The WhatsApp message stays the
+// customer's confirmation, so a failed save never blocks them. database/migrations/009_simple_orders.sql
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+function saveOrder(receipt) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_order`, {
+      method: 'POST',
+      keepalive: true, // finishes even if the phone switches to WhatsApp
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p: { ...receipt, requestId: ctx.requestId } }),
+    }).catch(() => {});
+  } catch {
+    /* the WhatsApp message still reaches the shop */
+  }
+}
 
 const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
 
@@ -20,11 +38,11 @@ function methods() {
   return list;
 }
 
+// The order number goes in the UPI note, so it exists before payment. Date in India time + 4 random characters.
 function newRef() {
-  const d = new Date();
-  const ymd = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `PRN-${ymd}-${rand}`;
+  const ymd = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(2, 10).replace(/-/g, '');
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return `PRN-${ymd}-${[...crypto.getRandomValues(new Uint8Array(4))].map((b) => abc[b % 32]).join('')}`;
 }
 
 const total = () => cartTotal(ctx.lines);
@@ -185,6 +203,7 @@ function receiptData(v) {
 
 function done(v) {
   ctx.receipt = receiptData(v);
+  saveOrder(ctx.receipt);
   try {
     const orders = JSON.parse(localStorage.getItem('parineeta:orders') || '[]');
     orders.unshift({ ref: ctx.ref, date: new Date().toISOString(), lines: ctx.lines, amount: amountNow(), name: v.name });
@@ -201,7 +220,7 @@ function done(v) {
 
 export function openCheckout({ lines, fromCart = false }) {
   if (!lines.length) return;
-  ctx = { lines: lines.map((l) => ({ ...l })), fromCart, ref: newRef() };
+  ctx = { lines: lines.map((l) => ({ ...l })), fromCart, ref: newRef(), requestId: crypto.randomUUID(), receipt: null };
   $('#co-title-ref').textContent = ctx.ref;
   render();
   openDialog(dialog());
