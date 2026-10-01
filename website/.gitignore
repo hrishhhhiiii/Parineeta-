@@ -7,3 +7,4 @@ frontend/public/media/photos/cms/
 .env.*
 !.env.example
 *.pem
+frontend/public/content-version.json
