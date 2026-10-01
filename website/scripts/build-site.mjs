@@ -26,6 +26,12 @@ if (bad.length) {
   console.error('[build-site] Paste the full value again (no "…", no spaces), save, and retry the build.');
   process.exit(1);
 }
+for (const k of ['VITE_SUPABASE_URL', 'SUPABASE_URL']) {
+  if (env[k] && !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(env[k])) {
+    console.error(`[build-site] ${k} must be the full address, e.g. https://abcdefgh.supabase.co (it is "${env[k]}"). Fix it, save, and retry.`);
+    process.exit(1);
+  }
+}
 if (env.VITE_SITE_URL && !/^https:\/\/[^/]+\.[a-z]{2,}$/i.test(env.VITE_SITE_URL)) {
   console.error(`[build-site] VITE_SITE_URL must look like https://parineeta.example.workers.dev (no slash at the end). Remove it, or fix it and retry.`);
   process.exit(1);
