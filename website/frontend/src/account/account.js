@@ -74,12 +74,15 @@ async function showAccount() {
   app.replaceChildren(
     h('div', { class: 'top' }, h('h1', { text: 'My orders' }), out),
     h('p', { class: 'muted', text: `Signed in as ${me.user.email}` }),
+    me.clerk ? h('p', { class: 'profile-actions' },
+      h('button', { type: 'button', class: 'ghost', text: 'Edit profile', onclick: () => me.clerk.openUserProfile() }),
+      h('button', { type: 'button', class: 'ghost', text: 'Change password', onclick: () => me.clerk.openUserProfile({ __experimental_startPath: '/security' }) })) : '',
     role ? h('p', {}, h('a', { href: '/admin.html', text: role === 'owner' ? 'Open the admin panel →' : 'Open the editor panel →' })) : '',
     ...(error ? [h('p', { class: 'msg is-err', text: 'Could not load your orders. Please try again later.' })]
       : orders?.length ? orders.map(orderCard)
       : [h('div', { class: 'card' }, h('p', { text: 'No orders yet.' }),
           h('p', { class: 'muted', text: `Orders placed with this email (${me.user.email}) appear here, with their stage as we make them.` }))]),
-    settings ? h('h2', { class: 'acc-h2', text: 'Account settings' }) : '',
+    settings ? h('h2', { class: 'acc-h2', text: 'Profile and password' }) : '',
     settings || '',
     back(), h('p', {}, del));
   if (me.clerk) {
