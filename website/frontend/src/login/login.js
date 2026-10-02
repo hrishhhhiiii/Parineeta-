@@ -1,6 +1,7 @@
 // One sign-in page for everyone, run by Clerk. After signing in, shop staff go to the admin panel
 // and customers go to their orders (/account). An account is optional: customers can always buy
-// as guests. Password, email code and Google sign-in are switched on in the Clerk dashboard, not here.
+// as guests. Tabs switch between Sign in and Create account, and "Forgot your password?" resets it
+// with a code sent by email. Password, email code and Google are switched on in the Clerk dashboard.
 import './login.css';
 import { configured, getClerk, getSupabase } from '../auth/client.js';
 
@@ -14,6 +15,7 @@ function h(tag, props = {}, ...kids) {
     if (v == null || v === false) continue;
     if (k === 'text') el.textContent = v;
     else if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? '' : v);
   }
   el.append(...kids.flat().filter((c) => c != null && c !== false));
@@ -42,17 +44,33 @@ async function route() {
   location.replace(role === 'owner' || role === 'editor' ? '/admin.html' : '/account.html');
 }
 
+const TEXT = {
+  signin: ['Welcome back', 'Sign in to see your orders and how they are coming along.'],
+  signup: ['Create your account', 'Optional: it keeps your orders in one place, with their progress. You can always order without one.'],
+  reset: ['Reset your password', 'We will email you a 6-digit code. Enter it with a new password and you are signed in.'],
+};
+
+let mounted = null; // the Clerk form on screen, removed before showing another
+// Switching tabs: also drop Clerk's #/… step, so the other form starts fresh. (Not on first load:
+// Google sign-in returns to #/sso-callback, which the mounted form must see.)
+const switchTo = (clerk, m) => {
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  show(clerk, m);
+};
 function show(clerk, mode, note = '') {
-  const signin = mode === 'signin';
-  const box = h('div', { class: 'clerk-box' });
+  if (mounted) { mounted(); mounted = null; }
+  const [title, intro] = TEXT[mode];
+  const tab = (m, label) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(mode === m), onclick: () => switchTo(clerk, m) }, label);
+  const box = h('div', { class: mode === 'reset' ? 'card' : 'clerk-box' });
   app.replaceChildren(
-    h('h1', { text: signin ? 'Welcome back' : 'Create your account' }),
-    h('p', { class: 'muted', text: signin
-      ? 'Sign in to see your orders and how they are coming along.'
-      : 'Optional: it keeps your orders in one place, with their progress. You can always order without one.' }),
+    h('h1', { text: title }),
+    h('p', { class: 'muted', text: intro }),
+    h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Sign in or create an account' }, tab('signin', 'Sign in'), tab('signup', 'Create account')),
     note ? h('p', { class: 'msg', role: 'status', text: note }) : '',
     box,
+    mode === 'signin' ? h('p', { class: 'forgot' }, h('button', { type: 'button', class: 'linkbtn', text: 'Forgot your password?', onclick: () => switchTo(clerk, 'reset') })) : '',
     back());
+  if (mode === 'reset') return resetForm(clerk, box);
   // Every finished sign-in or sign-up comes back here, and route() picks the right page.
   const opts = {
     routing: 'hash',
@@ -62,8 +80,74 @@ function show(clerk, mode, note = '') {
     signInUrl: `${here}?signin`,
     signUpUrl: `${here}?signup`,
   };
-  if (signin) clerk.mountSignIn(box, opts);
-  else clerk.mountSignUp(box, opts);
+  if (mode === 'signin') { clerk.mountSignIn(box, opts); mounted = () => clerk.unmountSignIn(box); }
+  else { clerk.mountSignUp(box, opts); mounted = () => clerk.unmountSignUp(box); }
+}
+
+const clerkMessage = (err) => err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || 'Something went wrong. Please try again.';
+
+/** Forgot password: email → 6-digit code + new password → signed in. */
+function resetForm(clerk, box) {
+  const msg = h('p', { class: 'msg', role: 'status' });
+  const say = (text, err = false) => { msg.textContent = text; msg.className = `msg${err ? ' is-err' : ''}`; };
+  let signIn = null;
+
+  const email = h('input', { type: 'email', name: 'email', autocomplete: 'email', required: true, inputmode: 'email' });
+  const sendBtn = h('button', { type: 'submit', text: 'Email me a code' });
+  const step1 = h('form', { class: 'form', novalidate: true },
+    h('label', {}, 'Your account email', email), sendBtn, msg);
+  step1.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) return say('Please enter the email you signed up with.', true);
+    sendBtn.disabled = true;
+    say('Sending…');
+    try {
+      signIn = await clerk.client.signIn.create({ strategy: 'reset_password_email_code', identifier: email.value.trim() });
+      showStep2();
+    } catch (err) {
+      say(clerkMessage(err), true);
+    } finally {
+      sendBtn.disabled = false;
+    }
+  });
+
+  function showStep2() {
+    const code = h('input', { type: 'text', name: 'code', autocomplete: 'one-time-code', inputmode: 'numeric', maxlength: 6, required: true });
+    const password = h('input', { type: 'password', name: 'password', autocomplete: 'new-password', minlength: 8, required: true });
+    const saveBtn = h('button', { type: 'submit', text: 'Set new password and sign in' });
+    const step2 = h('form', { class: 'form', novalidate: true },
+      h('p', { class: 'muted', text: `We sent a code to ${email.value.trim()}. It can take a minute; check your spam folder too.` }),
+      h('label', {}, '6-digit code', code),
+      h('label', {}, 'New password (8 or more characters)', password),
+      saveBtn, msg);
+    say('');
+    step2.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!/^\d{6}$/.test(code.value.trim())) return say('Enter the 6-digit code from the email.', true);
+      if (password.value.length < 8) return say('The new password needs 8 or more characters.', true);
+      saveBtn.disabled = true;
+      say('Saving…');
+      try {
+        let si = await signIn.attemptFirstFactor({ strategy: 'reset_password_email_code', code: code.value.trim() });
+        if (si.status === 'needs_new_password') si = await si.resetPassword({ password: password.value, signOutOfOtherSessions: true });
+        if (si.status === 'complete') {
+          await clerk.setActive({ session: si.createdSessionId });
+          return route();
+        }
+        say('Your password is changed. Please sign in with it.');
+        setTimeout(() => show(clerk, 'signin', 'Password changed. Sign in with your new password.'), 1500);
+      } catch (err) {
+        say(clerkMessage(err), true);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+    box.replaceChildren(step2);
+    code.focus();
+  }
+
+  box.replaceChildren(step1);
+  email.focus();
 }
 
 if (!configured) {
@@ -83,5 +167,5 @@ if (!configured) {
     } catch {}
     show(clerk, 'signin', 'You are signed out.');
   } else if (clerk?.user) route();
-  else if (clerk) show(clerk, params.has('signup') ? 'signup' : params.has('signin') || knownDevice() ? 'signin' : 'signup');
+  else if (clerk) show(clerk, params.has('reset') ? 'reset' : params.has('signup') ? 'signup' : params.has('signin') || knownDevice() ? 'signin' : 'signup');
 }
