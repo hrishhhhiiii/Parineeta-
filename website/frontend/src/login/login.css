@@ -6,9 +6,10 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 syste
 .acc a { color: var(--gold); }
 .muted { color: var(--ink-2); }
 .card { background: var(--card); border: 1px solid #3a2420; border-radius: 12px; padding: 18px; margin-top: 16px; }
-button:not(.clerk-box *) { min-height: 44px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--gold); background: var(--gold); color: #1d1a17; font: 600 15px system-ui, sans-serif; cursor: pointer; }
-button.ghost:not(.clerk-box *) { background: transparent; color: var(--ink); border-color: #5a403a; }
-button:not(.clerk-box *):disabled { opacity: 0.6; cursor: default; }
+/* Page buttons only: Clerk's own controls all carry cl- classes and are styled through its appearance settings. */
+button:not([class*="cl-"]) { min-height: 44px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--gold); background: var(--gold); color: #1d1a17; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+button.ghost:not([class*="cl-"]) { background: transparent; color: var(--ink); border-color: #5a403a; }
+button:not([class*="cl-"]):disabled { opacity: 0.6; cursor: default; }
 .msg { min-height: 1.5em; margin: 8px 0 0; }
 .msg.is-err { color: var(--err); }
 .clerk-box { display: flex; justify-content: center; margin-top: 16px; }
@@ -19,7 +20,7 @@ button:not(.clerk-box *):disabled { opacity: 0.6; cursor: default; }
 ul.items { margin: 8px 0 0; padding-left: 20px; color: var(--ink-2); }
 .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 
-button:not(.clerk-box *):hover:not(:disabled) { filter: brightness(1.08); }
+button:not([class*="cl-"]):hover:not(:disabled) { filter: brightness(1.08); }
 button.ghost:hover:not(:disabled) { border-color: var(--gold); filter: none; }
 .acc a:hover { color: #f0c46a; }
 .receipt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
@@ -29,8 +30,8 @@ button.ghost:hover:not(:disabled) { border-color: var(--gold); filter: none; }
 .user-btn { display: flex; align-items: center; min-height: 44px; }
 /* Sign in | Create account tabs, and the forgot-password form */
 .tabs { display: flex; gap: 4px; margin-top: 20px; padding: 4px; border: 1px solid #3a2420; border-radius: 999px; }
-.tabs button:not(.clerk-box *) { flex: 1; background: transparent; border-color: transparent; color: var(--ink-2); }
-.tabs button[aria-selected="true"]:not(.clerk-box *) { background: var(--gold); border-color: var(--gold); color: #1d1a17; }
+.tabs button:not([class*="cl-"]) { flex: 1; background: transparent; border-color: transparent; color: var(--ink-2); }
+.tabs button[aria-selected="true"]:not([class*="cl-"]) { background: var(--gold); border-color: var(--gold); color: #1d1a17; }
 .forgot { margin: 12px 0 0; text-align: center; }
 .linkbtn { background: none !important; border: 0 !important; min-height: 44px; padding: 0 8px !important; color: var(--gold) !important; text-decoration: underline; font-weight: 500 !important; }
 .form { display: grid; gap: 12px; }
@@ -38,3 +39,6 @@ button.ghost:hover:not(:disabled) { border-color: var(--gold); filter: none; }
 .form input { min-height: 44px; padding: 10px 14px; border-radius: 10px; border: 1px solid #5a403a; background: #150507; color: var(--ink); font: 16px system-ui, sans-serif; }
 .form input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .profile-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+/* Clerk's form can end up straight under .acc rather than inside .clerk-box: match it to the tabs' width either way. */
+.acc .cl-rootBox { width: 100%; margin-top: 16px; }
+.acc .cl-cardBox { width: 100%; max-width: none; }
