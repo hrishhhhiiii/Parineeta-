@@ -705,8 +705,7 @@ body {
   width: max-content;
   animation: marquee 60s linear infinite;
 }
-.marquee:hover .marquee__track,
-.motion-paused .marquee__track {
+.marquee:hover .marquee__track {
   animation-play-state: paused;
 }
 .marquee__group {

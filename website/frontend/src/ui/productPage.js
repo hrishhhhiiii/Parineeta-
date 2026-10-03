@@ -1,5 +1,6 @@
 import { PRODUCTS, SETS, STORY, PALETTES, CATEGORIES } from '../data/products.js';
 import { REVIEWS as FILM_REVIEWS, SITE, waLink, photoSrc } from '../data/site.js';
+import { HOMEPAGE } from '../data/homepage.js';
 import { reviewsFor, ratingSummary, myReviews, saveMyReview } from '../data/reviews.js';
 import { h, icon, inr } from './dom.js';
 import { store, lineInfo, MAX } from './store.js';
@@ -336,7 +337,8 @@ function reviewsSection(p) {
 
 /* ---------------- page ---------------- */
 function relatedSection(p) {
-  const sets = SETS.filter((s) => s.items.includes(p.id));
+  // Sets show only while the homepage's Bridal sets section is switched on.
+  const sets = HOMEPAGE.sets?.hidden ? [] : SETS.filter((s) => s.items.includes(p.id));
   const same = PRODUCTS.filter((x) => x.id !== p.id && x.category === p.category);
   const others = PRODUCTS.filter((x) => x.id !== p.id && x.category !== p.category);
   const picks = [...same, ...others].slice(0, 4);

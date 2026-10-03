@@ -37,8 +37,6 @@ import trash from '@phosphor-icons/core/assets/light/trash-light.svg?raw';
 import share from '@phosphor-icons/core/assets/light/share-network-light.svg?raw';
 import receipt from '@phosphor-icons/core/assets/light/receipt-light.svg?raw';
 import shuffle from '@phosphor-icons/core/assets/light/shuffle-light.svg?raw';
-import pauseIcon from '@phosphor-icons/core/assets/light/pause-light.svg?raw';
-import playIcon from '@phosphor-icons/core/assets/light/play-light.svg?raw';
 import star from '@phosphor-icons/core/assets/light/star-light.svg?raw';
 import starFill from '@phosphor-icons/core/assets/fill/star-fill.svg?raw';
 import sealCheck from '@phosphor-icons/core/assets/light/seal-check-light.svg?raw';
@@ -90,8 +88,6 @@ const ICONS = {
   'light:share-network': share,
   'light:receipt': receipt,
   'light:shuffle': shuffle,
-  'light:pause': pauseIcon,
-  'light:play': playIcon,
   'light:star': star,
   'fill:star': starFill,
   'light:seal-check': sealCheck,

@@ -25,7 +25,7 @@ export const HOMEPAGE = {
   story: { title: 'A Bengali wedding, in', titleEm: 'seven objects.', lede: 'Every piece we paint has a job in the ceremony. Scroll through the wedding day, from the last meal at home to the first step into a new one.', hidden: false },
   filmband: { title: 'Painted in Patuli,', titleEm: 'on the banks of the Bhagirathi.', lede: "Every piece is made by hand in our studio and finished to order for your family's day.", hidden: false },
   collection: { title: 'The collection', titleEm: '', lede: "Every piece is painted to order. Browse the shop's own photographs, or turn each piece in 3D and choose its colours.", hidden: false },
-  sets: { title: 'Bridal sets', titleEm: '', lede: 'Pieces that belong together, painted to match and priced as one.', hidden: false },
+  sets: { title: 'Bridal sets', titleEm: '', lede: 'Pieces that belong together, painted to match and priced as one.', hidden: true },
   lookbook: { title: 'The Parineeta', titleEm: 'edit.', lede: 'Our own photographs of pieces we have painted and weddings we have styled. Tap any picture to see it large.', hidden: false },
   studio: { title: 'Draw your own', titleEm: 'alpana.', lede: 'Bengali homes welcome guests with alpana: patterns painted on the floor with rice paste, by hand. Draw one line and watch it repeat around the circle.', hidden: false },
   invitations: { title: 'Design your', titleEm: 'wedding card.', lede: 'Make an invitation, a poster or a save-the-date in Bengali style. Type your names, choose a look and download it free.', hidden: false },

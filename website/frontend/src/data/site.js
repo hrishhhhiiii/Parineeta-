@@ -80,18 +80,18 @@ export const PHOTO_TITLES = {
 
 /** Curated lookbook from the shop's own photography. */
 export const LOOKBOOK = [
-  { id: 'aiburobhat-bride', title: 'An aiburobhat setting, styled by Parineeta', w: 600, h: 800 },
+  { id: 'aiburobhat-bride', title: 'Madur backdrop for an aiburobhat', w: 600, h: 800 },
   { id: 'mukut-noir', title: 'Shola mukut in pearl and silver', w: 800, h: 744 },
-  { id: 'amader-meyer-biye', title: 'Amader meyer biye, a painted welcome board', w: 609, h: 800 },
+  { id: 'amader-meyer-biye', title: 'Amader meyer biye, a painted patipatro', w: 609, h: 800 },
   { id: 'kouto-stage', title: 'A gach kouto family on the wedding stage', w: 800, h: 625 },
-  { id: 'velvet-arch-backdrop', title: 'Painted velvet arch for the bride\'s seat', w: 600, h: 800 },
+  { id: 'velvet-arch-backdrop', title: 'Painted khoi daan kulo', w: 600, h: 800 },
   { id: 'bride-kula-panel', title: 'A bride, painted on a kula', w: 646, h: 800 },
-  { id: 'kouto-set-garden', title: 'Kouto set in sindoor red', w: 800, h: 800 },
-  { id: 'gopal-idol', title: 'Gopal, hand-painted', w: 667, h: 800 },
-  { id: 'flower-dala', title: 'Flower dala for tattwa gifts', w: 748, h: 800 },
+  { id: 'kouto-set-garden', title: 'Gach kouto set in sindoor red', w: 800, h: 800 },
+  { id: 'gopal-idol', title: 'Gopal, Angaraag', w: 667, h: 800 },
+  { id: 'flower-dala', title: 'Engagement platter with roses and pearls', w: 748, h: 800 },
   { id: 'thala-set-top', title: 'Matir thala set, seen from above', w: 600, h: 800 },
   { id: 'mukut-garden', title: 'Shola mukut in daylight', w: 800, h: 595 },
-  { id: 'punjabi-indigo', title: 'Indigo punjabi with hand-painted motifs', w: 587, h: 800 },
+  { id: 'punjabi-indigo', title: 'Hand-painted punjabi', w: 587, h: 800 },
 ];
 
 export const SERVICES = [
@@ -99,7 +99,7 @@ export const SERVICES = [
     id: 'backdrops',
     title: 'Backdrops, walls and floor alpana',
     bn: 'সাবেকি ব্যাকড্রপ ও আলপনা',
-    body: 'Painted velvet arches, mats and stage backdrops in the old Bengali style, plus alpana on your floors and walls.',
+    body: 'Painted velvet kulo, mats and stage backdrops in the old Bengali style, plus alpana on your floors and walls.',
     photo: 'velvet-arch-backdrop',
     size: 'wide',
   },
@@ -113,7 +113,7 @@ export const SERVICES = [
   },
   {
     id: 'portraits',
-    title: 'Portraits and welcome boards',
+    title: 'Portraits and patipatro',
     bn: 'প্রতিকৃতি',
     body: 'The couple, the family or a family deity, painted onto a board, a kula or a gach kouto.',
     photo: 'amader-meyer-biye',
