@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TessellateModifier } from 'three/addons/modifiers/TessellateModifier.js';
 import { PALETTES } from '../data/products.js';
-import { bandTexture, kunkeTexture, kunkeRimTexture, alpanaTexture, leafTexture, fabricTexture, matTexture, LEAF_BOUNDS, KURTA_BOUNDS } from './textures.js';
+import { bandTexture, kunkeTexture, kunkeRimTexture, kuloTexture, KULO_SIZE, alpanaTexture, leafTexture, fabricTexture, matTexture, LEAF_BOUNDS, KURTA_BOUNDS } from './textures.js';
 import { M } from './materials.js';
 
 const TAU = Math.PI * 2;
@@ -498,74 +498,156 @@ function backdrop(pal) {
   return g;
 }
 
-const DALA = [[0, 0], [0.86, 0], [0.92, 0.04], [0.97, 0.2], [1.0, 0.3], [0.98, 0.34], [0.6, 0.36], [0, 0.37]];
-
-function flowerDala(pal) {
+// Khoi daan kulo: an arched panel covered in painted velvet, held in a round cane frame, leaning back a little.
+function kulo(pal) {
   const g = new THREE.Group();
-  const top = 0.36;
-  g.add(new THREE.Mesh(shared('dala', () => lathe(DALA, 96, 120)), M.silk(pal.base)));
-  g.add(ring(0.995, 0.3, 0.024));
-  g.add(ring(0.93, 0.06, 0.018));
-  const lace = new THREE.Mesh(shared('dala-lace', () => new THREE.TorusGeometry(0.95, 0.045, 12, 96)), M.rice());
-  lace.rotation.x = Math.PI / 2;
-  lace.position.y = 0.03;
-  g.add(lace);
-  const beadGeo = shared('bead', () => new THREE.SphereGeometry(1, 14, 10));
-  g.add(instancedRing(beadGeo, M.rice(), 60, (d, i) => {
-    const a = (i / 60) * TAU;
-    d.position.set(Math.cos(a) * 1.0, 0.075, Math.sin(a) * 1.0);
-    d.scale.setScalar(0.024);
-  }));
-  const hoopR = 0.62;
-  const stretch = 1.4;
-  const z = -0.18;
-  const hoop = new THREE.Mesh(shared('dala-hoop', () => new THREE.TorusGeometry(hoopR, 0.03, 12, 72, Math.PI)), M.gold());
-  hoop.scale.set(1, stretch, 1);
-  hoop.position.set(0, top, z);
-  g.add(hoop);
-  const fan = new THREE.Mesh(shared('dala-fan', () => new THREE.CircleGeometry(hoopR * 0.96, 48, 0, Math.PI)), M.silk(pal.deep));
-  fan.scale.set(1, stretch, 1);
-  fan.position.set(0, top, z - 0.02);
-  g.add(fan);
-  const roseGeo = shared('rose', () => new THREE.SphereGeometry(1, 18, 12));
-  const roses = [M.silk('#E8859B'), M.silk('#FAD0D8')];
-  const leafMat = M.silk(pal.leaf);
-  const onHoop = (t, r = hoopR) => new THREE.Vector3(Math.cos(t) * r, top + Math.sin(t) * r * stretch, z);
-  for (let i = 0; i <= 16; i++) {
-    const t = (i / 16) * Math.PI;
-    const rose = new THREE.Mesh(roseGeo, roses[i % 2]);
-    rose.position.copy(onHoop(t)).setZ(z + 0.03);
-    rose.scale.set(0.095, 0.085, 0.09);
-    g.add(rose);
-    if (i < 16) {
-      const leaf = new THREE.Mesh(roseGeo, leafMat);
-      leaf.position.copy(onHoop(t + Math.PI / 32, hoopR + 0.07));
-      leaf.scale.set(0.045, 0.022, 0.06);
-      g.add(leaf);
-    }
-  }
-  for (const side of [-1, 1]) {
-    const from = onHoop(Math.PI / 2 - side * 0.42).setZ(z + 0.05);
-    const to = new THREE.Vector3(side * 0.18, top + 0.03, 0.08);
-    const n = 18;
-    g.add(instancedRing(beadGeo, M.gem('#FFFFFF'), n, (d, i) => {
-      const t = i / (n - 1);
-      d.position.lerpVectors(from, to, t);
-      d.position.x += Math.sin(t * Math.PI) * side * 0.06;
-      d.scale.setScalar(0.021);
-    }));
-  }
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * TAU + 0.26;
-    const rose = new THREE.Mesh(roseGeo, roses[i % 2]);
-    rose.position.set(Math.cos(a) * 0.82, top + 0.04, Math.sin(a) * 0.82);
-    rose.scale.set(0.08, 0.06, 0.08);
-    g.add(rose);
-  }
+  const W = 1.2;
+  const R = W / 2;
+  const H = (W * KULO_SIZE.h) / KULO_SIZE.w;
+  const shape = new THREE.Shape();
+  shape.moveTo(-R, 0);
+  shape.lineTo(-R, H - R);
+  shape.absarc(0, H - R, R, Math.PI, 0, true);
+  shape.lineTo(R, 0);
+  shape.closePath();
+  const panel = shared('kulo-panel', () =>
+    planarUV(new THREE.ExtrudeGeometry(shape, { depth: 0.04, bevelEnabled: false, curveSegments: 48 }), { minX: -R, maxX: R, minY: 0, maxY: H }));
+  g.add(new THREE.Mesh(panel, [new THREE.MeshStandardMaterial({ map: kuloTexture(pal), roughness: 0.95 }), M.lacquer('#B98A3E', 0.5)]));
+  const cane = M.lacquer('#D2A24C', 0.45);
+  const path = new THREE.CurvePath();
+  path.add(new THREE.LineCurve3(new THREE.Vector3(-R, 0, 0.02), new THREE.Vector3(-R, H - R, 0.02)));
+  path.add(arc3(R, H - R));
+  path.add(new THREE.LineCurve3(new THREE.Vector3(R, H - R, 0.02), new THREE.Vector3(R, 0, 0.02)));
+  g.add(new THREE.Mesh(shared('kulo-cane', () => new THREE.TubeGeometry(path, 200, 0.045, 12, false)), cane));
+  const foot = new THREE.Mesh(shared('kulo-foot', () => new THREE.CylinderGeometry(0.03, 0.03, W, 12)), cane);
+  foot.rotation.z = Math.PI / 2;
+  foot.position.set(0, 0.03, 0.02);
+  g.add(foot);
+  g.rotation.x = -0.12;
   return g;
 }
 
-const BUILD = { gachKouto, sindoorKouto, kunke, darpan, piri, paanPata, mukut, topor, thalaSet, punjabi, archPanel, backdrop, flowerDala };
+// The cane's arch, as a 3D curve over the top of the kulo.
+function arc3(R, cy) {
+  const c = new THREE.Curve();
+  c.getPoint = (t, out = new THREE.Vector3()) => {
+    const a = Math.PI - t * Math.PI;
+    return out.set(Math.cos(a) * R, cy + Math.sin(a) * R, 0.02);
+  };
+  return c;
+}
+
+// Engagement platter: a low silk drum edged with gold zari and a white lace skirt, roses around the rim,
+// a hoop of roses at the back with strings of pearls falling to the centre, and a red silk leaf beside it.
+const PLATTER = [[0, 0], [0.9, 0], [0.96, 0.03], [0.98, 0.12], [0.98, 0.22], [0.95, 0.26], [0.6, 0.27], [0, 0.27]];
+// A full, round bloom: a domed heart inside a ruffled ring of petals, so it reads as a rose from any side.
+function rose(geo, mat, innerMat, scale) {
+  const r = new THREE.Group();
+  const ruffle = new THREE.Mesh(geo.ruffle, mat);
+  ruffle.rotation.x = Math.PI / 2;
+  ruffle.position.y = 0.3;
+  r.add(ruffle);
+  const bud = new THREE.Mesh(geo.bud, innerMat);
+  bud.position.y = 0.42;
+  bud.scale.set(0.72, 0.6, 0.72);
+  r.add(bud);
+  r.scale.setScalar(scale);
+  return r;
+}
+
+function flowerDala(pal) {
+  const g = new THREE.Group();
+  const top = 0.27;
+  g.add(new THREE.Mesh(shared('platter', () => lathe(PLATTER, 96, 120)), new THREE.MeshStandardMaterial({ color: pal.base, roughness: 0.72 })));
+  // gold zari band and edge
+  const zari = new THREE.Mesh(shared('platter-zari', () => new THREE.CylinderGeometry(0.985, 0.985, 0.07, 96, 1, true)), M.gold());
+  zari.position.y = 0.15;
+  g.add(zari);
+  g.add(ring(0.965, top - 0.005, 0.016));
+  // lace skirt: a white band with a row of little open rings
+  const lace = new THREE.Mesh(shared('platter-lace', () => new THREE.CylinderGeometry(1.0, 1.02, 0.07, 96, 1, true)), M.rice());
+  lace.position.y = 0.04;
+  g.add(lace);
+  const loopGeo = shared('lace-loop', () => new THREE.TorusGeometry(0.034, 0.009, 8, 20));
+  g.add(instancedRing(loopGeo, M.rice(), 72, (d, i) => {
+    const a = (i / 72) * TAU;
+    d.position.set(Math.cos(a) * 1.03, 0.035, Math.sin(a) * 1.03);
+    d.rotation.set(0, -a + Math.PI / 2, 0);
+  }));
+
+  const geo = {
+    ruffle: shared('rose-ruffle', () => new THREE.TorusGeometry(0.62, 0.36, 12, 24)),
+    bud: shared('rose-bud', () => new THREE.SphereGeometry(1, 16, 12)),
+  };
+  const peach = [M.lacquer('#EE8E7C', 0.6), M.lacquer('#F5AE9C', 0.6)];
+  const heart = M.lacquer('#D9604F', 0.6);
+  const lilac = M.lacquer('#5E3E96', 0.5);
+  const sprigGeo = shared('sprig', () => new THREE.SphereGeometry(1, 8, 6));
+  const sprig = (pos, s = 1) => {
+    for (let k = 0; k < 4; k++) {
+      const m = new THREE.Mesh(sprigGeo, lilac);
+      m.position.set(pos.x + (k % 2 ? 0.025 : -0.02) * s, pos.y + k * 0.018 * s, pos.z + (k > 1 ? 0.02 : -0.015) * s);
+      m.scale.setScalar(0.022 * s);
+      g.add(m);
+    }
+  };
+
+  // roses round the front and sides of the rim
+  for (let i = 0; i < 9; i++) {
+    const a = Math.PI * 0.08 + (i / 8) * Math.PI * 0.84;
+    const r = rose(geo, peach[i % 2], heart, 0.11);
+    r.position.set(Math.cos(a) * 0.86, top, Math.sin(a) * 0.86);
+    r.rotation.set(-0.35, 0, 0);
+    g.add(r);
+    if (i < 8) sprig(new THREE.Vector3(Math.cos(a + 0.17) * 0.9, top + 0.02, Math.sin(a + 0.17) * 0.9));
+  }
+
+  // the hoop of roses at the back
+  const hoopR = 0.55;
+  const stretch = 1.35;
+  const z = -0.42;
+  const hoop = new THREE.Mesh(shared('platter-hoop', () => new THREE.TorusGeometry(hoopR, 0.03, 12, 72, Math.PI)), M.gold());
+  hoop.scale.set(1, stretch, 1);
+  hoop.position.set(0, top, z);
+  g.add(hoop);
+  const onHoop = (t) => new THREE.Vector3(Math.cos(t) * hoopR, top + Math.sin(t) * hoopR * stretch, z);
+  for (let i = 0; i <= 20; i++) {
+    const t = (i / 20) * Math.PI;
+    const r = rose(geo, peach[i % 2], heart, 0.1);
+    r.position.copy(onHoop(t)).setZ(z + 0.03);
+    r.rotation.set(Math.PI / 2, 0, 0);
+    g.add(r);
+    if (i % 2) sprig(onHoop(t + 0.08).setZ(z + 0.07), 0.9);
+  }
+
+  // strings of pearls from the hoop down to the centre of the platter
+  const beadGeo = shared('bead', () => new THREE.SphereGeometry(1, 14, 10));
+  for (const off of [-0.55, -0.22, 0.22, 0.55]) {
+    const from = onHoop(Math.PI / 2 + off).setZ(z + 0.05);
+    const to = new THREE.Vector3(off * 0.35, top + 0.02, 0.18);
+    const n = 22;
+    g.add(instancedRing(beadGeo, M.gem('#FFFFFF'), n, (d, i) => {
+      const t = i / (n - 1);
+      d.position.lerpVectors(from, to, t);
+      d.position.y -= Math.sin(t * Math.PI) * 0.08;
+      d.scale.setScalar(0.019);
+    }));
+  }
+
+  // the red silk leaf standing beside the hoop
+  const leafShape = new THREE.Shape();
+  leafShape.moveTo(0, 0);
+  leafShape.bezierCurveTo(0.34, 0.2, 0.36, 0.7, 0, 1);
+  leafShape.bezierCurveTo(-0.36, 0.7, -0.34, 0.2, 0, 0);
+  const leaf = new THREE.Mesh(shared('platter-leaf', () => new THREE.ShapeGeometry(leafShape, 24)), new THREE.MeshPhysicalMaterial({ color: '#C21A2B', roughness: 0.5, clearcoat: 0.6, side: THREE.DoubleSide }));
+  leaf.scale.set(0.95, 0.95, 1);
+  leaf.position.set(0.42, top, z - 0.06);
+  leaf.rotation.set(0, -0.35, -0.38);
+  g.add(leaf);
+  return g;
+}
+
+const BUILD = { gachKouto, sindoorKouto, kunke, darpan, piri, paanPata, mukut, topor, thalaSet, punjabi, archPanel, backdrop, flowerDala, kulo };
 
 const FIT = {
   gachKouto: { h: 2.05, w: 1.6 },
@@ -581,6 +663,7 @@ const FIT = {
   archPanel: { h: 2.0, w: 1.6 },
   backdrop: { h: 1.8, w: 2.1 },
   flowerDala: { h: 1.9, w: 1.9 },
+  kulo: { h: 2.0, w: 1.6 },
 };
 
 export function buildModel(product, styleId) {

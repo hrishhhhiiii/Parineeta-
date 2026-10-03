@@ -1,20 +1,15 @@
-/** User-controlled pause for all idle animation (WCAG 2.2.2), remembered across visits. */
+/** Shared pause state for idle animation. There is no on-page control any more; visitors who ask
+ * their device for reduced motion get still versions instead (see reduceMotion / reducedMotion). */
 export const motion = {
-  paused: (() => {
-    try {
-      return localStorage.getItem('parineeta:motion') === 'paused';
-    } catch {
-      return false;
-    }
-  })(),
+  paused: false,
   listeners: new Set(),
   set(paused) {
     this.paused = paused;
-    try {
-      localStorage.setItem('parineeta:motion', paused ? 'paused' : 'on');
-    } catch {
-      /* storage unavailable */
-    }
     this.listeners.forEach((fn) => fn(paused));
   },
 };
+try {
+  localStorage.removeItem('parineeta:motion');
+} catch {
+  /* storage unavailable */
+}

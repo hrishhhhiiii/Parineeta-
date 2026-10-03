@@ -226,6 +226,126 @@ export function kunkeRimTexture(pal) {
   });
 }
 
+/** Khoi daan kulo face: deep velvet with a white feathered border following the arch and a kalka in the middle. */
+export const KULO_SIZE = { w: 960, h: 1280 };
+export function kuloTexture(pal) {
+  const { w, h } = KULO_SIZE;
+  return canvasTexture(`kulo:${pal.base}:${pal.detail}`, w, h, (g) => {
+    const R = w / 2;
+    // the arch outline, inset by d: semicircular top, straight sides
+    const arch = (d) => {
+      g.beginPath();
+      g.moveTo(d, h);
+      g.lineTo(d, R);
+      g.arc(R, R, R - d, Math.PI, 0);
+      g.lineTo(w - d, h);
+    };
+    const along = (d, t) => {
+      // t in 0..1 along the arch at inset d: left side up, over the top, right side down
+      const side = h - R;
+      const top = Math.PI * (R - d);
+      const total = side * 2 + top;
+      let s = t * total;
+      if (s < side) return { x: d, y: h - s, a: -Math.PI / 2 };
+      s -= side;
+      if (s < top) {
+        const ang = Math.PI + (s / top) * Math.PI;
+        return { x: R + Math.cos(ang) * (R - d), y: R + Math.sin(ang) * (R - d), a: ang + Math.PI / 2 };
+      }
+      s -= top;
+      return { x: w - d, y: R + s, a: Math.PI / 2 };
+    };
+    const grd = g.createRadialGradient(R, h * 0.45, 40, R, h * 0.45, h * 0.75);
+    grd.addColorStop(0, pal.base);
+    grd.addColorStop(1, pal.deep);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = pal.detail;
+    g.fillStyle = pal.detail;
+    // feathered border: leaves combed along the arch, leaning the same way, between two white lines
+    g.lineWidth = 6;
+    arch(28);
+    g.stroke();
+    arch(170);
+    g.stroke();
+    for (let i = 0; i < 40; i++) {
+      const p = along(99, (i + 0.5) / 40);
+      g.save();
+      g.translate(p.x, p.y);
+      g.rotate(p.a + 0.55);
+      petal(g, 0, 0, 52, 124);
+      g.fill();
+      g.strokeStyle = pal.base;
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(0, 58);
+      g.lineTo(0, -54);
+      for (let k = -44; k < 54; k += 11) {
+        g.moveTo(0, k);
+        g.lineTo(15, k - 11);
+        g.moveTo(0, k);
+        g.lineTo(-15, k - 11);
+      }
+      g.stroke();
+      g.restore();
+    }
+    // a row of dots inside the border
+    for (let i = 0; i < 90; i++) {
+      const p = along(196, (i + 0.5) / 90);
+      g.beginPath();
+      g.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      g.fill();
+    }
+    // the kalka (paisley) in the middle, over two curling scrolls
+    const cx = R;
+    const cy = h * 0.5;
+    g.lineWidth = 7;
+    g.strokeStyle = pal.detail;
+    petal(g, cx, cy, 250, 380);
+    g.stroke();
+    petal(g, cx, cy + 18, 190, 300);
+    g.stroke();
+    // the kalka's filling: tiers of small leaves
+    for (let row = 0; row < 6; row++) {
+      const y = cy + 100 - row * 40;
+      const n = row < 2 ? 3 : row < 4 ? 2 : 1;
+      for (let k = 0; k < n; k++) {
+        const x = cx + (k - (n - 1) / 2) * 44;
+        petal(g, x, y, 22, 40);
+        g.fill();
+      }
+    }
+    g.beginPath();
+    g.moveTo(cx, cy - 190);
+    g.lineTo(cx, cy - 235);
+    g.stroke();
+    g.beginPath();
+    g.arc(cx, cy - 246, 14, 0, Math.PI * 2);
+    g.fill();
+    for (const s of [-1, 1]) {
+      g.beginPath();
+      for (let t = 0; t <= 1.001; t += 0.02) {
+        const ang = t * Math.PI * 3.2;
+        const r = 95 * (1 - t * 0.8);
+        const x = cx + s * (110 + Math.cos(ang) * r);
+        const y = cy + 230 - Math.sin(ang) * r;
+        if (t === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.stroke();
+      for (let k = 0; k < 9; k++) {
+        petal(g, cx + s * (40 + k * 30), cy + 360, 16, 40, s * 0.5);
+        g.fill();
+      }
+    }
+    g.lineWidth = 5;
+    g.beginPath();
+    g.moveTo(cx - 280, cy + 330);
+    g.lineTo(cx + 280, cy + 330);
+    g.stroke();
+  });
+}
+
 /** Alpana panel: frame border plus central mandala. */
 export function alpanaTexture(pal, w = 1024, h = 1024, { bg = null, frame = true } = {}) {
   const key = `alpana:${w}x${h}:${pal.base}:${pal.detail}:${bg}:${frame}`;

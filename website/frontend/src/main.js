@@ -118,21 +118,6 @@ function hidePreloader() {
 // Reveal the page as soon as fonts are in, so the headline is not held back by WebGL.
 Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1200))]).then(hidePreloader);
 
-/* ---------- pause-animations control ---------- */
-const motionBtn = $('#motion-toggle');
-const bandVideoEl = $('#filmband-video');
-function paintMotion(paused) {
-  document.documentElement.classList.toggle('motion-paused', paused);
-  motionBtn.setAttribute('aria-pressed', String(paused));
-  motionBtn.setAttribute('aria-label', paused ? 'Play animations' : 'Pause animations');
-  motionBtn.title = paused ? 'Play animations' : 'Pause animations';
-  motionBtn.replaceChildren(icon(paused ? 'play' : 'pause'));
-  if (paused) bandVideoEl.pause();
-}
-motion.listeners.add(paintMotion);
-paintMotion(motion.paused);
-motionBtn.addEventListener('click', () => motion.set(!motion.paused));
-
 /* ---------- deferred images ---------- */
 // Chrome's preload scanner fetched the services backdrop despite loading="lazy", so it carries data-src until it nears the viewport.
 const deferred = $$('img[data-src]');

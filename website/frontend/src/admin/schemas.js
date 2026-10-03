@@ -21,7 +21,8 @@ export const SHAPES = [
   ['punjabi', 'Kurta / punjabi'],
   ['archPanel', 'Arched painted panel'],
   ['backdrop', 'Stage backdrop'],
-  ['flowerDala', 'Round tray (dala)'],
+  ['flowerDala', 'Engagement platter (round tray with a rose hoop)'],
+  ['kulo', 'Khoi daan kulo (arched velvet panel in a cane frame)'],
 ];
 
 const palettes = () => Object.entries(PALETTES).map(([id, p]) => [id, p.label]);
