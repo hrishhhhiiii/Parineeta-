@@ -8,7 +8,7 @@ import { thumbImg } from './drawers.js';
 import { toast } from './toast.js';
 
 export function renderMarquee() {
-  const words = ['গাছকৌটো', 'Gach Kouto', 'টোপর', 'Topor', 'শোলার মুকুট', 'Shola Mukut', 'পানপাতা', 'Paan Pata', 'আলপনা', 'Alpana', 'বিয়ের পিঁড়ি', 'Biyer Piri', 'সিঁদুরকৌটো', 'Sindoor Kouto'];
+  const words = ['গাছকৌটো', 'Gach Kouto', 'টোপর', 'Topor', 'শোলার মুকুট', 'Shola Mukut', 'পানপাতা', 'Paan Pata', 'আলপনা', 'Alpana', 'বিয়ের পিঁড়ি', 'Biyer Piri', 'কুনকে', 'Kunke'];
   const track = $('#marquee');
   const group = () => h('div', { class: 'marquee__group' }, ...words.flatMap((w, i) => [
     h('span', { class: i % 2 === 0 ? 'marquee__bn bn' : 'marquee__en', lang: i % 2 === 0 ? 'bn' : 'en', text: w }),
