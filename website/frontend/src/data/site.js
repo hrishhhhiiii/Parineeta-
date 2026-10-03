@@ -87,7 +87,7 @@ export const LOOKBOOK = [
   { id: 'velvet-arch-backdrop', title: 'Painted velvet arch for the bride\'s seat', w: 600, h: 800 },
   { id: 'bride-kula-panel', title: 'A bride, painted on a kula', w: 646, h: 800 },
   { id: 'kouto-set-garden', title: 'Kouto set in sindoor red', w: 800, h: 800 },
-  { id: 'gopal-idol', title: 'Gopal, hand-painted clay', w: 667, h: 800 },
+  { id: 'gopal-idol', title: 'Gopal, hand-painted', w: 667, h: 800 },
   { id: 'flower-dala', title: 'Flower dala for tattwa gifts', w: 748, h: 800 },
   { id: 'thala-set-top', title: 'Matir thala set, seen from above', w: 600, h: 800 },
   { id: 'mukut-garden', title: 'Shola mukut in daylight', w: 800, h: 595 },
