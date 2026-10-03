@@ -81,6 +81,12 @@ function applySocials() {
 
 const mapsLink = (q) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 const mapsEmbed = (q) => `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=14&output=embed`;
+// A Google Maps link pasted in the admin (Share → Copy link). Only Google Maps addresses are used.
+const isMapsUrl = (u) => /^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|maps\.google\.[a-z.]+|(www\.)?google\.[a-z.]+\/maps)(\/|$)/i.test(String(u || '').trim());
+// Directions: the pasted link if there is one, otherwise a search for the place.
+const directionsHref = (s) => (isMapsUrl(s.mapsUrl) ? String(s.mapsUrl).trim() : mapsPlace(s) ? mapsLink(mapsPlace(s)) : '');
+// The small embedded map needs a place to search for; a short share link can't be embedded.
+const mapsPlace = (s) => s.mapsQuery || (isMapsUrl(s.mapsUrl) ? [s.name, String(s.address || '').split('\n').join(', ')].filter(Boolean).join(', ') : '');
 
 function applyStores() {
   const stores = STORES.filter((s) => !s.hidden && (s.name || s.address));
@@ -97,8 +103,8 @@ function applyStores() {
       stores.length > 1 && s.name ? el('br') : null,
       ...String(s.address || '').split('\n').flatMap((line, j) => (j ? [el('br'), line] : [line])),
       s.hours ? el('br') : null, s.hours ? el('small', { text: s.hours }) : null,
-      stores.length > 1 && s.mapsQuery ? el('br') : null,
-      stores.length > 1 && s.mapsQuery ? el('a', { href: mapsLink(s.mapsQuery), target: '_blank', rel: 'noopener', text: 'Directions' }) : null,
+      stores.length > 1 && directionsHref(s) ? el('br') : null,
+      stores.length > 1 && directionsHref(s) ? el('a', { href: directionsHref(s), target: '_blank', rel: 'noopener', text: 'Directions' }) : null,
     ]).filter((x) => x != null && x !== false));
     addr.hidden = !stores.length;
   }
@@ -117,14 +123,14 @@ function applyStores() {
     const n = SITE.whatsapp;
     wa.textContent = n.startsWith('91') && n.length === 12 ? `+91 ${n.slice(2, 7)} ${n.slice(7)}` : `+${n}`;
   }
-  const first = stores.find((s) => s.mapsQuery);
+  const first = stores.find((s) => directionsHref(s));
   const dir = $('#visit .visit__ctas a[href*="google.com/maps"]');
   const frame = $('#visit .visit__map iframe');
   if (first) {
-    if (dir) dir.href = mapsLink(first.mapsQuery);
-    if (frame) {
-      frame.src = mapsEmbed(first.mapsQuery);
-      frame.title = `Map showing ${first.mapsQuery}`;
+    if (dir) dir.href = directionsHref(first);
+    if (frame && mapsPlace(first)) {
+      frame.src = mapsEmbed(mapsPlace(first));
+      frame.title = `Map showing ${mapsPlace(first)}`;
     }
   }
   if (dir) dir.hidden = !first;
