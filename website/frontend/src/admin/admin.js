@@ -107,7 +107,7 @@ const ctx = {
   notLive: new Set(), // keys published but not yet on the live site (failed or running build)
   role: 'editor',
   job: null, // latest publish job
-  section: SECTIONS[0].key,
+  section: 'home', // the Home screen; otherwise a section key or 'orders'
   index: 0, // selected item in a list section
 };
 const isDirty = (key) => JSON.stringify(ctx.data[key]) !== ctx.saved[key];
@@ -200,10 +200,10 @@ async function publishAll() {
   const edited = edits();
   if (edited.length) return toast(`Save or undo your changes first (${edited.map((x) => x.title).join(', ')}).`, 'err');
   const n = unpublished().length;
-  if (!confirm(`Publish ${n} section${n === 1 ? '' : 's'} to the live website?`)) return;
+  if (!confirm(`Put your ${n} saved change${n === 1 ? '' : 's'} on the live website now?`)) return;
   const { error } = await sb.rpc('publish');
   if (error) return toast(explain(error), 'err');
-  toast('Publishing. The website updates in about 2 minutes.');
+  toast('Done! The website will show your changes in about 2 minutes.');
   await loadAll();
   render();
 }
@@ -222,16 +222,16 @@ function paintPublishBar() {
   const j = ctx.job;
   const busy = Boolean(j && ['queued', 'building'].includes(j.status));
   const state = busy || j?.status === 'failed' ? jobText(j)
-    : n ? `${n} section${n === 1 ? '' : 's'} not published yet`
+    : n ? `${n} change${n === 1 ? '' : 's'} saved but not live yet`
     : ctx.notLive.size ? 'Some published changes are not live yet'
-    : jobText(j) || 'Everything is live';
+    : 'Your website is up to date ✓';
   bar.replaceChildren(...[
     h('span', { class: `pub__state${j?.status === 'failed' ? ' is-err' : ''}`, role: 'status', text: state }),
     j?.run_url && (j.status === 'failed' || busy) ? h('a', { href: j.run_url, target: '_blank', rel: 'noopener', class: 'linkbtn', text: 'Run log' }) : null,
     h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Preview', onclick: openPreview }),
     ctx.role === 'owner' && !busy && (j?.status === 'failed' || (!n && ctx.notLive.size)) ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Retry update', onclick: retryDeploy }) : null,
     ctx.role === 'owner'
-      ? h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: 'Publish', disabled: !n || busy, onclick: publishAll })
+      ? h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: 'Put changes live', disabled: !n || busy, onclick: publishAll })
       : h('span', { class: 'muted', text: 'The owner publishes changes.' }),
   ].filter(Boolean));
 }
@@ -282,10 +282,25 @@ function validate(section, value) {
   return problems;
 }
 
+// Codes like the web address name are folded under "More options", so fill any empty ones from the name.
+function fillCodes(section, value) {
+  const items = section.kind === 'list' ? value : [value];
+  for (const it of items) {
+    for (const f of section.fields) {
+      if (f.type !== 'slug' || !f.from || getPath(it, f.key)) continue;
+      const s = slugify(getPath(it, f.from));
+      if (s) setPath(it, f.key, f.prefix && !s.startsWith(f.prefix) ? f.prefix + s : s);
+    }
+  }
+}
+
 async function save(section) {
+  fillCodes(section, ctx.data[section.key]);
   let value = clone(ctx.data[section.key]);
   const problems = validate(section, value);
   if (problems.length) {
+    moreOpen = true; // a problem may be in a folded field
+    render();
     alert(`Please fix these before saving:\n\n• ${problems.slice(0, 12).join('\n• ')}`);
     return;
   }
@@ -297,7 +312,7 @@ async function save(section) {
   ctx.version[section.key] = data.version;
   ctx.updated[section.key] = { at: new Date().toISOString(), by: ctx.user.email };
   writeBackup(section.key);
-  toast(`${section.title} saved as a draft. Press Publish when you're ready for it to go live.`);
+  toast(`${section.title} saved. Press “Put changes live” at the top when you are ready.`);
   render();
 }
 
@@ -463,7 +478,7 @@ function setToDefault(section) {
   const count = section.kind === 'list'
     ? `${cur.length} item${cur.length === 1 ? '' : 's'} now → ${def.length} built-in`
     : `${section.fields.filter((f) => f.key && JSON.stringify(getPath(cur, f.key) ?? '') !== JSON.stringify(getPath(def, f.key) ?? '')).length} field(s) differ from the built-in content`;
-  if (!confirm(`Put "${section.title}" back to the website's original built-in content?\n\n${count}.\n\nThis only changes your draft: press Save changes, then Publish, to make it live. Undo changes brings your version back until you save.`)) return;
+  if (!confirm(`Put "${section.title}" back to the website's original built-in content?\n\n${count}.\n\nThis only changes your draft: press Save changes, then “Put changes live”. Undo changes brings your version back until you save.`)) return;
   ctx.data[section.key] = def;
   ctx.index = 0;
   writeBackup(section.key);
@@ -476,7 +491,7 @@ async function openHistory(section) {
   const SRC = { save: 'Saved', restore: 'Restored', reset: 'Set to default', migration: 'Original' };
   const dlg = h('dialog', { class: 'history', onclose: () => dlg.remove() },
     h('h2', { text: `${section.title}: saved versions` }),
-    h('p', { class: 'muted', text: ctx.role === 'owner' ? 'Restoring makes that version your draft. Save is not needed; press Publish to make it live.' : 'Only the owner can restore a version.' }),
+    h('p', { class: 'muted', text: ctx.role === 'owner' ? 'Restoring makes that version your draft. Save is not needed; press “Put changes live” at the top.' : 'Only the owner can restore a version.' }),
     revs?.length ? h('ol', { class: 'history__list' }, ...revs.map((r) => h('li', {},
       h('span', { text: `${new Date(r.created_at).toLocaleString()} · ${SRC[r.source] || r.source} · ${r.created_by}` }),
       ctx.role === 'owner' ? h('button', {
@@ -489,7 +504,7 @@ async function openHistory(section) {
           try { localStorage.removeItem(backupKey(section.key)); } catch {}
           await loadAll();
           render();
-          toast('Version restored as your draft. Press Publish to make it live.');
+          toast('Old version brought back. Press “Put changes live” at the top.');
         },
       }) : null))) : h('p', { text: 'No saved versions yet.' }),
     h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: 'Close', onclick: () => dlg.close() }));
@@ -500,17 +515,79 @@ async function openHistory(section) {
 /* ---------- layout ---------- */
 // Owner only: orders from the website's checkout. /admin#orders opens it directly.
 const ORDERS = 'orders';
+const HOME = 'home';
+
+// The menu, grouped by how often each part is used. Anything not listed falls under "More".
+const GROUPS = [
+  { title: 'Every day', keys: [ORDERS, 'products'] },
+  { title: 'Your website', keys: ['sets', 'reviews', 'lookbook', 'announcement', 'homepage'] },
+  { title: 'Shop details', keys: ['settings', 'stores', 'socials'] },
+];
+GROUPS.push({ title: 'More', keys: SECTIONS.map((s) => s.key).filter((k) => !GROUPS.some((g) => g.keys.includes(k))) });
+
+// What each tile on the Home screen says, in plain words.
+const TILE_TEXT = {
+  [ORDERS]: 'See new orders and mark them paid, made or delivered.',
+  products: 'Add a product, change a price or a photo, or hide one.',
+  sets: 'Bundles sold together at one price.',
+  reviews: 'Add a review a customer sent you.',
+  lookbook: 'The photo gallery on the website.',
+  announcement: 'A one-line message across the top of the website.',
+  homepage: 'The big headline and photo at the top of the home page.',
+  settings: 'Your WhatsApp number, UPI ID and bank details.',
+  stores: 'Shop addresses, phone numbers and opening hours.',
+  socials: 'Your Instagram and Facebook links.',
+};
+
+function go(key) {
+  ctx.section = key;
+  ctx.index = 0;
+  history.replaceState(null, '', key === ORDERS ? '#orders' : location.pathname + location.search);
+  render();
+  window.scrollTo(0, 0);
+}
+
+/** The first screen: big tiles for the common jobs, plus a 3-step reminder of how changes go live. */
+function homeView() {
+  const tile = (key) => {
+    const s = SECTIONS.find((x) => x.key === key);
+    const title = key === ORDERS ? 'Orders' : s.title;
+    return h('button', { type: 'button', class: 'tile', onclick: () => go(key) },
+      h('span', { class: 'tile__icon', 'aria-hidden': 'true', text: key === ORDERS ? '🧾' : s.icon }),
+      h('span', { class: 'tile__title', text: title }),
+      h('span', { class: 'tile__text', text: TILE_TEXT[key] || s.intro || '' }));
+  };
+  const name = (profileOf(ctx.user).name || '').split(' ')[0];
+  return h('div', { class: 'home' },
+    h('h1', { text: `Namaskar${name ? `, ${name}` : ''}! What would you like to do?` }),
+    h('ol', { class: 'howto' },
+      h('li', {}, h('strong', { text: 'Change' }), ' something below.'),
+      h('li', {}, h('strong', { text: 'Save' }), ' it (the gold button on each page).'),
+      h('li', {}, h('strong', { text: 'Put changes live' }), ' (top of the screen). The website updates in about 2 minutes.')),
+    ...GROUPS.slice(0, 3).map((g) => {
+      const keys = g.keys.filter((k) => (k === ORDERS ? ctx.role === 'owner' : SECTIONS.some((s) => s.key === k)));
+      return keys.length ? h('section', { class: 'home__group' }, h('h2', { text: g.title }), h('div', { class: 'tiles' }, ...keys.map(tile))) : null;
+    }),
+    h('p', { class: 'muted home__more', text: 'Other parts of the website are under “More” in the menu.' }));
+}
 
 function render() {
-  if (ctx.section === ORDERS && ctx.role !== 'owner') ctx.section = SECTIONS[0].key;
+  if (ctx.section === ORDERS && ctx.role !== 'owner') ctx.section = HOME;
   const section = SECTIONS.find((s) => s.key === ctx.section);
+  if (!section && ctx.section !== ORDERS) ctx.section = HOME;
   const navBtn = (key, icon, title, extra = null) => h('button', {
     type: 'button', class: `side__btn${key === ctx.section ? ' is-active' : ''}`, 'aria-current': key === ctx.section ? 'page' : null,
-    onclick: () => { ctx.section = key; ctx.index = 0; history.replaceState(null, '', key === ORDERS ? '#orders' : location.pathname + location.search); render(); },
+    onclick: () => go(key),
   }, h('span', { 'aria-hidden': 'true', text: icon }), h('span', { text: title }), extra);
+  const dirtyDot = (key) => (isDirty(key) ? h('span', { class: 'dot', title: 'Not saved yet', text: '●' }) : null);
   const nav = h('nav', { class: 'side', 'aria-label': 'Sections' },
-    ctx.role === 'owner' ? navBtn(ORDERS, '🧾', 'Orders') : null,
-    ...SECTIONS.map((s) => navBtn(s.key, s.icon, s.title, isDirty(s.key) ? h('span', { class: 'dot', title: 'Unsaved changes', text: '●' }) : null)));
+    navBtn(HOME, '🏠', 'Home'),
+    ...GROUPS.flatMap((g) => {
+      const keys = g.keys.filter((k) => (k === ORDERS ? ctx.role === 'owner' : SECTIONS.some((s) => s.key === k)));
+      if (!keys.length) return [];
+      return [h('p', { class: 'side__group', text: g.title }),
+        ...keys.map((k) => (k === ORDERS ? navBtn(ORDERS, '🧾', 'Orders') : (() => { const s = SECTIONS.find((x) => x.key === k); return navBtn(s.key, s.icon, s.title, dirtyDot(s.key)); })()))];
+    }));
 
   // Clerk's UserButton: Manage account and Sign out (the browser warns first if there are unsaved changes).
   const userBtn = clerk ? h('div', { class: 'top__user' }) : null;
@@ -522,7 +599,7 @@ function render() {
       clerk ? userBtn : h('span', { class: 'top__user', title: ctx.user.email }, avatar(ctx.user, 30), h('span', { class: 'top__name', text: profileOf(ctx.user).name || ctx.user.email })),
       clerk ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) toLogin('?signout'); } })));
 
-  root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === ORDERS ? ordersView(sb, { h, toast, explain }) : sectionView(section))));
+  root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === HOME ? homeView() : ctx.section === ORDERS ? ordersView(sb, { h, toast, explain }) : sectionView(section))));
   if (clerk) {
     if (ctx.userBtn) clerk.unmountUserButton(ctx.userBtn);
     clerk.mountUserButton((ctx.userBtn = userBtn), { showName: true });
@@ -534,11 +611,22 @@ function render() {
   }
 }
 
+/** Renders the everyday fields, with the rarely needed ones folded under "More options". */
+let moreOpen = false;
+const onMore = (e) => { moreOpen = e.target.open; };
+function withMore(fields, render, toggle) {
+  const basic = fields.filter((f) => !f.advanced).map(render);
+  const extra = fields.filter((f) => f.advanced);
+  if (!extra.length) return basic;
+  return [...basic, h('details', { class: 'more', open: moreOpen || null, ontoggle: toggle },
+    h('summary', { text: 'More options (you rarely need these)' }), ...extra.map(render))];
+}
+
 function sectionView(section) {
   const dirty = isDirty(section.key);
   const upd = ctx.updated[section.key];
   const saveBar = h('div', { class: `savebar${dirty ? ' is-dirty' : ''}` },
-    h('span', { class: 'savebar__state', text: dirty ? (upd ? 'Unsaved changes' : 'Not saved yet') : `Draft saved${upd ? ` ${new Date(upd.at).toLocaleString()}${upd.by ? ` by ${upd.by}` : ''}` : ''}` }),
+    h('span', { class: 'savebar__state', text: dirty ? 'You have changes. Press Save.' : upd ? 'Saved. Press “Put changes live” at the top when ready.' : '' }),
     dirty && upd ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Undo changes', onclick: () => { ctx.data[section.key] = JSON.parse(ctx.saved[section.key]); writeBackup(section.key); render(); } }) : null,
     h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Set to default', onclick: () => setToDefault(section) }),
     ctx.saved[section.key] ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'History', onclick: () => openHistory(section) }) : null,
@@ -547,7 +635,7 @@ function sectionView(section) {
     const d = isDirty(section.key);
     saveBar.classList.toggle('is-dirty', d);
     saveBar.querySelector('.btn--gold').disabled = !d;
-    saveBar.querySelector('.savebar__state').textContent = d ? 'Unsaved changes' : 'Saved';
+    saveBar.querySelector('.savebar__state').textContent = d ? 'You have changes. Press Save.' : 'Saved.';
     const navBtn = document.querySelector('.side__btn.is-active');
     const dot = navBtn?.querySelector('.dot');
     if (d && navBtn && !dot) navBtn.append(h('span', { class: 'dot', title: 'Unsaved changes', text: '●' }));
@@ -563,7 +651,7 @@ function sectionView(section) {
     const obj = ctx.data[section.key];
     const form = h('div', { class: 'card form' });
     const defs = section.defaults();
-    const paint = () => form.replaceChildren(...section.fields.map((f) => {
+    const paint = () => form.replaceChildren(...withMore(section.fields, (f) => {
       const node = field(f, obj, onChange, paint);
       if (!f.key || f.type === 'list') return node;
       const dv = getPath(defs, f.key);
@@ -589,7 +677,7 @@ This changes your draft only.`)) return;
       node.addEventListener('change', sync);
       node.append(btn);
       return node;
-    }));
+    }, onMore));
     paint();
     return h('div', {}, head, form);
   }
@@ -606,13 +694,13 @@ This changes your draft only.`)) return;
   const form = h('div', { class: 'card form' });
   const paintForm = () => {
     const it = list[ctx.index];
-    if (!it) return form.replaceChildren(h('p', { class: 'muted', text: 'Nothing here yet. Use “Add” to create the first one.' }));
+    if (!it) return form.replaceChildren(h('p', { class: 'muted', text: 'Nothing here yet. Press “+ Add new” to make the first one.' }));
     const tools = h('div', { class: 'form__tools' },
       h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '↑ Move up', disabled: ctx.index === 0, onclick: () => move(-1) }),
       h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '↓ Move down', disabled: ctx.index === list.length - 1, onclick: () => move(1) }),
       h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Duplicate', onclick: () => { const c = clone(it); if (c.id) c.id = `${c.id}-copy`; list.splice(ctx.index + 1, 0, c); ctx.index += 1; onChange(); paintAll(); } }),
       h('button', { type: 'button', class: 'btn btn--danger btn--sm', text: 'Delete', onclick: () => { if (!confirm(`Delete “${section.itemTitle(it)}”? You can undo until you save.`)) return; list.splice(ctx.index, 1); ctx.index = Math.max(0, ctx.index - 1); onChange(); paintAll(); } }));
-    form.replaceChildren(tools, ...section.fields.map((f) => field(f, it, onChange, paintForm)));
+    form.replaceChildren(tools, ...withMore(section.fields, (f) => field(f, it, onChange, paintForm), onMore));
   };
   const move = (d) => {
     const j = ctx.index + d;
@@ -625,7 +713,7 @@ This changes your draft only.`)) return;
   paintAll();
 
   const add = h('button', {
-    type: 'button', class: 'btn btn--gold btn--sm', text: '+ Add',
+    type: 'button', class: 'btn btn--gold btn--sm', text: '+ Add new',
     onclick: () => {
       const blank = section.blank();
       if (section.newFirst) { list.unshift(blank); ctx.index = 0; } else { list.push(blank); ctx.index = list.length - 1; }
@@ -636,7 +724,7 @@ This changes your draft only.`)) return;
   });
 
   return h('div', {}, head, h('div', { class: 'split' },
-    h('aside', { class: 'card items-card' }, h('div', { class: 'items-head' }, h('strong', { text: `${list.length} ${section.title.toLowerCase()}` }), add), items),
+    h('aside', { class: 'card items-card' }, h('div', { class: 'items-head' }, h('strong', { text: `${list.length} ${section.title.toLowerCase()}` }), h('span', { class: 'muted items-hint', text: 'Tap one to change it' }), add), items),
     form));
 }
 

@@ -23,7 +23,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 15px/1.5 var(--font-body);
+  font: 17px/1.55 var(--font-body);
 }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.15; margin: 0 0 6px; }
 h1 { font-size: 2rem; }
@@ -47,7 +47,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 42px; padding: 0 18px;
+  min-height: 48px; padding: 0 20px;
   border-radius: 999px; border: 1px solid var(--line-strong);
   background: none; color: var(--ink); font-weight: 600; text-decoration: none; white-space: nowrap;
 }
@@ -57,7 +57,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .btn--danger { border-color: rgba(255, 138, 138, 0.5); color: var(--danger); }
 .btn--danger:hover:not(:disabled) { border-color: var(--danger); background: rgba(255, 138, 138, 0.08); }
 .linkbtn:hover { color: var(--gold); }
-.btn--sm { min-height: 34px; padding: 0 12px; font-size: 0.85rem; }
+.btn--sm { min-height: 42px; padding: 0 16px; font-size: 0.95rem; }
 .linkbtn { background: none; border: 0; color: var(--gold-2); text-decoration: underline; padding: 0; justify-self: start; }
 .form-msg { margin: 0; min-height: 1.4em; color: var(--gold-2); font-size: 0.9rem; }
 
@@ -202,3 +202,31 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .avatar { position: relative; display: inline-grid; place-items: center; flex: none; width: var(--size, 30px); height: var(--size, 30px); overflow: hidden; border-radius: 999px; background: linear-gradient(135deg, #e3aa3e, #9b5a1a); color: #1d0a06; font-weight: 700; font-size: calc(var(--size, 30px) * 0.38); line-height: 1; }
 .avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 @media (max-width: 640px) { .top__name { display: none; } }
+
+/* ---------- simple mode: Home tiles, grouped menu, folded options ---------- */
+.side__group { margin: 14px 12px 4px; font-size: 0.8rem; font-weight: 700; color: var(--ink-3); }
+.side__btn { min-height: 46px; font-size: 1rem; }
+.home h1 { font-size: clamp(1.8rem, 3vw, 2.4rem); margin-bottom: 18px; }
+.howto { display: grid; gap: 6px; margin: 0 0 28px; padding: 16px 20px 16px 40px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; max-width: 760px; }
+.home__group { margin-bottom: 28px; }
+.home__group h2 { font-size: 1.4rem; margin-bottom: 12px; color: var(--gold-2); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.tile {
+  display: grid; gap: 6px; align-content: start; min-height: 150px; padding: 20px;
+  text-align: left; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.tile:hover { border-color: var(--gold); background: var(--surface-2); transform: translateY(-2px); }
+.tile:active { transform: translateY(0) scale(0.99); }
+.tile__icon { font-size: 2rem; line-height: 1; }
+.tile__title { font-size: 1.2rem; font-weight: 700; }
+.tile__text { color: var(--ink-2); font-size: 0.95rem; }
+.home__more { margin-top: 8px; }
+.items-hint { display: block; font-size: 0.8rem; text-transform: none; }
+.items-head { flex-wrap: wrap; gap: 4px 10px; }
+.more { border: 1px dashed var(--line-strong); border-radius: 12px; padding: 10px 14px; }
+.more summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--ink-2); font-weight: 600; }
+.more[open] { display: grid; gap: 16px; }
+.savebar__state { font-size: 0.95rem; }
+@media (prefers-reduced-motion: reduce) { .tile { transition: none; } .tile:hover { transform: none; } }
+@media (max-width: 900px) { .side__group { display: none; } }
