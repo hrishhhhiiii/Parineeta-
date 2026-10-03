@@ -309,11 +309,11 @@ export const STORY = [
     body: 'All the while she hides her face behind two betel leaves. When the circles end she lowers them and the couple see each other.',
   },
   {
-    product: 'sindoor-kouto',
+    product: 'kunke',
     photo: { type: 'reel', id: 'ritual-set' },
     moment: 'Sindoor daan',
     title: 'A line of vermilion',
-    body: 'The groom takes sindoor from a small painted box and draws it along the parting of her hair. Now she is married.',
+    body: 'The groom takes sindoor from a painted kunke and draws it along the parting of her hair. Now she is married.',
   },
   {
     product: 'gach-kouto',

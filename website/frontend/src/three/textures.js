@@ -150,6 +150,82 @@ export function bandTexture(pal, variant = 'default') {
   });
 }
 
+/** Kunke wall: sindoor-red drum painted with white feather scrolls between dotted borders, like the shop's own. */
+export function kunkeTexture(pal) {
+  return canvasTexture(`kunke:${pal.base}:${pal.accent}:${pal.detail}`, 2048, 320, (g, w, h) => {
+    g.fillStyle = pal.base;
+    g.fillRect(0, 0, w, h);
+    // dotted borders top and bottom, each between two fine lines
+    for (const y of [h * 0.08, h * 0.92]) {
+      g.fillStyle = pal.detail;
+      g.fillRect(0, y - h * 0.055, w, h * 0.012);
+      g.fillRect(0, y + h * 0.043, w, h * 0.012);
+      for (let x = 10; x < w; x += 26) {
+        g.beginPath();
+        g.arc(x, y, h * 0.022, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    // feathers: curved quills combed on both sides, leaning alternately, packed close like the hand-painted ones
+    const n = 16;
+    const cw = w / n;
+    const top = h * 0.2;
+    const bot = h * 0.8;
+    g.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const x0 = i * cw + cw * 0.2;
+      const lean = i % 2 ? -1 : 1;
+      const pt = (t) => ({
+        x: x0 + cw * 0.6 * t,
+        y: bot - (bot - top) * t + Math.sin(t * Math.PI) * (bot - top) * 0.22 * lean,
+      });
+      g.strokeStyle = pal.detail;
+      g.lineWidth = h * 0.022;
+      g.beginPath();
+      for (let k = 0; k <= 40; k++) {
+        const q = pt(k / 40);
+        if (k === 0) g.moveTo(q.x, q.y);
+        else g.lineTo(q.x, q.y);
+      }
+      g.stroke();
+      g.lineWidth = h * 0.009;
+      for (let k = 2; k < 39; k++) {
+        const a = pt(k / 40);
+        const b = pt((k + 1) / 40);
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const reach = h * (0.04 + 0.09 * Math.sin((k / 40) * Math.PI));
+        for (const side of [1, -1]) {
+          g.beginPath();
+          g.moveTo(a.x, a.y);
+          g.lineTo(a.x + (-dy / len) * reach * side + (dx / len) * reach * 0.7, a.y + (dx / len) * reach * side + (dy / len) * reach * 0.7);
+          g.stroke();
+        }
+      }
+      g.fillStyle = pal.accent;
+      const c = pt(0.08);
+      g.beginPath();
+      g.arc(c.x, c.y, h * 0.026, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+}
+
+/** Kunke rims: plain red bands with one row of white dots. */
+export function kunkeRimTexture(pal) {
+  return canvasTexture(`kunke-rim:${pal.base}:${pal.detail}`, 1024, 64, (g, w, h) => {
+    g.fillStyle = pal.base;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = pal.detail;
+    for (let x = 8; x < w; x += 16) {
+      g.beginPath();
+      g.arc(x, h / 2, h * 0.14, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+}
+
 /** Alpana panel: frame border plus central mandala. */
 export function alpanaTexture(pal, w = 1024, h = 1024, { bg = null, frame = true } = {}) {
   const key = `alpana:${w}x${h}:${pal.base}:${pal.detail}:${bg}:${frame}`;

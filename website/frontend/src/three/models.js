@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TessellateModifier } from 'three/addons/modifiers/TessellateModifier.js';
 import { PALETTES } from '../data/products.js';
-import { bandTexture, alpanaTexture, leafTexture, fabricTexture, matTexture, LEAF_BOUNDS, KURTA_BOUNDS } from './textures.js';
+import { bandTexture, kunkeTexture, kunkeRimTexture, alpanaTexture, leafTexture, fabricTexture, matTexture, LEAF_BOUNDS, KURTA_BOUNDS } from './textures.js';
 import { M } from './materials.js';
 
 const TAU = Math.PI * 2;
@@ -117,40 +117,40 @@ function sindoorKouto(pal) {
   return g;
 }
 
-const KUNKE = [[0, 0], [0.46, 0], [0.5, 0.03], [0.47, 0.08], [0.5, 0.3], [0.56, 0.52], [0.62, 0.6], [0.6, 0.64], [0.55, 0.61], [0.5, 0.52], [0.44, 0.3], [0.41, 0.12], [0, 0.1]];
-
+// A squat open drum with raised lips top and bottom, like the shop's painted kunke.
 function kunke(pal) {
   const g = new THREE.Group();
-  const geo = shared('kunke', () => lathe(KUNKE, 96, 160));
-  g.add(new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ map: bandTexture(pal, 'small'), roughness: 0.4, clearcoat: 0.7, side: THREE.DoubleSide })));
-  g.add(ring(radiusAt(geo.userData.profile, 0.3) + 0.012, 0.3, 0.018));
-  const domeGeo = shared('rice-dome', () => new THREE.SphereGeometry(0.55, 40, 16, 0, TAU, 0, Math.PI / 2));
-  const dome = new THREE.Mesh(domeGeo, M.rice());
-  dome.scale.set(1, 0.38, 1);
-  dome.position.y = 0.5;
-  g.add(dome);
-  const grainGeo = shared('grain', () => new THREE.SphereGeometry(0.02, 6, 4));
-  const rand = mulberry(5);
-  g.add(instancedRing(grainGeo, M.rice(), 320, (d, i) => {
-    const a = rand() * TAU;
-    const r = Math.sqrt(rand()) * 0.52;
-    const h = Math.sqrt(Math.max(0, 1 - (r / 0.55) ** 2)) * 0.55 * 0.38;
-    d.position.set(Math.cos(a) * r, 0.5 + h + 0.004, Math.sin(a) * r);
-    d.rotation.set(rand() * 3, rand() * 3, 0);
-    d.scale.set(1.6, 0.7, 0.7);
-  }));
-  return g;
-}
-
-function mulberry(seed) {
-  let a = seed;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  const H = 0.62;
+  const wall = new THREE.Mesh(shared('kunke-wall', () => new THREE.CylinderGeometry(0.55, 0.56, H - 0.16, 128, 1, true)), M.painted(kunkeTexture(pal)));
+  wall.position.y = H / 2;
+  g.add(wall);
+  const inside = new THREE.Mesh(shared('kunke-inside', () => new THREE.CylinderGeometry(0.5, 0.5, H - 0.06, 96, 1, true)),
+    new THREE.MeshStandardMaterial({ color: pal.deep, roughness: 0.75, side: THREE.BackSide }));
+  inside.position.y = H / 2 + 0.03;
+  g.add(inside);
+  const floor = new THREE.Mesh(shared('kunke-floor', () => new THREE.CircleGeometry(0.5, 64)), inside.material);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0.06;
+  g.add(floor);
+  // rims: a rounded band whose cross-section is a short capsule
+  const lip = (rIn, rOut, y0, y1) => {
+    const pts = [];
+    const mid = (y0 + y1) / 2;
+    const half = (y1 - y0) / 2;
+    for (let k = 0; k <= 16; k++) {
+      const a = -Math.PI / 2 + (k / 16) * Math.PI;
+      pts.push(V2(rOut - half + Math.cos(a) * half, mid + Math.sin(a) * half));
+    }
+    pts.push(V2(rIn, y1), V2(rIn, y0));
+    pts.push(pts[0].clone());
+    return new THREE.LatheGeometry(pts, 128);
   };
+  const rimMat = M.painted(kunkeRimTexture(pal));
+  g.add(new THREE.Mesh(shared('kunke-base', () => lip(0, 0.61, 0, 0.09)), rimMat));
+  g.add(new THREE.Mesh(shared('kunke-lip', () => lip(0.5, 0.61, H - 0.1, H)), rimMat));
+  g.add(ring(0.565, 0.1, 0.012));
+  g.add(ring(0.565, H - 0.1, 0.012));
+  return g;
 }
 
 function darpan(pal) {
