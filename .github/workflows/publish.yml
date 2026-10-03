@@ -4,7 +4,7 @@
 # Also pings Supabase daily so the free project never pauses for inactivity.
 #
 # GitHub → Settings → Environments → production:
-#   secret   DEPLOY_HOOK         Cloudflare's deploy hook (Workers & Pages → parineeta → Settings → Builds → Deploy Hooks)
+#   secret   DEPLOY_HOOK (or CLDFLAREDEPLOYHOOK)  Cloudflare's deploy hook (Workers & Pages → parineeta → Settings → Builds → Deploy Hooks)
 #   secret   VERCEL_DEPLOY_HOOK  Vercel's deploy hook, while the Vercel copy of the site still runs
 #   variable SUPABASE_URL, SUPABASE_ANON_KEY (or the same values named VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 name: publish
@@ -73,7 +73,7 @@ jobs:
       # Every host that has a hook rebuilds: DEPLOY_HOOK (Cloudflare) and VERCEL_DEPLOY_HOOK (Vercel, while both run).
       - name: Ask the hosts to rebuild the site
         env:
-          CLOUDFLARE_HOOK: ${{ secrets.DEPLOY_HOOK }}
+          CLOUDFLARE_HOOK: ${{ secrets.DEPLOY_HOOK || secrets.CLDFLAREDEPLOYHOOK }}
           VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         run: |
           if [ -z "$CLOUDFLARE_HOOK$VERCEL_HOOK" ]; then echo "::error::Add the DEPLOY_HOOK secret (the host's deploy hook address)."; exit 1; fi
