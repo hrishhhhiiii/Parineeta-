@@ -230,3 +230,46 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .savebar__state { font-size: 0.95rem; }
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } .tile:hover { transform: none; } }
 @media (max-width: 900px) { .side__group { display: none; } }
+
+/* ---------- item list and editor: thumbnails, header, smooth switching ---------- */
+.items { gap: 6px; }
+.item {
+  position: relative; gap: 12px; padding: 10px 12px; min-height: 64px;
+  border: 1px solid var(--line); background: var(--bg);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.item:hover { border-color: var(--line-strong); transform: translateX(2px); }
+.item.is-active { border-color: var(--gold); background: var(--surface-2); box-shadow: inset 4px 0 0 var(--gold); }
+.item__thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex: none; background: var(--surface-2); }
+.item__thumb--icon { display: grid; place-items: center; font-size: 1.3rem; }
+.pill { margin-left: auto; flex: none; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: var(--ink-2); border: 1px solid var(--line-strong); }
+.form__head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.form__head .item__thumb { width: 64px; height: 64px; border-radius: 14px; font-size: 1.8rem; }
+.form__heading { flex: 1 1 200px; min-width: 0; }
+.form__heading h2 { font-size: 1.6rem; margin: 0; overflow-wrap: anywhere; }
+.form__step { display: flex; gap: 8px; }
+.form__body { display: grid; gap: 16px; }
+.empty-state { display: grid; justify-items: center; gap: 4px; padding: 48px 16px; text-align: center; }
+.empty-state__icon { font-size: 2.6rem; }
+.empty-state p { margin: 0; }
+@keyframes form-in-next { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes form-in-prev { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+.form.is-next { animation: form-in-next 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+.form.is-prev { animation: form-in-prev 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .item, .item:hover { transition: none; transform: none; }
+  .form.is-next, .form.is-prev { animation: none; }
+}
+
+/* ---------- reviews waiting for the shop ---------- */
+.inbox-reviews { display: grid; gap: 12px; margin-bottom: 20px; border-color: var(--gold); }
+.inbox-reviews h2 { font-size: 1.4rem; margin: 0; color: var(--gold-2); }
+.rv-card { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg); }
+.rv-card p { margin: 0; }
+.rv-card__head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.rv-card__stars { color: var(--gold); letter-spacing: 2px; }
+.rv-card__title { font-weight: 700; }
+.rv-card__text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.rv-card .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.tile__title .count { margin-left: 8px; vertical-align: middle; }
+.count { margin-left: auto; min-width: 1.6em; padding: 1px 8px; border-radius: 999px; background: var(--gold); color: var(--gold-ink); font-size: 0.8rem; font-weight: 700; text-align: center; }

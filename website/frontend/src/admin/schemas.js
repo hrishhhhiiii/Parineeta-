@@ -45,6 +45,7 @@ export const SECTIONS = [
     kind: 'list',
     intro: 'Everything in the collection. Hidden products stay saved but do not appear on the site.',
     itemTitle: (p) => p.en || 'New product',
+    thumb: (p) => (p.media || []).find((m) => m && m.id && m.type !== 'reel')?.id,
     itemSub: (p) => `${p.bn || ''}${p.priceFrom ? ` · from ₹${p.priceFrom}` : ''}${p.hidden ? ' · hidden' : ''}`,
     defaults: () => clone(PRODUCTS),
     blank: () => ({

@@ -129,6 +129,7 @@ export async function receiptBlob(r) {
   pair('Estimated total', inr(r.total), { bold: true, size: 32 });
   const settled = paid ? r.paidAmount : r.method.id === 'later' ? 0 : r.paidNow;
   if (paid) pair('Paid', inr(settled), { bold: true });
+  else if (r.method.id === 'later') pair('Paying now', 'Nothing, pay at the shop');
   else pair(`Paying now (${r.plan})`, inr(settled));
   pair('Balance due', inr(Math.max(0, r.total - settled)));
 

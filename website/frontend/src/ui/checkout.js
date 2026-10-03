@@ -48,7 +48,11 @@ function newRef() {
 const total = () => cartTotal(ctx.lines);
 const advance = () => Math.ceil((total() * PAYMENTS.advancePercent) / 100);
 
+// "Pay at the shop or on delivery" means nothing is paid now.
+const payLater = () => (dialog().querySelector('input[name="co-method"]:checked')?.value || 'later') === 'later';
+
 function amountNow() {
+  if (payLater()) return 0;
   const choice = dialog().querySelector('input[name="co-amount"]:checked')?.value || 'advance';
   return choice === 'full' ? total() : advance();
 }
@@ -71,6 +75,9 @@ function copyButton(value, label) {
 
 function renderMethodDetail() {
   const box = $('#co-method-detail');
+  // The advance or full-amount choice only applies when paying now.
+  const amountStep = $('#co-amount-step');
+  if (amountStep) amountStep.hidden = payLater();
   const m = dialog().querySelector('input[name="co-method"]:checked')?.value;
   const amt = amountNow();
   box.replaceChildren();
@@ -129,7 +136,7 @@ function render() {
     h('section', { class: 'co-step' }, h('h3', { class: 'co-step__title', text: 'Your order' }), list,
       h('p', { class: 'enq__total' }, h('span', { text: 'Estimated total' }), h('strong', { text: inr(total()) })),
       h('p', { class: 'field__help', text: 'Prices are estimates until we confirm your order. Any difference is settled on delivery.' })),
-    h('section', { class: 'co-step' }, h('h3', { class: 'co-step__title', text: 'How much would you like to pay now?' }), amountChoice),
+    h('section', { class: 'co-step', id: 'co-amount-step' }, h('h3', { class: 'co-step__title', text: 'How much would you like to pay now?' }), amountChoice),
     h('section', { class: 'co-step' }, h('h3', { class: 'co-step__title', text: 'Your details' }),
       h('div', { class: 'enq__row' }, field('co-name', 'Your name', { maxlength: 80, autocomplete: 'name', required: true }), field('co-phone', 'Phone or WhatsApp', { type: 'tel', inputmode: 'tel', maxlength: 20, autocomplete: 'tel', required: true })),
       h('div', { class: 'enq__row' }, field('co-email', 'Email', { type: 'email', maxlength: 120, autocomplete: 'email', spellcheck: 'false' }, true), field('co-date', 'Wedding or event date', { type: 'date' }, true)),
@@ -176,7 +183,8 @@ function orderMessage(v) {
     const { p, total: t, styleLabel, comboLabel } = lineInfo(l);
     out.push(`${i + 1}. ${p.en} | ${[styleLabel, comboLabel].filter(Boolean).join(', ')} | Qty ${l.qty}${l.custom ? ` | Personalise: “${l.custom}”` : ''} | ${inr(t)}`);
   });
-  out.push('', `Estimated total: ${inr(total())}`, `Paying now: ${full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`}, ${inr(amountNow())}`, `Method: ${method?.label || ''}`);
+  const paying = payLater() ? 'Paying: at the shop or on delivery' : `Paying now: ${full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`}, ${inr(amountNow())}`;
+  out.push('', `Estimated total: ${inr(total())}`, paying, `Method: ${method?.label || ''}`);
   if (v.utr) out.push(`Payment reference: ${v.utr}`);
   out.push('', `Name: ${v.name}`, `Phone: ${v.phone}`);
   if (v.email) out.push(`Email: ${v.email}`);
@@ -196,7 +204,7 @@ function receiptData(v) {
       const { p, total: t, styleLabel, comboLabel } = lineInfo(l);
       return { title: p.en, qty: l.qty, amount: t, detail: [styleLabel, comboLabel, l.custom ? `Personalise: “${l.custom}”` : ''].filter(Boolean).join(', ') };
     }),
-    total: total(), paidNow: amountNow(), plan: full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`,
+    total: total(), paidNow: amountNow(), plan: id === 'later' ? 'pay at the shop' : full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`,
     method: { id, label: methods().find((m) => m.id === id)?.label || '' }, payTo, utr: v.utr,
   };
 }

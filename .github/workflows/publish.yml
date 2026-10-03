@@ -4,7 +4,8 @@
 # Also pings Supabase daily so the free project never pauses for inactivity.
 #
 # GitHub → Settings → Environments → production:
-#   secret   DEPLOY_HOOK         the host's deploy hook (Cloudflare: project → Settings → Builds → Deploy hooks)
+#   secret   DEPLOY_HOOK         Cloudflare's deploy hook (Workers & Pages → parineeta → Settings → Builds → Deploy Hooks)
+#   secret   VERCEL_DEPLOY_HOOK  Vercel's deploy hook, while the Vercel copy of the site still runs
 #   variable SUPABASE_URL, SUPABASE_ANON_KEY (or the same values named VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 name: publish
 
@@ -69,13 +70,16 @@ jobs:
         run: |
           curl -fsS "$SUPABASE_URL/rest/v1/published_content?select=key&limit=1" -H "apikey: $SUPABASE_ANON_KEY" > /dev/null
 
-      - name: Ask the host to rebuild the site
+      # Every host that has a hook rebuilds: DEPLOY_HOOK (Cloudflare) and VERCEL_DEPLOY_HOOK (Vercel, while both run).
+      - name: Ask the hosts to rebuild the site
         env:
-          HOOK: ${{ secrets.DEPLOY_HOOK || secrets.VERCEL_DEPLOY_HOOK }}
+          CLOUDFLARE_HOOK: ${{ secrets.DEPLOY_HOOK }}
+          VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         run: |
-          if [ -z "$HOOK" ]; then echo "::error::Add the DEPLOY_HOOK secret (the host's deploy hook address)."; exit 1; fi
-          curl -fsS -X POST "$HOOK" > /dev/null
-          echo "The host is rebuilding the site; it is usually live within 2 minutes."
+          if [ -z "$CLOUDFLARE_HOOK$VERCEL_HOOK" ]; then echo "::error::Add the DEPLOY_HOOK secret (the host's deploy hook address)."; exit 1; fi
+          if [ -n "$CLOUDFLARE_HOOK" ]; then curl -fsS -X POST "$CLOUDFLARE_HOOK" > /dev/null && echo "Cloudflare is rebuilding the site."; fi
+          if [ -n "$VERCEL_HOOK" ]; then curl -fsS -X POST "$VERCEL_HOOK" > /dev/null && echo "Vercel is rebuilding the site."; fi
+          echo "It is usually live within 2 minutes."
 
       - name: Mark live
         env:

@@ -1,6 +1,7 @@
 // /account: a signed-in customer's orders and their stage, plus profile settings (sign-in is on /login).
 // Orders are matched by the account's email: checkout fills it in for signed-in customers.
 import '../login/login.css';
+import { tooManyHops } from '../auth/hops.js';
 
 const DEMO = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
 const app = document.getElementById('app');
@@ -53,9 +54,17 @@ async function connect() {
   return { clerk, user: userOf(clerk.user), sb: await getSupabase(), deleteUser: () => clerk.user.delete() };
 }
 
+function stuck() {
+  app.replaceChildren(h('h1', { text: 'Your account could not open' }),
+    h('p', { class: 'muted', text: 'Close this tab, open the website again and sign in. If it keeps happening, message us on WhatsApp about your order.' }),
+    back());
+}
+
 async function showAccount() {
-  const me = await connect();
-  if (!me) return location.replace('/login.html?signin');
+  const looping = tooManyHops();
+  let me;
+  try { me = await connect(); } catch { return stuck(); }
+  if (!me) return looping ? stuck() : location.replace('/login.html?signin');
   const { sb } = me;
   const [{ data: orders, error }, { data: role }] = await Promise.all([sb.rpc('my_orders'), sb.rpc('admin_role')]);
   // Clerk's UserButton (Manage account, Sign out) when signed in for real; a plain button in demo mode.
@@ -85,9 +94,11 @@ async function showAccount() {
     settings ? h('h2', { class: 'acc-h2', text: 'Profile and password' }) : '',
     settings || '',
     back(), h('p', {}, del));
-  if (me.clerk) {
+  if (me.clerk && !looping) {
     me.clerk.mountUserButton(out, { customMenuItems: [{ label: 'manageAccount' }, { label: 'signOut' }] });
-    me.clerk.mountUserProfile(settings, { routing: 'hash' });
+    // Virtual routing: the panel's pages switch in memory and never change the address. Hash routing
+    // went through clerk.navigate(), which on a development key reloads the page and caused a loop.
+    me.clerk.mountUserProfile(settings, { routing: 'virtual' });
   }
 }
 

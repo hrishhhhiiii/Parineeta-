@@ -4,6 +4,7 @@
 // with a code sent by email. Password, email code and Google are switched on in the Clerk dashboard.
 import './login.css';
 import { configured, getClerk, getSupabase } from '../auth/client.js';
+import { tooManyHops } from '../auth/hops.js';
 
 const app = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -41,7 +42,16 @@ async function route() {
   app.replaceChildren(h('p', { text: 'Signing you in…' }));
   const sb = await getSupabase();
   const { data: role } = await sb.rpc('admin_role');
-  location.replace(role === 'owner' || role === 'editor' ? '/admin.html' : '/account.html');
+  const next = role === 'owner' || role === 'editor' ? '/admin.html' : '/account.html';
+  if (tooManyHops()) {
+    app.replaceChildren(h('h1', { text: 'You are signed in' }),
+      h('p', { class: 'muted', text: 'The page kept reloading, so we stopped it. Open your page below. If it happens again, sign out and back in.' }),
+      h('p', {}, h('a', { href: next, text: role ? 'Open the admin panel →' : 'Open my orders →' })),
+      h('p', {}, h('a', { href: '/login.html?signout', text: 'Sign out' })),
+      back());
+    return;
+  }
+  location.replace(next);
 }
 
 const TEXT = {

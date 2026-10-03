@@ -1,10 +1,10 @@
 import { PRODUCTS, SETS, STORY, PALETTES, CATEGORIES } from '../data/products.js';
-import { REVIEWS as FILM_REVIEWS, SITE, waLink, photoSrc } from '../data/site.js';
+import { REVIEWS as FILM_REVIEWS, waLink, photoSrc } from '../data/site.js';
 import { HOMEPAGE } from '../data/homepage.js';
-import { reviewsFor, ratingSummary, myReviews, saveMyReview } from '../data/reviews.js';
+import { reviewsFor, ratingSummary, myReviews, saveMyReview, loadReviews, SOURCE_LABELS } from '../data/reviews.js';
 import { h, icon, inr } from './dom.js';
 import { store, lineInfo, MAX } from './store.js';
-import { openEnquiry, postForm } from './enquiry.js';
+import { openEnquiry } from './enquiry.js';
 import { openCheckout } from './checkout.js';
 import { openLightbox, describeMedia } from './lightbox.js';
 import { thumbImg } from './drawers.js';
@@ -148,7 +148,7 @@ function reviewCard(r, pending = false) {
   const style = r.style && PALETTES[r.style] ? PALETTES[r.style].label : '';
   return h('article', { class: `review${pending ? ' review--pending' : ''}` },
     h('header', { class: 'review__head' },
-      stars(r.rating),
+      r.rating ? stars(r.rating) : null,
       r.title ? h('h3', { class: 'review__title', text: r.title }) : null),
     h('p', { class: 'review__text', text: r.text }),
     h('footer', { class: 'review__meta' },
@@ -156,7 +156,29 @@ function reviewCard(r, pending = false) {
       r.date ? h('span', { text: fmtDate(r.date) }) : null,
       style ? h('span', { text: `Colourway: ${style}` }) : null,
       r.verified ? h('span', { class: 'review__verified' }, icon('seal-check'), 'Confirmed order') : null,
+      SOURCE_LABELS[r.source] ? (r.sourceUrl
+        ? h('a', { class: 'review__source', href: r.sourceUrl, target: '_blank', rel: 'noopener', text: `From ${SOURCE_LABELS[r.source]} ↗` })
+        : h('span', { class: 'review__source', text: `From ${SOURCE_LABELS[r.source]}` })) : null,
       pending ? h('span', { class: 'review__pending', text: 'Awaiting approval, only visible to you' }) : null));
+}
+
+// Saves a review in /admin → Customer reviews, hidden until the shop shows it
+// (database/migrations/011_reviews.sql). Resolves to true when it was saved.
+async function submitReview(p, v) {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !key) return false;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/submit_review`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p: { product: p.id, rating: v.rating, name: v.name, place: v.place, style: v.style, phone: v.phone, title: v.title, text: v.text } }),
+      signal: AbortSignal.timeout(10000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 function reviewForm(p, onDone) {
@@ -181,9 +203,9 @@ function reviewForm(p, onDone) {
     h('div', { class: 'field' }, h('label', { class: 'field__label', for: 'rv-text', text: 'Your review' }), h('textarea', { class: 'input input--area', id: 'rv-text', name: 'text', rows: 4, maxlength: 1000, required: true, autocomplete: 'off' }), err('rv-text')),
     status,
     h('div', { class: 'enq__actions' },
-      h('button', { type: 'button', class: 'btn btn--gold', 'data-send': 'wa' }, icon('whatsapp-logo', 'fill'), 'Send on WhatsApp'),
-      h('button', { type: 'button', class: 'btn btn--ghost', 'data-send': 'mail', disabled: !SITE.web3formsKey || null }, icon('envelope-simple'), 'Send by email')),
-    h('p', { class: 'fineprint', text: 'We publish reviews after checking the order with you. Your phone number is only used for that and is never shown.' }));
+      h('button', { type: 'button', class: 'btn btn--gold', 'data-send': 'save' }, icon('pencil-simple-line'), 'Submit review'),
+      h('button', { type: 'button', class: 'btn btn--ghost', 'data-send': 'wa' }, icon('whatsapp-logo', 'fill'), 'Send on WhatsApp instead')),
+    h('p', { class: 'fineprint', text: 'The shop reads every review and adds it to the website after checking the order. Your phone number is only used for that and is never shown.' }));
 
   const setErr = (id, msg) => {
     const out = form.querySelector(`#${id}-err`);
@@ -250,37 +272,42 @@ function reviewForm(p, onDone) {
       return;
     }
     status.textContent = '';
-    if (btn.dataset.send === 'wa') {
-      const url = waLink(message(v));
-      if (!window.open(url, '_blank', 'noopener')) window.location.href = url;
-      finish(v);
-      toast('Thank you. WhatsApp is open with your review; press send and we will publish it after checking.', { iconName: 'whatsapp-logo' });
+    if (btn.dataset.send === 'save') {
+      btn.disabled = true;
+      status.className = 'enq__status is-busy';
+      status.textContent = 'Sending your review…';
+      const ok = await submitReview(p, v);
+      btn.disabled = false;
+      if (ok) {
+        status.textContent = '';
+        finish(v);
+        toast('Thank you! The shop will check your review and add it to the website.', { iconName: 'check-circle' });
+      } else {
+        status.className = 'enq__status is-error';
+        status.textContent = 'We could not send that just now. Please press “Send on WhatsApp instead”.';
+      }
       return;
     }
-    btn.disabled = true;
-    status.className = 'enq__status is-busy';
-    status.textContent = 'Sending your review…';
-    try {
-      await postForm({ subject: `Review for ${p.en} from ${v.name}`, name: v.name, phone: v.phone, message: message(v) });
+    if (btn.dataset.send === 'wa') {
+      const url = waLink(message(v));
+      // 'noopener' would make window.open return null, and this tab would follow to WhatsApp too.
+      const win = window.open(url, '_blank');
+      if (win) win.opener = null;
+      else window.location.href = url;
       finish(v);
-      toast('Thank you. Your review has reached us and will appear once we have checked it.');
-    } catch {
-      status.className = 'enq__status is-error';
-      status.textContent = 'We could not send that just now. Please try WhatsApp instead.';
-    } finally {
-      btn.disabled = !SITE.web3formsKey;
+      toast('Thank you. WhatsApp is open with your review; press send and we will publish it after checking.', { iconName: 'whatsapp-logo' });
     }
   });
   return form;
 }
 
 function reviewsSection(p) {
-  const written = reviewsFor(p.id);
-  const { total, avg, counts } = ratingSummary(written);
+  let written = reviewsFor(p.id);
   const section = h('section', { class: 'ppage__section ppage__reviews', id: 'pg-reviews', 'aria-labelledby': 'pg-reviews-title' });
   const list = h('div', { class: 'reviews-list' });
   const formWrap = h('div', { class: 'review-form-wrap', hidden: true });
   const writeBtn = h('button', { type: 'button', class: 'btn btn--gold', 'aria-expanded': 'false' }, icon('pencil-simple-line'), 'Write a review');
+  const summaryBox = h('div', { class: 'reviews-summary' });
 
   function paintList() {
     const mine = myReviews(p.id);
@@ -305,21 +332,25 @@ function reviewsSection(p) {
     paintList();
   }));
 
-  const dist = h('div', { class: 'dist', 'aria-label': 'Rating breakdown' },
-    ...[5, 4, 3, 2, 1].map((n) => {
-      const c = counts[n - 1];
-      return h('div', { class: 'dist__row' },
-        h('span', { class: 'dist__label', text: `${n}` }), icon('star', 'fill'),
-        h('span', { class: 'dist__bar' }, h('span', { class: 'dist__fill', style: `width:${total ? (c / total) * 100 : 0}%` })),
-        h('span', { class: 'dist__count', text: String(c) }));
-    }));
-
-  const summary = h('div', { class: 'reviews-summary' },
-    h('p', { class: `reviews-summary__avg${total ? '' : ' reviews-summary__avg--none'}`, text: total ? avg.toFixed(1) : 'No reviews yet' }),
-    stars(total ? avg : 0),
-    h('p', { class: 'reviews-summary__count', text: total ? `${total} written review${total > 1 ? 's' : ''}` : 'Be the first to review this piece' }),
-    total ? dist : null,
-    writeBtn);
+  function paintSummary() {
+    const { total, avg, counts } = ratingSummary(written);
+    const dist = h('div', { class: 'dist', 'aria-label': 'Rating breakdown' },
+      ...[5, 4, 3, 2, 1].map((n) => {
+        const c = counts[n - 1];
+        return h('div', { class: 'dist__row' },
+          h('span', { class: 'dist__label', text: `${n}` }), icon('star', 'fill'),
+          h('span', { class: 'dist__bar' }, h('span', { class: 'dist__fill', style: `width:${total ? (c / total) * 100 : 0}%` })),
+          h('span', { class: 'dist__count', text: String(c) }));
+      }));
+    summaryBox.replaceChildren(
+      h('p', { class: `reviews-summary__avg${total ? '' : ' reviews-summary__avg--none'}`, text: total ? avg.toFixed(1) : 'No reviews yet' }),
+      stars(total ? avg : 0),
+      h('p', { class: 'reviews-summary__count', text: total ? `${total} written review${total > 1 ? 's' : ''}` : 'Be the first to review this piece' }),
+      total ? dist : null,
+      writeBtn);
+    return { total, avg };
+  }
+  const first = paintSummary();
 
   const productFilms = FILM_REVIEWS.filter((f) => f.product === p.id);
   const shopFilms = FILM_REVIEWS.filter((f) => f.product !== p.id);
@@ -330,9 +361,17 @@ function reviewsSection(p) {
   paintList();
   section.append(
     h('h2', { class: 'h2', id: 'pg-reviews-title', text: 'Reviews' }),
-    h('div', { class: 'ppage__reviews-grid' }, summary, h('div', {}, formWrap, list)),
+    h('div', { class: 'ppage__reviews-grid' }, summaryBox, h('div', {}, formWrap, list)),
     films);
-  return { section, openForm: () => toggleForm(true), total, avg };
+  const api = { section, openForm: () => toggleForm(true), total: first.total, avg: first.avg };
+  // The reviews the shop chose to show arrive from the database a moment later.
+  api.refresh = () => {
+    written = reviewsFor(p.id);
+    paintList();
+    Object.assign(api, paintSummary());
+    return api;
+  };
+  return api;
 }
 
 /* ---------------- page ---------------- */
@@ -423,12 +462,19 @@ export function renderProductPage(root, p) {
   cur.qty = 1;
   const reviews = reviewsSection(p);
 
-  const ratingLine = h('p', { class: 'ppage__rating' },
+  const ratingLine = h('p', { class: 'ppage__rating' });
+  const paintRating = () => ratingLine.replaceChildren(
     stars(reviews.total ? reviews.avg : 0),
     h('button', { type: 'button', class: 'ppage__rating-link', onclick: () => {
       reviews.section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (!reviews.total) setTimeout(reviews.openForm, 500);
     }, text: reviews.total ? `${reviews.avg.toFixed(1)} from ${reviews.total} review${reviews.total > 1 ? 's' : ''}` : 'No reviews yet. Write the first' }));
+  paintRating();
+  loadReviews().then(() => {
+    if (cur.p !== p) return;
+    reviews.refresh();
+    paintRating();
+  });
 
   const stage = h('div', { class: 'ppage__viewer' });
   const gallery = mediaStage(p, { stage, canvas, ensureViewer, viewer: () => viewer, style: () => cur.style, isCurrent: () => cur.p === p });

@@ -1,5 +1,5 @@
 -- Parineeta: full database setup. Paste all of this into Supabase → SQL Editor → New query → Run.
--- Built from database/schema.sql + migrations 001–009 (the same as the live database once 009 is run). Safe to re-run.
+-- Built from database/schema.sql + migrations 001–011. Safe to re-run.
 -- Set up Clerk in Supabase first.
 
 
@@ -1283,3 +1283,118 @@ end $$;
 revoke execute on function public.submit_order(jsonb), public.set_order_status(text, text, int), public.delete_order(text) from public, anon;
 grant execute on function public.submit_order(jsonb) to anon, authenticated;
 grant execute on function public.set_order_status(text, text, int), public.delete_order(text) to authenticated;
+
+
+-- ======== database/migrations/010_unstick_publish.sql ========
+-- A Publish that GitHub accepted but whose build never reported back (for example because the
+-- build couldn't reach Supabase) used to stay "queued" for ever. That kept the admin on
+-- "Taking longer than usual…" and blocked the next Publish. Run after 001–009. Safe to re-run.
+-- The cron job from 001 calls this every minute, so a stuck job clears within a minute.
+create or replace function public._sweep_dispatches() returns void
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  update public.publish_jobs j set status = 'failed', finished_at = now(),
+    error = format('Couldn''t start the update (the build service answered %s).', coalesce(r.status_code::text, r.error_msg))
+  from net._http_response r
+  where j.status = 'queued' and r.id = j.net_request_id and coalesce(r.status_code, 0) not between 200 and 299;
+
+  update public.publish_jobs set status = 'failed', finished_at = now(), error = 'Couldn''t reach the build service.'
+  where status = 'queued' and requested_at < now() - interval '2 minutes'
+    and not exists (select 1 from net._http_response r where r.id = net_request_id);
+
+  -- Accepted but the build never said it started: it couldn't reach Supabase, or never ran.
+  update public.publish_jobs set status = 'failed', finished_at = now(),
+    error = 'The update never started. Check the run log, then press Retry update.'
+  where status = 'queued' and requested_at < now() - interval '15 minutes';
+
+  update public.publish_jobs set status = 'failed', finished_at = now(), error = 'The update took too long and was stopped.'
+  where status = 'building' and requested_at < now() - interval '30 minutes';
+end $$;
+
+revoke all on function public._sweep_dispatches() from public, anon, authenticated;
+
+-- Clear any job already stuck (the cron would do it within a minute; this does it now).
+select public._sweep_dispatches();
+
+
+-- ======== database/migrations/011_review_inbox.sql ========
+-- Reviews customers write on a product page wait here until the shop accepts or rejects them in
+-- /admin → Customer reviews. Accepting copies the review into the site's reviews (in the admin),
+-- which go live with "Put changes live". Run after 001–010. Safe to re-run.
+
+create table if not exists public.review_submissions (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  product text not null check (char_length(product) between 1 and 80),
+  rating int not null check (rating between 1 and 5),
+  name text not null check (char_length(name) between 2 and 60),
+  place text check (char_length(place) <= 60),
+  style text check (char_length(style) <= 40),
+  phone text check (char_length(phone) <= 20),   -- only for the shop to check the order; never shown
+  title text check (char_length(title) <= 80),
+  text text not null check (char_length(text) between 20 and 1000),
+  status text not null default 'new' check (status in ('new', 'accepted', 'rejected')),
+  suspect boolean not null default false,
+  decided_at timestamptz,
+  decided_by text
+);
+create index if not exists review_submissions_new on public.review_submissions (created_at desc) where status = 'new';
+
+-- Only the functions below touch the table.
+alter table public.review_submissions enable row level security;
+revoke all on public.review_submissions from anon, authenticated;
+
+/* ---------- anyone: submit a review (rate-limited per connection) ---------- */
+create or replace function public.submit_review(p jsonb) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  ip text := split_part(coalesce(current_setting('request.headers', true)::json ->> 'x-forwarded-for', 'unknown'), ',', 1);
+  sus boolean;
+  v_text text := left(trim(coalesce(p ->> 'text', '')), 1000);
+  v_name text := left(trim(coalesce(p ->> 'name', '')), 60);
+  v_rating int;
+begin
+  begin v_rating := (p ->> 'rating')::int; exception when others then v_rating := 0; end;
+  if v_rating not between 1 and 5 then raise exception 'BAD_REVIEW' using hint = 'rating'; end if;
+  if char_length(v_name) < 2 then raise exception 'BAD_REVIEW' using hint = 'name'; end if;
+  if char_length(v_text) < 20 then raise exception 'BAD_REVIEW' using hint = 'text'; end if;
+  if coalesce(p ->> 'product', '') !~ '^[a-z0-9-]{1,80}$' then raise exception 'BAD_REVIEW' using hint = 'product'; end if;
+  sus := public._rate('rev', encode(digest(trim(ip), 'sha256'), 'hex'));  -- refuses past 20 an hour from one connection
+  insert into public.review_submissions (product, rating, name, place, style, phone, title, text, suspect)
+  values (p ->> 'product', v_rating, v_name,
+          nullif(left(trim(coalesce(p ->> 'place', '')), 60), ''),
+          nullif(left(trim(coalesce(p ->> 'style', '')), 40), ''),
+          nullif(left(regexp_replace(coalesce(p ->> 'phone', ''), '[^0-9+ ]', '', 'g'), 20), ''),
+          nullif(left(trim(coalesce(p ->> 'title', '')), 80), ''),
+          v_text, sus);
+end $$;
+
+/* ---------- staff: see the waiting reviews, accept or reject ---------- */
+create or replace function public.list_review_submissions() returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+begin
+  perform public._require('editor');
+  return (select coalesce(jsonb_agg(to_jsonb(r) order by r.created_at desc), '[]')
+    from (select id, created_at, product, rating, name, place, style, phone, title, text, suspect
+          from public.review_submissions where status = 'new' order by created_at desc limit 200) r);
+end $$;
+
+create or replace function public.decide_review(p_id uuid, p_accept boolean) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare actor text := public._require('editor'); n int;
+begin
+  update public.review_submissions
+     set status = case when p_accept then 'accepted' else 'rejected' end, decided_at = now(), decided_by = actor
+   where id = p_id and status = 'new';
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'NOT_FOUND' using hint = 'It was already dealt with.'; end if;
+  perform public._log(actor, case when p_accept then 'review_accepted' else 'review_rejected' end, 'reviews', p_id::text);
+end $$;
+
+revoke execute on function public.submit_review(jsonb), public.list_review_submissions(), public.decide_review(uuid, boolean) from public, anon;
+grant execute on function public.submit_review(jsonb) to anon, authenticated;
+grant execute on function public.list_review_submissions(), public.decide_review(uuid, boolean) to authenticated;
+
+-- Rejected reviews are deleted after 90 days (with the other daily clean-ups).
+select cron.schedule('review-inbox-purge', '30 3 * * *',
+  $$delete from public.review_submissions where status = 'rejected' and decided_at < now() - interval '90 days'$$);

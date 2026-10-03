@@ -16,16 +16,44 @@
  */
 export const WRITTEN_REVIEWS = [];
 
-export const reviewsFor = (productId) =>
-  WRITTEN_REVIEWS.filter((r) => r.product === productId).sort((a, b) => b.date.localeCompare(a.date));
+/* Reviews the shop switched on in /admin → Customer reviews, read live from the database
+   (database/migrations/011_reviews.sql), so they appear without a rebuild. Until they arrive, or if
+   the database can't be reached, the built-in WRITTEN_REVIEWS above are used. */
+let live = null;
+let loading = null;
+export function loadReviews() {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !key) return Promise.resolve(allReviews());
+  return (loading ??= fetch(`${url}/rest/v1/rpc/public_reviews`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: '{}',
+    signal: AbortSignal.timeout(8000),
+  })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((rows) => { if (Array.isArray(rows)) live = rows; return allReviews(); })
+    .catch(() => allReviews()));
+}
+const allReviews = () => (live ?? []).concat(WRITTEN_REVIEWS);
 
+export const reviewsFor = (productId) =>
+  allReviews().filter((r) => r.product === productId).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+/** The newest shown reviews from across the shop (homepage). */
+export const latestReviews = (n = 6) => allReviews().slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, n);
+
+/** Star summary; reviews without stars (e.g. YouTube comments) are left out of the average. */
 export function ratingSummary(list) {
+  const rated = list.filter((r) => r.rating >= 1 && r.rating <= 5);
   const counts = [0, 0, 0, 0, 0];
-  for (const r of list) counts[Math.max(1, Math.min(5, Math.round(r.rating))) - 1] += 1;
-  const total = list.length;
-  const avg = total ? list.reduce((s, r) => s + r.rating, 0) / total : 0;
+  for (const r of rated) counts[Math.round(r.rating) - 1] += 1;
+  const total = rated.length;
+  const avg = total ? rated.reduce((s, r) => s + r.rating, 0) / total : 0;
   return { total, avg, counts };
 }
+
+export const SOURCE_LABELS = { google: 'Google', facebook: 'Facebook', instagram: 'Instagram', youtube: 'YouTube', whatsapp: 'WhatsApp' };
 
 /* Reviews a visitor wrote on this device: shown only to them until the shop approves and publishes them. */
 const KEY = 'parineeta:my-reviews';

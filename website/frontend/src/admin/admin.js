@@ -53,6 +53,8 @@ function demoClient() {
   const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
     total: 1450, paid_now: 725, plan: '50% advance', utr: '426512345678', event_date: '2026-12-02', address: 'Patuli, Kolkata', status: 'placed', suspect: false,
     items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null }];
+  const demoReviews = [{ id: 'rv-1', created_at: new Date().toISOString(), product: 'gach-kouto', rating: 5, name: 'Moumita Ghosh', place: 'Katwa', style: 'sindoor', phone: '9800012345',
+    title: 'Beautiful work', text: 'The kouto was painted exactly as we asked, with our names on the lid. Everyone at the wedding asked where it came from.', suspect: false }];
   const rpcs = {
     get_heads: () => [...heads.values()],
     admin_role: () => 'owner',
@@ -73,6 +75,8 @@ function demoClient() {
     redeploy: () => rpcs.publish(),
     list_revisions: () => [],
     list_orders: () => demoOrders,
+    list_review_submissions: () => demoReviews,
+    decide_review: ({ p_id }) => demoReviews.splice(demoReviews.findIndex((r) => r.id === p_id), 1),
     set_order_status: ({ p_ref, p_status, p_amount }) => Object.assign(demoOrders.find((o) => o.ref === p_ref), { status: p_status, suspect: false, ...(p_amount ? { paid_amount: p_amount, paid_at: new Date().toISOString(), paid_by: user.email } : {}) }),
     delete_order: ({ p_ref }) => demoOrders.splice(demoOrders.findIndex((o) => o.ref === p_ref), 1),
   };
@@ -107,6 +111,7 @@ const ctx = {
   notLive: new Set(), // keys published but not yet on the live site (failed or running build)
   role: 'editor',
   job: null, // latest publish job
+  newReviews: 0, // customer reviews waiting in Customer reviews
   section: 'home', // the Home screen; otherwise a section key or 'orders'
   index: 0, // selected item in a list section
 };
@@ -552,9 +557,9 @@ function homeView() {
   const tile = (key) => {
     const s = SECTIONS.find((x) => x.key === key);
     const title = key === ORDERS ? 'Orders' : s.title;
-    return h('button', { type: 'button', class: 'tile', onclick: () => go(key) },
+    return h('button', { type: 'button', class: 'tile', 'data-key': key, onclick: () => go(key) },
       h('span', { class: 'tile__icon', 'aria-hidden': 'true', text: key === ORDERS ? '🧾' : s.icon }),
-      h('span', { class: 'tile__title', text: title }),
+      h('span', { class: 'tile__title' }, title, key === 'reviews' && ctx.newReviews ? h('span', { class: 'count', text: `${ctx.newReviews} new` }) : null),
       h('span', { class: 'tile__text', text: TILE_TEXT[key] || s.intro || '' }));
   };
   const name = (profileOf(ctx.user).name || '').split(' ')[0];
@@ -576,7 +581,7 @@ function render() {
   const section = SECTIONS.find((s) => s.key === ctx.section);
   if (!section && ctx.section !== ORDERS) ctx.section = HOME;
   const navBtn = (key, icon, title, extra = null) => h('button', {
-    type: 'button', class: `side__btn${key === ctx.section ? ' is-active' : ''}`, 'aria-current': key === ctx.section ? 'page' : null,
+    type: 'button', 'data-key': key, class: `side__btn${key === ctx.section ? ' is-active' : ''}`, 'aria-current': key === ctx.section ? 'page' : null,
     onclick: () => go(key),
   }, h('span', { 'aria-hidden': 'true', text: icon }), h('span', { text: title }), extra);
   const dirtyDot = (key) => (isDirty(key) ? h('span', { class: 'dot', title: 'Not saved yet', text: '●' }) : null);
@@ -586,7 +591,7 @@ function render() {
       const keys = g.keys.filter((k) => (k === ORDERS ? ctx.role === 'owner' : SECTIONS.some((s) => s.key === k)));
       if (!keys.length) return [];
       return [h('p', { class: 'side__group', text: g.title }),
-        ...keys.map((k) => (k === ORDERS ? navBtn(ORDERS, '🧾', 'Orders') : (() => { const s = SECTIONS.find((x) => x.key === k); return navBtn(s.key, s.icon, s.title, dirtyDot(s.key)); })()))];
+        ...keys.map((k) => (k === ORDERS ? navBtn(ORDERS, '🧾', 'Orders') : (() => { const s = SECTIONS.find((x) => x.key === k); return navBtn(s.key, s.icon, s.title, s.key === 'reviews' && ctx.newReviews ? h('span', { class: 'count', 'aria-label': `${ctx.newReviews} new`, text: String(ctx.newReviews) }) : dirtyDot(s.key)); })()))];
     }));
 
   // Clerk's UserButton: Manage account and Sign out (the browser warns first if there are unsaved changes).
@@ -620,6 +625,91 @@ function withMore(fields, render, toggle) {
   if (!extra.length) return basic;
   return [...basic, h('details', { class: 'more', open: moreOpen || null, ontoggle: toggle },
     h('summary', { text: 'More options (you rarely need these)' }), ...extra.map(render))];
+}
+
+/* ---------- reviews customers wrote on the website, waiting for the shop (011_review_inbox.sql) ---------- */
+const handledReviews = new Set(); // accepted/rejected in this visit, so a re-render never shows them again
+
+// Updates the "N new" badges on the menu and the Home tile without redrawing the page.
+function setReviewCount(n) {
+  ctx.newReviews = n;
+  const btn = [...document.querySelectorAll('.side__btn')].find((b) => b.dataset.key === 'reviews');
+  if (btn) {
+    btn.querySelector('.count')?.remove();
+    if (n) btn.append(h('span', { class: 'count', 'aria-label': `${n} new`, text: String(n) }));
+  }
+  const tile = document.querySelector('.tile[data-key="reviews"] .tile__title');
+  if (tile) {
+    tile.querySelector('.count')?.remove();
+    if (n) tile.append(h('span', { class: 'count', text: `${n} new` }));
+  }
+}
+
+async function refreshReviewCount() {
+  const { data, error } = await sb.rpc('list_review_submissions');
+  if (error) return; // the database isn't updated yet (011): no inbox
+  setReviewCount((data || []).filter((r) => !handledReviews.has(r.id)).length);
+}
+
+function reviewInbox(section) {
+  const box = h('section', { class: 'card inbox-reviews', 'aria-labelledby': 'rv-inbox-title' }, h('p', { class: 'loading', text: 'Looking for new reviews…' }));
+  const productName = (id) => (ctx.data.products || []).find((p) => p.id === id)?.en || id;
+  const paint = (rows) => {
+    setReviewCount(rows.length);
+    const title = h('h2', { id: 'rv-inbox-title', text: rows.length ? `New reviews from customers (${rows.length})` : 'New reviews from customers' });
+    if (!rows.length) return box.replaceChildren(title, h('p', { class: 'muted', text: 'None waiting. When a customer writes a review on a product page, it appears here for you to accept or reject.' }));
+    box.replaceChildren(title,
+      h('p', { class: 'muted', text: 'Accept adds the review to the list below. Then press “Put changes live” at the top.' }),
+      ...rows.map((r) => {
+        const digits = String(r.phone || '').replace(/\D/g, '');
+        const accept = h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: 'Accept and add' });
+        const reject = h('button', { type: 'button', class: 'btn btn--danger btn--sm', text: 'Reject' });
+        const card = h('article', { class: 'rv-card' },
+          h('div', { class: 'rv-card__head' },
+            h('span', { class: 'rv-card__stars', 'aria-label': `${r.rating} out of 5 stars`, text: '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating) }),
+            h('strong', { text: productName(r.product) }),
+            h('span', { class: 'muted', text: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) })),
+          r.title ? h('p', { class: 'rv-card__title', text: r.title }) : null,
+          h('p', { class: 'rv-card__text', text: r.text }),
+          h('p', { class: 'muted' }, [r.name, r.place].filter(Boolean).join(', '),
+            digits.length >= 10 ? [' · ', h('a', { href: `https://wa.me/${digits.length === 10 ? `91${digits}` : digits}`, target: '_blank', rel: 'noopener', text: 'WhatsApp them to check the order' })] : null),
+          r.suspect ? h('p', { class: 'form-msg', text: 'Many reviews came from the same connection. Check this one is real.' }) : null,
+          h('div', { class: 'row' }, accept, reject));
+        accept.addEventListener('click', async () => {
+          accept.disabled = reject.disabled = true;
+          handledReviews.add(r.id);
+          const list = ctx.data.reviews;
+          list.unshift({ product: r.product, name: r.name, place: r.place || '', date: String(r.created_at).slice(0, 10), rating: r.rating,
+            title: r.title || '', text: r.text, style: r.style || '', verified: false, hidden: false });
+          await save(section);
+          if (isDirty(section.key)) { // the save didn't go through: undo
+            list.shift();
+            handledReviews.delete(r.id);
+            accept.disabled = reject.disabled = false;
+            return;
+          }
+          const { error } = await sb.rpc('decide_review', { p_id: r.id, p_accept: true });
+          if (error) toast(explain(error), 'err');
+          else toast('Review added. Press “Put changes live” at the top to show it on the website.');
+          refreshReviewCount();
+        });
+        reject.addEventListener('click', async () => {
+          if (!confirm(`Reject the review from ${r.name}? It will not appear on the website.`)) return;
+          accept.disabled = reject.disabled = true;
+          const { error } = await sb.rpc('decide_review', { p_id: r.id, p_accept: false });
+          if (error) { accept.disabled = reject.disabled = false; return toast(explain(error), 'err'); }
+          handledReviews.add(r.id);
+          card.remove();
+          paint(rows.filter((x) => x !== r));
+        });
+        return card;
+      }));
+  };
+  sb.rpc('list_review_submissions').then(({ data, error }) => {
+    if (error) return box.remove(); // the database isn't updated yet (011)
+    paint((data || []).filter((r) => !handledReviews.has(r.id)));
+  });
+  return box;
 }
 
 function sectionView(section) {
@@ -685,23 +775,69 @@ This changes your draft only.`)) return;
   const list = ctx.data[section.key];
   ctx.index = Math.min(ctx.index, list.length - 1);
   const items = h('ol', { class: 'items' });
+  // Thumbnail: the section's photo field, or the first photo of a product; otherwise the section's icon.
+  const thumbOf = (it) => (section.thumb ? section.thumb(it) : section.thumbKey ? it[section.thumbKey] : null);
+  const thumb = (it, size) => {
+    const id = thumbOf(it);
+    const icon = () => h('span', { class: 'item__thumb item__thumb--icon', 'aria-hidden': 'true', text: section.icon });
+    return id ? h('img', { class: 'item__thumb', width: size, height: size, src: /^\//.test(id) ? id : photoSrc(id, 400), alt: '', loading: 'lazy', onerror: (e) => e.target.replaceWith(icon()) }) : icon();
+  };
+  const subOf = (it) => (section.itemSub ? section.itemSub(it).replace(/ · hidden$/, '') : '');
   const paintItems = () => items.replaceChildren(...list.map((it, i) => h('li', {},
-    h('button', { type: 'button', class: `item${i === ctx.index ? ' is-active' : ''}${it.hidden ? ' is-hidden' : ''}`, onclick: () => { ctx.index = i; paintForm(); paintItems(); } },
-      section.thumbKey && it[section.thumbKey] ? h('img', { class: 'item__thumb', width: 38, height: 38, src: photoSrc(it[section.thumbKey], 400), alt: '', loading: 'lazy' }) : null,
-      h('span', { class: 'item__text' }, h('span', { class: 'item__title', text: section.itemTitle(it) }), section.itemSub ? h('span', { class: 'item__sub', text: section.itemSub(it) }) : null)))));
-  refreshListLabels = paintItems;
+    h('button', { type: 'button', class: `item${i === ctx.index ? ' is-active' : ''}${it.hidden ? ' is-hidden' : ''}`, 'aria-current': i === ctx.index ? 'true' : null, onclick: () => select(i) },
+      thumb(it, 44),
+      h('span', { class: 'item__text' }, h('span', { class: 'item__title', text: section.itemTitle(it) }), subOf(it) ? h('span', { class: 'item__sub', text: subOf(it) }) : null),
+      it.hidden ? h('span', { class: 'pill', text: 'Hidden' }) : null))));
+  refreshListLabels = () => { paintItems(); paintFormHead(); };
 
   const form = h('div', { class: 'card form' });
-  const paintForm = () => {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  // Switching items: the editor slides in from the side you are moving towards, and fades in.
+  const select = (i) => {
+    if (i === ctx.index || i < 0 || i >= list.length) return;
+    const dir = i > ctx.index ? 'next' : 'prev';
+    ctx.index = i;
+    paintItems();
+    paintForm(dir);
+    items.querySelector('.is-active')?.scrollIntoView({ block: 'nearest', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+    // On a phone the editor is below the list: bring it into view.
+    if (form.getBoundingClientRect().top < 0 || form.getBoundingClientRect().top > window.innerHeight * 0.6) {
+      form.scrollIntoView({ block: 'start', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+    }
+  };
+  let formHead = null;
+  const paintFormHead = () => {
     const it = list[ctx.index];
-    if (!it) return form.replaceChildren(h('p', { class: 'muted', text: 'Nothing here yet. Press “+ Add new” to make the first one.' }));
+    if (!formHead || !it) return;
+    formHead.replaceChildren(
+      thumb(it, 64),
+      h('div', { class: 'form__heading' },
+        h('h2', { text: section.itemTitle(it) }),
+        h('span', { class: 'muted', text: `${ctx.index + 1} of ${list.length}${it.hidden ? ' · hidden from the website' : ''}` })),
+      h('div', { class: 'form__step' },
+        h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '← Previous', disabled: ctx.index === 0, onclick: () => select(ctx.index - 1) }),
+        h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Next →', disabled: ctx.index === list.length - 1, onclick: () => select(ctx.index + 1) })));
+  };
+  const paintForm = (dir = '') => {
+    const it = list[ctx.index];
+    if (!it) return form.replaceChildren(h('div', { class: 'empty-state' }, h('span', { class: 'empty-state__icon', 'aria-hidden': 'true', text: section.icon }),
+      h('p', { text: 'Nothing here yet.' }), h('p', { class: 'muted', text: 'Press “+ Add new” to make the first one.' })));
+    formHead = h('div', { class: 'form__head' });
+    paintFormHead();
     const tools = h('div', { class: 'form__tools' },
       h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '↑ Move up', disabled: ctx.index === 0, onclick: () => move(-1) }),
       h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '↓ Move down', disabled: ctx.index === list.length - 1, onclick: () => move(1) }),
-      h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Duplicate', onclick: () => { const c = clone(it); if (c.id) c.id = `${c.id}-copy`; list.splice(ctx.index + 1, 0, c); ctx.index += 1; onChange(); paintAll(); } }),
-      h('button', { type: 'button', class: 'btn btn--danger btn--sm', text: 'Delete', onclick: () => { if (!confirm(`Delete “${section.itemTitle(it)}”? You can undo until you save.`)) return; list.splice(ctx.index, 1); ctx.index = Math.max(0, ctx.index - 1); onChange(); paintAll(); } }));
-    form.replaceChildren(tools, ...withMore(section.fields, (f) => field(f, it, onChange, paintForm), onMore));
+      h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Duplicate', onclick: () => { const c = clone(it); if (c.id) c.id = `${c.id}-copy`; list.splice(ctx.index + 1, 0, c); ctx.index += 1; onChange(); paintAll('next'); } }),
+      h('button', { type: 'button', class: 'btn btn--danger btn--sm', text: 'Delete', onclick: () => { if (!confirm(`Delete “${section.itemTitle(it)}”? You can undo until you save.`)) return; list.splice(ctx.index, 1); ctx.index = Math.max(0, ctx.index - 1); onChange(); paintAll('prev'); } }));
+    const body = h('div', { class: 'form__body' }, ...withMore(section.fields, (f) => field(f, it, onChange, () => paintForm()), onMore));
+    form.replaceChildren(formHead, tools, body);
+    if (dir && !reduceMotion.matches) {
+      form.classList.remove('is-next', 'is-prev');
+      void form.offsetWidth; // restart the animation
+      form.classList.add(dir === 'next' ? 'is-next' : 'is-prev');
+    }
   };
+  form.addEventListener('animationend', () => form.classList.remove('is-next', 'is-prev'));
   const move = (d) => {
     const j = ctx.index + d;
     [list[ctx.index], list[j]] = [list[j], list[ctx.index]];
@@ -709,7 +845,7 @@ This changes your draft only.`)) return;
     onChange();
     paintAll();
   };
-  const paintAll = () => { paintItems(); paintForm(); };
+  const paintAll = (dir) => { paintItems(); paintForm(dir); };
   paintAll();
 
   const add = h('button', {
@@ -718,12 +854,12 @@ This changes your draft only.`)) return;
       const blank = section.blank();
       if (section.newFirst) { list.unshift(blank); ctx.index = 0; } else { list.push(blank); ctx.index = list.length - 1; }
       onChange();
-      paintAll();
+      paintAll('next');
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
   });
 
-  return h('div', {}, head, h('div', { class: 'split' },
+  return h('div', {}, head, section.key === 'reviews' ? reviewInbox(section) : null, h('div', { class: 'split' },
     h('aside', { class: 'card items-card' }, h('div', { class: 'items-head' }, h('strong', { text: `${list.length} ${section.title.toLowerCase()}` }), h('span', { class: 'muted items-hint', text: 'Tap one to change it' }), add), items),
     form));
 }
@@ -755,6 +891,7 @@ async function start() {
   try {
     await loadAll();
     render();
+    refreshReviewCount();
   } catch (err) {
     root.replaceChildren(h('main', { class: 'card card--narrow' }, h('h1', { text: 'Could not load' }), h('p', { text: err.message }),
       h('p', { class: 'muted', text: 'If this is the first time, run database/schema.sql and then the files in database/migrations in the Supabase SQL editor.' })));
