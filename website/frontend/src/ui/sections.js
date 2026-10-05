@@ -6,6 +6,7 @@ import { store } from './store.js';
 import { openEnquiry } from './enquiry.js';
 import { thumbImg } from './drawers.js';
 import { toast } from './toast.js';
+import { loadReviews, latestReviews, SOURCE_LABELS } from '../data/reviews.js';
 
 export function renderMarquee() {
   const words = ['গাছকৌটো', 'Gach Kouto', 'টোপর', 'Topor', 'শোলার মুকুট', 'Shola Mukut', 'পানপাতা', 'Paan Pata', 'আলপনা', 'Alpana', 'বিয়ের পিঁড়ি', 'Biyer Piri', 'কুনকে', 'Kunke'];
@@ -238,4 +239,26 @@ export function renderReels() {
   REELS.forEach((id, i) => wall.append(reelTile(id, i, refs)));
   const reviews = $('#reviews');
   REVIEWS.forEach((r) => reviews.append(videoTile(r, 'video--review')));
+  renderWrittenReviews(reviews);
+}
+
+/** The newest written reviews the shop chose to show (admin → Customer reviews), above the films. */
+function renderWrittenReviews(films) {
+  loadReviews().then(() => {
+    const list = latestReviews(3);
+    if (!list.length) return;
+    const fmt = (d) => new Date(d).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+    const box = h('div', { class: 'home-reviews' }, ...list.map((r) => h('article', { class: 'review review--compact' },
+      r.rating ? h('p', { class: 'review__stars', 'aria-label': `${r.rating} out of 5 stars`, text: '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating) }) : null,
+      r.title ? h('h4', { class: 'review__title', text: r.title }) : null,
+      h('p', { class: 'review__text', text: r.text.length > 220 ? `${r.text.slice(0, 217).trimEnd()}…` : r.text }),
+      h('footer', { class: 'review__meta' },
+        h('span', { class: 'review__name', text: [r.name, r.place].filter(Boolean).join(', ') }),
+        r.product && byId(r.product) ? h('span', { text: byId(r.product).en }) : null,
+        r.date ? h('span', { text: fmt(r.date) }) : null,
+        SOURCE_LABELS[r.source] ? (r.sourceUrl
+          ? h('a', { class: 'review__source', href: r.sourceUrl, target: '_blank', rel: 'noopener', text: `From ${SOURCE_LABELS[r.source]} ↗` })
+          : h('span', { class: 'review__source', text: `From ${SOURCE_LABELS[r.source]}` })) : null))));
+    films.before(box);
+  });
 }

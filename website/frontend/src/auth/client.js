@@ -4,7 +4,9 @@ import { Clerk } from '@clerk/clerk-js';
 import { ui } from '@clerk/ui';
 import { createClient } from '@supabase/supabase-js';
 
-export { profileOf, avatar } from './profile.js';
+// Don't re-export profile.js from here: the admin imports it too, so the bundler packs it into the
+// admin bundle, and every page that loads sign-in would then run the whole admin panel (its
+// "Leave site?" guard and its redirect to /login). Import profile.js directly where it's needed.
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;

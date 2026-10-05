@@ -474,6 +474,7 @@ export function renderProductPage(root, p) {
     if (cur.p !== p) return;
     reviews.refresh();
     paintRating();
+    setJsonLd(p, reviews); // Google's star rating for the product
   });
 
   const stage = h('div', { class: 'ppage__viewer' });

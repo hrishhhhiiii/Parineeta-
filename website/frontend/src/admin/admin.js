@@ -4,6 +4,7 @@ import { SECTIONS, FILM_OPTIONS } from './schemas.js';
 import { photoSrc } from '../data/site.js';
 import { avatar, profileOf } from '../auth/profile.js';
 import { ordersView } from './orders.js';
+import { reviewsView, newReviewCount } from './reviews.js';
 
 const root = document.getElementById('app');
 
@@ -53,8 +54,12 @@ function demoClient() {
   const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
     total: 1450, paid_now: 725, plan: '50% advance', utr: '426512345678', event_date: '2026-12-02', address: 'Patuli, Kolkata', status: 'placed', suspect: false,
     items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null }];
-  const demoReviews = [{ id: 'rv-1', created_at: new Date().toISOString(), product: 'gach-kouto', rating: 5, name: 'Moumita Ghosh', place: 'Katwa', style: 'sindoor', phone: '9800012345',
-    title: 'Beautiful work', text: 'The kouto was painted exactly as we asked, with our names on the lid. Everyone at the wedding asked where it came from.', suspect: false }];
+  const demoReviews = [
+    { id: 'rv-1', review_date: '2026-10-03', product: 'gach-kouto', rating: 5, name: 'Moumita Ghosh', place: 'Katwa', phone: '9800012345', source: 'website',
+      title: 'Beautiful work', text: 'The kouto was painted exactly as we asked, with our names on the lid. Everyone at the wedding asked where it came from.', shown: false, checked: false },
+    { id: 'rv-2', review_date: '2026-09-21', product: null, rating: 5, name: 'Sourav Pal', place: 'Bardhaman', source: 'google', source_url: 'https://maps.app.goo.gl/example',
+      title: '', text: 'Lovely shop and very patient with all our questions about the topor.', shown: true, checked: true, verified: true },
+  ];
   const rpcs = {
     get_heads: () => [...heads.values()],
     admin_role: () => 'owner',
@@ -75,8 +80,15 @@ function demoClient() {
     redeploy: () => rpcs.publish(),
     list_revisions: () => [],
     list_orders: () => demoOrders,
-    list_review_submissions: () => demoReviews,
-    decide_review: ({ p_id }) => demoReviews.splice(demoReviews.findIndex((r) => r.id === p_id), 1),
+    admin_reviews: () => demoReviews,
+    set_review_shown: ({ p_id, p_shown }) => Object.assign(demoReviews.find((r) => r.id === p_id), { shown: p_shown, checked: true }),
+    mark_reviews_checked: ({ p_ids }) => demoReviews.filter((r) => p_ids.includes(r.id)).forEach((r) => { r.checked = true; }),
+    delete_review: ({ p_id }) => demoReviews.splice(demoReviews.findIndex((r) => r.id === p_id), 1),
+    save_review: ({ p }) => {
+      const row = { ...p, review_date: p.date, source_url: p.sourceUrl, rating: p.rating ? Number(p.rating) : null, checked: true };
+      if (p.id) Object.assign(demoReviews.find((r) => r.id === p.id), row);
+      else demoReviews.unshift({ ...row, id: `rv-${Date.now()}` });
+    },
     set_order_status: ({ p_ref, p_status, p_amount }) => Object.assign(demoOrders.find((o) => o.ref === p_ref), { status: p_status, suspect: false, ...(p_amount ? { paid_amount: p_amount, paid_at: new Date().toISOString(), paid_by: user.email } : {}) }),
     delete_order: ({ p_ref }) => demoOrders.splice(demoOrders.findIndex((o) => o.ref === p_ref), 1),
   };
@@ -535,7 +547,7 @@ const TILE_TEXT = {
   [ORDERS]: 'See new orders and mark them paid, made or delivered.',
   products: 'Add a product, change a price or a photo, or hide one.',
   sets: 'Bundles sold together at one price.',
-  reviews: 'Add a review a customer sent you.',
+  reviews: 'Every review, kept. Choose which ones show on the website.',
   lookbook: 'The photo gallery on the website.',
   announcement: 'A one-line message across the top of the website.',
   homepage: 'The big headline and photo at the top of the home page.',
@@ -604,7 +616,9 @@ function render() {
       clerk ? userBtn : h('span', { class: 'top__user', title: ctx.user.email }, avatar(ctx.user, 30), h('span', { class: 'top__name', text: profileOf(ctx.user).name || ctx.user.email })),
       clerk ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) toLogin('?signout'); } })));
 
-  root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === HOME ? homeView() : ctx.section === ORDERS ? ordersView(sb, { h, toast, explain }) : sectionView(section))));
+  root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === HOME ? homeView() : ctx.section === ORDERS ? ordersView(sb, { h, toast, explain })
+    : ctx.section === 'reviews' ? reviewsView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), onCount: setReviewCount })
+    : sectionView(section))));
   if (clerk) {
     if (ctx.userBtn) clerk.unmountUserButton(ctx.userBtn);
     clerk.mountUserButton((ctx.userBtn = userBtn), { showName: true });
@@ -627,13 +641,10 @@ function withMore(fields, render, toggle) {
     h('summary', { text: 'More options (you rarely need these)' }), ...extra.map(render))];
 }
 
-/* ---------- reviews customers wrote on the website, waiting for the shop (011_review_inbox.sql) ---------- */
-const handledReviews = new Set(); // accepted/rejected in this visit, so a re-render never shows them again
-
-// Updates the "N new" badges on the menu and the Home tile without redrawing the page.
+/* ---------- the "N new" review badges on the menu and the Home tile ---------- */
 function setReviewCount(n) {
   ctx.newReviews = n;
-  const btn = [...document.querySelectorAll('.side__btn')].find((b) => b.dataset.key === 'reviews');
+  const btn = [...document.querySelectorAll('.side__btn')].find((x) => x.dataset.key === 'reviews');
   if (btn) {
     btn.querySelector('.count')?.remove();
     if (n) btn.append(h('span', { class: 'count', 'aria-label': `${n} new`, text: String(n) }));
@@ -644,73 +655,7 @@ function setReviewCount(n) {
     if (n) tile.append(h('span', { class: 'count', text: `${n} new` }));
   }
 }
-
-async function refreshReviewCount() {
-  const { data, error } = await sb.rpc('list_review_submissions');
-  if (error) return; // the database isn't updated yet (011): no inbox
-  setReviewCount((data || []).filter((r) => !handledReviews.has(r.id)).length);
-}
-
-function reviewInbox(section) {
-  const box = h('section', { class: 'card inbox-reviews', 'aria-labelledby': 'rv-inbox-title' }, h('p', { class: 'loading', text: 'Looking for new reviews…' }));
-  const productName = (id) => (ctx.data.products || []).find((p) => p.id === id)?.en || id;
-  const paint = (rows) => {
-    setReviewCount(rows.length);
-    const title = h('h2', { id: 'rv-inbox-title', text: rows.length ? `New reviews from customers (${rows.length})` : 'New reviews from customers' });
-    if (!rows.length) return box.replaceChildren(title, h('p', { class: 'muted', text: 'None waiting. When a customer writes a review on a product page, it appears here for you to accept or reject.' }));
-    box.replaceChildren(title,
-      h('p', { class: 'muted', text: 'Accept adds the review to the list below. Then press “Put changes live” at the top.' }),
-      ...rows.map((r) => {
-        const digits = String(r.phone || '').replace(/\D/g, '');
-        const accept = h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: 'Accept and add' });
-        const reject = h('button', { type: 'button', class: 'btn btn--danger btn--sm', text: 'Reject' });
-        const card = h('article', { class: 'rv-card' },
-          h('div', { class: 'rv-card__head' },
-            h('span', { class: 'rv-card__stars', 'aria-label': `${r.rating} out of 5 stars`, text: '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating) }),
-            h('strong', { text: productName(r.product) }),
-            h('span', { class: 'muted', text: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) })),
-          r.title ? h('p', { class: 'rv-card__title', text: r.title }) : null,
-          h('p', { class: 'rv-card__text', text: r.text }),
-          h('p', { class: 'muted' }, [r.name, r.place].filter(Boolean).join(', '),
-            digits.length >= 10 ? [' · ', h('a', { href: `https://wa.me/${digits.length === 10 ? `91${digits}` : digits}`, target: '_blank', rel: 'noopener', text: 'WhatsApp them to check the order' })] : null),
-          r.suspect ? h('p', { class: 'form-msg', text: 'Many reviews came from the same connection. Check this one is real.' }) : null,
-          h('div', { class: 'row' }, accept, reject));
-        accept.addEventListener('click', async () => {
-          accept.disabled = reject.disabled = true;
-          handledReviews.add(r.id);
-          const list = ctx.data.reviews;
-          list.unshift({ product: r.product, name: r.name, place: r.place || '', date: String(r.created_at).slice(0, 10), rating: r.rating,
-            title: r.title || '', text: r.text, style: r.style || '', verified: false, hidden: false });
-          await save(section);
-          if (isDirty(section.key)) { // the save didn't go through: undo
-            list.shift();
-            handledReviews.delete(r.id);
-            accept.disabled = reject.disabled = false;
-            return;
-          }
-          const { error } = await sb.rpc('decide_review', { p_id: r.id, p_accept: true });
-          if (error) toast(explain(error), 'err');
-          else toast('Review added. Press “Put changes live” at the top to show it on the website.');
-          refreshReviewCount();
-        });
-        reject.addEventListener('click', async () => {
-          if (!confirm(`Reject the review from ${r.name}? It will not appear on the website.`)) return;
-          accept.disabled = reject.disabled = true;
-          const { error } = await sb.rpc('decide_review', { p_id: r.id, p_accept: false });
-          if (error) { accept.disabled = reject.disabled = false; return toast(explain(error), 'err'); }
-          handledReviews.add(r.id);
-          card.remove();
-          paint(rows.filter((x) => x !== r));
-        });
-        return card;
-      }));
-  };
-  sb.rpc('list_review_submissions').then(({ data, error }) => {
-    if (error) return box.remove(); // the database isn't updated yet (011)
-    paint((data || []).filter((r) => !handledReviews.has(r.id)));
-  });
-  return box;
-}
+const refreshReviewCount = () => newReviewCount(sb).then(setReviewCount).catch(() => {});
 
 function sectionView(section) {
   const dirty = isDirty(section.key);
@@ -859,7 +804,7 @@ This changes your draft only.`)) return;
     },
   });
 
-  return h('div', {}, head, section.key === 'reviews' ? reviewInbox(section) : null, h('div', { class: 'split' },
+  return h('div', {}, head, h('div', { class: 'split' },
     h('aside', { class: 'card items-card' }, h('div', { class: 'items-head' }, h('strong', { text: `${list.length} ${section.title.toLowerCase()}` }), h('span', { class: 'muted items-hint', text: 'Tap one to change it' }), add), items),
     form));
 }
