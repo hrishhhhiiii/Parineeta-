@@ -3,6 +3,7 @@ import { gsap } from 'gsap';
 import { createStage, dragRotate, reducedMotion, motion, frameDistance } from './stage.js';
 import { createPedestal, PEDESTAL_TOP } from './pedestal.js';
 import { buildModel } from './models.js';
+import { has3d } from '../data/products.js';
 import { glowTexture } from './textures.js';
 
 export function initStory(canvas, products) {
@@ -25,7 +26,8 @@ export function initStory(canvas, products) {
 
   function slot(i) {
     if (!slots[i]) {
-      const m = buildModel(products[i], products[i].styles[0]);
+      // A product shown with photos only (3D off) leaves the pedestal empty for its chapter.
+      const m = has3d(products[i]) ? buildModel(products[i], products[i].styles[0]) : new THREE.Group();
       m.scale.setScalar(0.001);
       m.visible = false;
       turn.add(m);

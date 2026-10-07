@@ -5,10 +5,12 @@ import { SITE, PAYMENTS, TRUST, LOOKBOOK, SERVICES, FILMS } from '../data/site.j
 import { WRITTEN_REVIEWS } from '../data/reviews.js';
 import { ANNOUNCEMENT } from '../data/announcement.js';
 import { HOMEPAGE, HOMEPAGE_SECTIONS, SOCIALS, PLATFORMS, STORES, VIDEOS, SEO } from '../data/homepage.js';
+import { MODELS, customKind } from '../data/shapes.js';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
 export const SHAPES = [
+  ['none', 'None: show only the photos and films'],
   ['gachKouto', 'Tall tiered box (gach kouto)'],
   ['sindoorKouto', 'Small round box (sindoor kouto)'],
   ['kunke', 'Small pot (kunke)'],
@@ -29,6 +31,11 @@ const palettes = () => Object.entries(PALETTES).map(([id, p]) => [id, p.label]);
 const films = () => Object.entries(FILMS).map(([id, f]) => [id, f.title]);
 // Options that depend on other sections are read live from the admin's working copy.
 const productOptions = (ctx) => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]);
+// The 3D shape list: None, the built-in shapes, then the shop's uploaded models (from "3D models").
+const shapeOptions = (ctx) => [
+  ...SHAPES,
+  ...(ctx?.data?.models?.custom || []).filter((m) => m.id && m.file).map((m) => [customKind(m.id), `${m.name || m.id} (your upload)`]),
+];
 const categoryOptions = (ctx) => (ctx.data.categories || []).map((c) => [c.id, c.label || c.id]);
 
 const mediaFields = [
@@ -38,6 +45,24 @@ const mediaFields = [
 ];
 
 export const SECTIONS = [
+  {
+    // Shown on its own screen (admin/modelsView.js), not the usual form.
+    key: 'models',
+    title: '3D models',
+    icon: '🧊',
+    kind: 'object',
+    intro: 'Every 3D model on the website, which products use it, and your own uploaded models.',
+    defaults: () => clone(MODELS),
+    fields: [
+      { key: 'off', label: 'Built-in shapes switched off', type: 'multi', options: () => SHAPES.filter(([k]) => k !== 'none') },
+      { key: 'custom', label: 'Your uploaded models', type: 'list', of: [
+        { key: 'id', label: 'Code', type: 'slug', required: true },
+        { key: 'name', label: 'Name', type: 'text', required: true },
+        { key: 'file', label: 'File', type: 'text', required: true },
+        { key: 'hidden', label: 'Switched off', type: 'bool' },
+      ] },
+    ],
+  },
   {
     key: 'products',
     title: 'Products',
@@ -51,18 +76,20 @@ export const SECTIONS = [
     blank: () => ({
       id: '', en: '', bn: '', category: 'ritual', line: '', story: '', priceFrom: 0,
       styles: ['sindoor'], combos: [{ id: 'single', label: 'Single piece', add: 0 }],
-      customizable: true, leadDays: 7, model: { kind: 'kunke' }, media: [],
+      // New products start with photos and films only; a 3D model is optional.
+      customizable: true, leadDays: 7, model: { kind: 'none' }, media: [],
     }),
-    normalize: (p) => ({ ...p, model: p.model?.image ? p.model : { kind: p.model?.kind || 'kunke' } }),
+    normalize: (p) => ({ ...p, model: p.model?.image ? p.model : { kind: p.model?.kind || 'none' } }),
     fields: [
       { key: 'en', label: 'Name (English)', type: 'text', required: true },
       { key: 'bn', label: 'Name (Bengali)', type: 'text', lang: 'bn' },
-      { advanced: true, key: 'id', label: 'Web address name', type: 'slug', from: 'en', required: true, help: 'Used in the page link, e.g. /#/p/gach-kouto. Lowercase letters, numbers and dashes. Avoid changing it once shared.' },
+      { advanced: true, key: 'id', label: 'Web address name', type: 'slug', from: 'en', required: true, help: 'Used in the page link, e.g. /p/gach-kouto/. Lowercase letters, numbers and dashes. Avoid changing it once shared.' },
       { key: 'category', label: 'Category', type: 'select', options: categoryOptions, required: true },
       { key: 'priceFrom', label: 'Price from (₹)', type: 'number', min: 0, required: true },
       { key: 'line', label: 'One-line summary', type: 'text', help: 'Shown under the name in the collection.' },
       { key: 'story', label: 'Full description', type: 'textarea' },
       { key: 'media', label: 'Photos and films', type: 'list', of: mediaFields, itemTitle: (m) => m.title || m.id || 'New photo', help: 'The first photo is the one shown in the collection grid.' },
+      { key: 'model.kind', label: '3D model (optional)', type: 'select', options: shapeOptions, required: true, noStar: true, default: 'none', help: 'Leave as “None” to show only your photos and films. To let customers turn the piece around in 3D, pick the closest shape, or one of your own models from “3D models” in the menu.' },
       { key: 'styles', label: 'Colourways offered', type: 'multi', options: palettes, required: true, help: 'The first one is shown by default.' },
       { key: 'combos', label: 'Options and add-ons', type: 'list', of: [
         { key: 'label', label: 'Option name', type: 'text', required: true },
@@ -72,7 +99,6 @@ export const SECTIONS = [
       { key: 'leadDays', label: 'Days to make', type: 'number', min: 0 },
       { key: 'customizable', label: 'Can be personalised (names, portraits, colours)', type: 'bool' },
       { advanced: true, key: 'customHelp', label: 'Personalisation hint for customers', type: 'text' },
-      { advanced: true, key: 'model.kind', label: '3D shape', type: 'select', options: SHAPES, required: true, help: 'The 3D model used in the gallery. Pick the closest shape.' },
       { advanced: true, key: 'model.image', label: 'Painting on the panel (arched panel shape only)', type: 'media', photoOnly: true },
       { key: 'hidden', label: 'Hide from the site', type: 'bool' },
     ],

@@ -122,10 +122,9 @@ export function openEnquiry({ lines = [], subject = '', fromCart = false } = {})
   status('');
   ['enq-name', 'enq-phone', 'enq-email'].forEach((id) => setError(id, ''));
   const mailNote = $('#enq-mail-note');
-  mailNote.textContent = SITE.web3formsKey
-    ? 'We reply within a day, usually on WhatsApp.'
-    : 'Email sending is being set up. WhatsApp is the fastest way to reach us.';
-  $('#enq-mail').disabled = !SITE.web3formsKey;
+  mailNote.textContent = 'We reply within a day, usually on WhatsApp.';
+  // Without an email service set up in the admin, only WhatsApp is offered.
+  $('#enq-mail').hidden = !SITE.web3formsKey;
   openDialog(dialog());
   if (window.matchMedia('(pointer: fine)').matches) setTimeout(() => $('#enq-name').focus(), 60);
 }

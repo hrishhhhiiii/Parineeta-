@@ -1,4 +1,4 @@
-import { PRODUCTS, SETS, STORY, PALETTES, CATEGORIES } from '../data/products.js';
+import { PRODUCTS, SETS, STORY, PALETTES, CATEGORIES, productHref } from '../data/products.js';
 import { REVIEWS as FILM_REVIEWS, waLink, photoSrc } from '../data/site.js';
 import { HOMEPAGE } from '../data/homepage.js';
 import { reviewsFor, ratingSummary, myReviews, saveMyReview, loadReviews, SOURCE_LABELS } from '../data/reviews.js';
@@ -20,7 +20,7 @@ const refs = {};
 
 // The prebuilt /p/<id>/ page, so shared links open the product with its own title and preview.
 const pageUrl = (id) => `${location.origin}/p/${id}/`;
-export const productHref = (id) => `#/p/${id}`;
+export { productHref };
 
 function ensureViewer() {
   viewerLoading ||= import('../three/viewer.js').then(({ createViewer }) => {
@@ -137,7 +137,7 @@ function configurator(p) {
     refs.wish,
     share),
   h('div', { class: 'ppage__buy2' },
-    h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openCheckout({ lines: [line()] }) }, icon('paper-plane-tilt'), 'Book and pay'),
+    h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openCheckout({ lines: [line()] }) }, icon('shopping-bag-open'), 'Book and pay'),
     h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openEnquiry({ lines: [line()] }) }, icon('chat-circle-text'), 'Enquire')),
   h('p', { class: 'fineprint', text: 'Pay a booking advance or the full estimate by UPI or bank transfer, or pay when you collect. We confirm the final price with you on WhatsApp.' }));
   return form;
@@ -355,7 +355,7 @@ function reviewsSection(p) {
   const productFilms = FILM_REVIEWS.filter((f) => f.product === p.id);
   const shopFilms = FILM_REVIEWS.filter((f) => f.product !== p.id);
   const films = h('div', { class: 'review-films' },
-    h('h3', { class: 'h3', text: productFilms.length ? 'Customers on film' : 'Customers at Our Shop, on Film' }),
+    h('h3', { class: 'h3', text: productFilms.length ? 'Customers on film' : 'Customers at our shop, on film' }),
     h('div', { class: 'review-films__row' }, ...[...productFilms, ...shopFilms].map((f) => videoTile(f, 'video--review'))));
 
   paintList();
@@ -383,7 +383,7 @@ function relatedSection(p) {
   const picks = [...same, ...others].slice(0, 4);
   const card = (x) => h('a', { class: 'mini-card', href: productHref(x.id) },
     h('span', { class: 'mini-card__media' }, thumbImg(x, x.styles[0], 'mini-card__img'), realPhoto(x)),
-    h('span', { class: 'mini-card__bn bn', lang: 'bn', text: x.bn }),
+    h('span', { class: 'mini-card__bn bn', lang: 'bn', translate: 'no', text: x.bn }),
     h('span', { class: 'mini-card__title', text: x.en }),
     h('span', { class: 'mini-card__price', text: `from ${inr(x.priceFrom)}` }));
   return h('section', { class: 'ppage__section', 'aria-labelledby': 'pg-related-title' },
@@ -391,7 +391,7 @@ function relatedSection(p) {
     sets.length ? h('div', { class: 'ppage__sets' },
       ...sets.map((s) => h('div', { class: 'ppage__set' },
         h('div', {},
-          h('p', { class: 'set__bn bn', lang: 'bn', text: s.bn }),
+          h('p', { class: 'set__bn bn', lang: 'bn', translate: 'no', text: s.bn }),
           h('p', { class: 'ppage__set-title', text: s.en }),
           h('p', { class: 'field__help', text: `${s.items.length} pieces, from ${inr(s.price)}` })),
         h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => {
@@ -419,8 +419,8 @@ function detailsSection(p) {
   const items = [
     ['clock', 'Made to order', `Ready in about ${p.leadDays} days from confirmation.`],
     ['paint-brush', 'Painted by hand', 'Every piece is painted in our studio in Patuli, so no two are identical.'],
-    ['palette', `${p.styles.length} Colourways`, p.styles.map((s) => PALETTES[s].label).join(', ')],
-    ['text-aa', p.customizable ? 'Personalised for you' : 'Classic design', p.customizable ? 'Add names, a date or a portrait at no extra step.' : 'Painted in our signature design for this piece.'],
+    ['palette', `${p.styles.length} colourway${p.styles.length === 1 ? '' : 's'}`, p.styles.map((s) => PALETTES[s].label).join(', ')],
+    ['text-aa', p.customizable ? 'Personalised for you' : 'Classic design', p.customizable ? 'Add names, a date or a portrait, painted by hand.' : 'Painted in our signature design for this piece.'],
   ];
   return h('section', { class: 'ppage__section', 'aria-labelledby': 'pg-details-title' },
     h('h2', { class: 'h2', id: 'pg-details-title', text: 'The details' }),
@@ -437,10 +437,11 @@ function setJsonLd(p, summary) {
     '@type': 'Product',
     name: p.en,
     alternateName: p.bn,
+    sku: p.id,
     description: p.story,
     brand: { '@type': 'Brand', name: 'Parineeta' },
     image: photo ? new URL(photoSrc(photo.id, 1600), location.origin).href : `${location.origin}/brand/og-image.jpg`,
-    offers: { '@type': 'Offer', priceCurrency: 'INR', price: p.priceFrom, availability: 'https://schema.org/MadeToOrder', url: pageUrl(p.id) },
+    offers: { '@type': 'Offer', priceCurrency: 'INR', price: p.priceFrom, availability: 'https://schema.org/MadeToOrder', seller: { '@type': 'Organization', name: 'Parineeta' }, url: pageUrl(p.id) },
   };
   if (summary.total) data.aggregateRating = { '@type': 'AggregateRating', ratingValue: summary.avg.toFixed(1), reviewCount: summary.total };
   const s = document.createElement('script');
@@ -468,7 +469,7 @@ export function renderProductPage(root, p) {
     h('button', { type: 'button', class: 'ppage__rating-link', onclick: () => {
       reviews.section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (!reviews.total) setTimeout(reviews.openForm, 500);
-    }, text: reviews.total ? `${reviews.avg.toFixed(1)} from ${reviews.total} review${reviews.total > 1 ? 's' : ''}` : 'No reviews yet. Write the first' }));
+    }, text: reviews.total ? `${reviews.avg.toFixed(1)} from ${reviews.total} review${reviews.total > 1 ? 's' : ''}` : 'No reviews yet. Write the first one.' }));
   paintRating();
   loadReviews().then(() => {
     if (cur.p !== p) return;
@@ -492,7 +493,7 @@ export function renderProductPage(root, p) {
           stage,
           gallery.thumbs),
         h('div', { class: 'ppage__info' },
-          h('p', { class: 'pp__bn bn', lang: 'bn', text: p.bn }),
+          h('p', { class: 'pp__bn bn', lang: 'bn', translate: 'no', text: p.bn }),
           h('h1', { class: 'ppage__title', id: 'pg-en', tabindex: '-1', text: p.en }),
           ratingLine,
           h('p', { class: 'ppage__line', text: p.line }),

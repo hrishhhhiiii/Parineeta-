@@ -1,4 +1,4 @@
-import { byId, PALETTES } from '../data/products.js';
+import { byId, PALETTES, productHref } from '../data/products.js';
 import { store, lineInfo, MAX } from './store.js';
 import { h, icon, inr, $ } from './dom.js';
 import { openDialog, closeDialog } from './dialogs.js';
@@ -53,7 +53,7 @@ function render(p) {
   $('#pp-bn').textContent = p.bn;
   $('#pp-en').textContent = p.en;
   $('#pp-story').textContent = p.story;
-  $('#pp-page').href = `#/p/${p.id}`;
+  $('#pp-page').href = productHref(p.id);
 
   // Real photos and films lead the big view; the 3D model is the last thumbnail.
   const cv = canvas();

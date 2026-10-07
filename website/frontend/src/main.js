@@ -7,8 +7,8 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 
-import { PRODUCTS, STORY, byId } from './data/products.js';
-import { waLink } from './data/site.js';
+import { PRODUCTS, STORY, byId, has3d } from './data/products.js';
+import { waLink, photoSrc, reelStill } from './data/site.js';
 import { $, $$, reduceMotion, inr, icon } from './ui/dom.js';
 import { hydrateIcons } from './ui/icons.js';
 import { store } from './ui/store.js';
@@ -36,9 +36,15 @@ renderAnnouncement();
 renderCmsContent();
 // Signed-in customers: the header icon becomes their account menu, and the cart and wishlist follow them
 // across devices. Clerk's cookie is checked first, so guests never download Clerk or supabase-js.
+// They load after the page has finished and the browser is idle, so Clerk never competes with the first screen.
 if (!IS_PREVIEW && /(?:^|;\s*)__client_uat(?:_[\w-]+)?=[1-9]/.test(document.cookie)) {
-  import('./ui/cartSync.js').then((m) => m.startCartSync()).catch(() => {});
-  import('./ui/accountMenu.js').then((m) => m.startAccountMenu()).catch(() => {});
+  const startAccount = () => {
+    import('./ui/cartSync.js').then((m) => m.startCartSync()).catch(() => {});
+    import('./ui/accountMenu.js').then((m) => m.startAccountMenu()).catch(() => {});
+  };
+  const later = () => ('requestIdleCallback' in window ? requestIdleCallback(startAccount, { timeout: 3000 }) : setTimeout(startAccount, 300));
+  if (document.readyState === 'complete') later();
+  else addEventListener('load', later, { once: true });
 }
 
 gsap.registerPlugin(ScrollTrigger);
@@ -59,12 +65,30 @@ renderSets();
 renderBento();
 renderReels();
 
+// Google Maps weighs about half a megabyte, so the Visit map loads only when asked for.
+function setupVisitMap() {
+  const btn = document.getElementById('visit-map-load');
+  const frame = document.querySelector('#visit .visit__map iframe');
+  if (!btn || !frame) return;
+  btn.addEventListener('click', () => {
+    frame.src = frame.dataset.src;
+    frame.hidden = false;
+    frame.removeAttribute('tabindex');
+    // A tap anywhere on the map opens the shop's own Google Maps page.
+    const open = document.querySelector('#visit .visit__map-open');
+    if (open) open.hidden = false;
+    btn.remove();
+    frame.focus({ preventScroll: true });
+  }, { once: true });
+}
+
 setupDialogs();
 setupLightbox();
 setupEnquiry();
 setupProductPanel();
 setupDrawers();
 setupCheckout();
+setupVisitMap();
 initAlpana();
 initInvite();
 
@@ -149,24 +173,60 @@ function whenNear(el, fn, margin = '600px') {
 }
 
 const chapters = $$('.chapter');
-whenNear($('#story-chapters'), () => {
-  import('./three/story.js').then(({ initStory }) => {
-    const story = initStory($('#story-canvas'), STORY.map((c) => byId(c.product)));
-    chapters.forEach((li, i) => {
-      ScrollTrigger.create({
-        trigger: li,
-        start: 'top 62%',
-        end: 'bottom 62%',
-        onToggle: (self) => {
-          if (!self.isActive) return;
-          story.setChapter(i);
-          chapters.forEach((c) => c.classList.toggle('is-active', c === li));
-        },
-      });
-    });
-    whenScrollIdle(() => ScrollTrigger.refresh());
+// Chapters light up as they scroll by whether or not the 3D model loads (on a weak phone WebGL can
+// fail, and the chapters must not stay faded). The model follows along once it has loaded.
+let story = null;
+let chapterNow = 0;
+// A chapter whose product has no 3D model shows a photo on the stage instead of an empty pedestal:
+// the chapter's own photo, else the product's first photo or film still.
+const storyStage = $('.story__stage');
+const storyPhoto = storyStage ? document.createElement('img') : null;
+if (storyPhoto) {
+  storyPhoto.className = 'story__photo';
+  storyPhoto.alt = '';
+  storyPhoto.decoding = 'async';
+  storyStage.append(storyPhoto);
+}
+function stagePhoto(i) {
+  if (!storyPhoto) return;
+  const c = STORY[i];
+  const p = c && byId(c.product);
+  const media = [c?.photo, ...(p?.media || [])].filter((m) => m?.id && (m.type === 'photo' || m.type === 'reel'));
+  const m = !p || has3d(p) ? null : media.find((x) => x.type === 'photo') || media[0];
+  storyStage.classList.toggle('is-photo', !!m);
+  if (!m) return;
+  const src = m.type === 'photo' ? photoSrc(m.id, 800) : reelStill(m.id);
+  if (storyPhoto.getAttribute('src') !== src) storyPhoto.src = src;
+  storyPhoto.alt = p.en;
+}
+stagePhoto(0);
+chapters.forEach((li, i) => {
+  ScrollTrigger.create({
+    trigger: li,
+    start: 'top 62%',
+    end: 'bottom 62%',
+    onToggle: (self) => {
+      if (!self.isActive) return;
+      chapterNow = i;
+      story?.setChapter(i);
+      stagePhoto(i);
+      chapters.forEach((c) => c.classList.toggle('is-active', c === li));
+    },
   });
 });
+// The 3D model (about 160 KB of three.js) starts loading only when the story is close, after the page
+// has finished loading and the browser is idle, and not at all when the visitor asked to save data.
+const idle = (fn) => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(fn, 200));
+const afterLoad = (fn) => (document.readyState === 'complete' ? fn() : addEventListener('load', fn, { once: true }));
+if (!navigator.connection?.saveData) {
+  whenNear($('#story-chapters'), () => afterLoad(() => idle(() => {
+    import('./three/story.js').then(({ initStory }) => {
+      story = initStory($('#story-canvas'), STORY.map((c) => byId(c.product)));
+      story.setChapter(chapterNow);
+      whenScrollIdle(() => ScrollTrigger.refresh());
+    }).catch(() => { /* no 3D: the chapters still work */ });
+  })), '200px');
+}
 chapters[0]?.classList.add('is-active');
 ScrollTrigger.create({
   trigger: '#story-chapters',
@@ -215,7 +275,7 @@ $('#focus-open').addEventListener('click', () => {
 function startGallery() {
   if (gallery || view !== '3d') return;
   import('./three/gallery.js').then(({ initGallery }) => {
-    gallery = initGallery({ canvas: $('#gallery-canvas'), stageEl: $('#pavilion-stage'), products: PRODUCTS, onFocus, onOpen: (p) => openProduct(p.id) });
+    gallery = initGallery({ canvas: $('#gallery-canvas'), stageEl: $('#pavilion-stage'), products: PRODUCTS.filter(has3d), onFocus, onOpen: (p) => openProduct(p.id) });
     if (filter !== 'all') gallery.setFilter(filter);
     $('#pav-prev').addEventListener('click', () => gallery.prev());
     $('#pav-next').addEventListener('click', () => gallery.next());
@@ -279,11 +339,14 @@ if (!reduce) {
 }
 
 /* ---------- ambient film band ---------- */
+// A silent 10-second, 540px loop cut from the bright part of the film (444 KB instead of the 2.8 MB film);
+// "Watch the film" still opens the full version with sound.
+const BAND_LOOP = '/media/reels/kouto-river-loop.mp4';
 const bandVideo = $('#filmband-video');
 let bandInView = false;
 motion.listeners.add((paused) => {
   if (!paused && bandInView && !reduce) {
-    if (!bandVideo.src) bandVideo.src = '/media/reels/kouto-river.mp4';
+    if (!bandVideo.src) bandVideo.src = BAND_LOOP;
     bandVideo.play().catch(() => {});
   }
 });
@@ -291,7 +354,7 @@ if (!reduce) {
   new IntersectionObserver(([entry]) => {
     bandInView = entry.isIntersecting;
     if (entry.isIntersecting && !motion.paused) {
-      if (!bandVideo.src) bandVideo.src = '/media/reels/kouto-river.mp4';
+      if (!bandVideo.src) bandVideo.src = BAND_LOOP;
       bandVideo.play().catch(() => {});
     } else bandVideo.pause();
   }, { threshold: 0.25 }).observe(bandVideo);
@@ -301,7 +364,7 @@ $('#filmband-open').addEventListener('click', () => {
   openLightbox([{ type: 'reel', id: 'kouto-river' }], 0);
 });
 
-/* ---------- product pages (#/p/<id>) ---------- */
+/* ---------- product pages (/p/<id>/) ---------- */
 store.subscribe(refreshWish);
 initRouter({
   render: renderProductPage,

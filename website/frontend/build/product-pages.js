@@ -44,6 +44,11 @@ function applySeo(html) {
     if (phone) ld.telephone = phone.replace(/[^\d+]/g, '');
     if (SITE.email) ld.email = SITE.email;
     if (SEO.description) ld.description = SEO.description;
+    // The first shop's map link from the admin: a pasted Google Maps link, or a search for its place.
+    const shop = STORES.find((x) => !x.hidden);
+    const pasted = String(shop?.mapsUrl || '').trim();
+    if (/^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|maps\.google\.[a-z.]+|(www\.)?google\.[a-z.]+\/maps)(\/|$)/i.test(pasted)) ld.hasMap = pasted;
+    else if (shop?.mapsQuery) ld.hasMap = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shop.mapsQuery)}`;
     return `<script type="application/ld+json">\n  ${JSON.stringify(ld, null, 2).replace(/</g, '\\u003c')}\n  </script>`;
   });
 }
@@ -65,6 +70,16 @@ function setUrls(html, site, path, image) {
   return html.replace('</head>', `  <link rel="canonical" href="${site}${path}" />\n</head>`);
 }
 
+/** The product's name, words and photo, written into the page so search engines and no-script visitors
+ *  see it straight away. The browser then draws the full product page over it with the same classes. */
+function productBody(p, image, cat) {
+  const crumbs = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/#collection">Collection</a> / <span aria-current="page">${esc(p.en)}</span></nav>`;
+  const img = `<div class="ppage__viewer"><img src="${esc(image)}" alt="${esc(`${p.en} (${p.bn}), hand-painted by Parineeta`)}" fetchpriority="high" /></div>`;
+  const price = p.priceFrom ? `<p class="ppage__line">From ₹${Number(p.priceFrom).toLocaleString('en-IN')}${cat ? ` · ${esc(cat)}` : ''}</p>` : '';
+  const info = `<div class="ppage__info"><p class="pp__bn bn" lang="bn" translate="no">${esc(p.bn)}</p><h1 class="ppage__title" id="pg-en" tabindex="-1">${esc(p.en)}</h1><p class="ppage__line">${esc(p.line)}</p><p class="pp__story">${esc(p.story)}</p>${price}</div>`;
+  return `<main class="ppage" id="product-page"><div class="container">${crumbs}<div class="ppage__top"><div class="ppage__media">${img}</div>${info}</div></div></main>`;
+}
+
 function productHtml(base, p, site) {
   const path = `/p/${p.id}/`;
   const title = `${p.en} (${p.bn}) | Parineeta, Patuli`;
@@ -82,16 +97,19 @@ function productHtml(base, p, site) {
   html = setMeta(html, 'property', 'og:image:alt', `${p.en} (${p.bn}), hand-painted by Parineeta`);
   html = html.replace(/\s*<meta property="og:image:(width|height)" content="[^"]*" \/>/g, '');
   html = setUrls(html, site, path, image);
+  // The product shows first; the landing page stays in the HTML for when the visitor goes back.
+  html = html.replace('<main id="main">', '<main id="main" hidden>').replace('<main class="ppage" id="product-page" hidden></main>', productBody(p, image, cat));
   const ld = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: p.en,
     alternateName: p.bn,
+    sku: p.id,
     description: p.story,
     category: cat,
     brand: { '@type': 'Brand', name: 'Parineeta' },
     image: abs(site, image),
-    offers: { '@type': 'Offer', priceCurrency: 'INR', price: p.priceFrom, availability: 'https://schema.org/MadeToOrder', ...(site ? { url: site + path } : {}) },
+    offers: { '@type': 'Offer', priceCurrency: 'INR', price: p.priceFrom, availability: 'https://schema.org/MadeToOrder', seller: { '@type': 'Organization', name: 'Parineeta' }, ...(site ? { url: site + path } : {}) },
   };
   return html.replace('</head>', `  <script type="application/ld+json" id="pg-jsonld">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>\n</head>`);
 }
@@ -111,7 +129,12 @@ export function productPages({ site = '' } = {}) {
         if (!ctx.path.endsWith('/index.html')) return html;
         html = applySeo(html);
         const ogImage = SEO.ogImage ? photoSrc(SEO.ogImage, 1600) : DEFAULT_IMAGE;
-        return setUrls(html, site, '/', ogImage).replace('"image": "/brand/og-image.jpg"', `"image": "${abs(site, DEFAULT_IMAGE)}"`);
+        html = setUrls(html, site, '/', ogImage).replace('"image": "/brand/og-image.jpg"', `"image": "${abs(site, DEFAULT_IMAGE)}"`);
+        // With the site address known, the shop gets a stable id and absolute links.
+        if (site) html = html.replace('"logo": "/brand/favicon-192x192.png"', `"@id": "${site}/#store",
+  "url": "${site}/",
+  "logo": "${site}/brand/favicon-192x192.png"`);
+        return html;
       },
     },
     async closeBundle() {

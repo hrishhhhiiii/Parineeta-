@@ -2,9 +2,11 @@ import './admin.css';
 import { configured, getClerk, getSupabase, userOf } from '../auth/client.js';
 import { SECTIONS, FILM_OPTIONS } from './schemas.js';
 import { photoSrc } from '../data/site.js';
+import { mergeEdits } from './merge.js';
 import { avatar, profileOf } from '../auth/profile.js';
 import { ordersView } from './orders.js';
 import { reviewsView, newReviewCount } from './reviews.js';
+import { modelsView } from './modelsView.js';
 
 const root = document.getElementById('app');
 
@@ -49,6 +51,7 @@ const DEMO = import.meta.env.DEV && new URLSearchParams(location.search).has('de
 function demoClient() {
   const heads = new Map();
   let rev = 0;
+  const demoFiles = new Map();
   const jobs = [];
   const user = { email: 'demo@localhost' };
   const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
@@ -97,7 +100,11 @@ function demoClient() {
       try { return { data: rpcs[name](args || {}), error: null }; } catch (error) { return { data: null, error }; }
     },
     from: () => ({ select: () => ({ order: () => ({ limit: async () => ({ data: jobs.slice(0, 1), error: null }) }) }) }),
-    storage: { from: () => ({ upload: async () => ({ error: new Error('uploads are off in demo mode') }) }) },
+    // Demo: 3D models "upload" into this tab only (a local link), so the 3D models screen can be tried.
+    storage: { from: () => ({
+      upload: async (path, file) => (path.startsWith('models/') ? (demoFiles.set(path, URL.createObjectURL(file)), { error: null }) : { error: new Error('uploads are off in demo mode') }),
+      getPublicUrl: (path) => ({ data: { publicUrl: demoFiles.get(path) || '' } }),
+    }) },
   };
 }
 
@@ -178,7 +185,8 @@ function writeBackup(key) {
 const unpublished = () => SECTIONS.filter((s) => ctx.saved[s.key] && ctx.saved[s.key] !== ctx.published[s.key]);
 
 const ERRORS = {
-  CONTENT_CONFLICT: 'Someone else saved this section while you were editing. Copy anything you need, then reload to see their version.',
+  CONTENT_CONFLICT: 'This section was saved on another device at the same moment. Press Save again.',
+  UNKNOWN_KEY: 'This part of the admin needs a one-time database update: run 012_models.sql in Supabase, then press Save again.',
   NO_CHANGES: 'Everything is already live.',
   NOT_ALLOWED: "Your account can't do this. Ask the owner.",
   INVALID_CONTENT: 'Some values are not allowed.',
@@ -215,7 +223,11 @@ function jobText(j) {
 async function publishAll() {
   // Sections never saved show the built-in content; they only block publishing once someone edits them.
   const edited = edits();
-  if (edited.length) return toast(`Save or undo your changes first (${edited.map((x) => x.title).join(', ')}).`, 'err');
+  if (edited.length) {
+    // Take them to the first section that still needs saving, so they can see what it is.
+    if (ctx.section !== edited[0].key) go(edited[0].key);
+    return toast(`${edited.map((x) => x.title).join(', ')}: you have changes that aren't saved. Press Save changes (or Undo changes), then put them live.`, 'err');
+  }
   const n = unpublished().length;
   if (!confirm(`Put your ${n} saved change${n === 1 ? '' : 's'} on the live website now?`)) return;
   const { error } = await sb.rpc('publish');
@@ -238,7 +250,10 @@ function paintPublishBar() {
   const n = unpublished().length;
   const j = ctx.job;
   const busy = Boolean(j && ['queued', 'building'].includes(j.status));
+  const unsaved = edits();
   const state = busy || j?.status === 'failed' ? jobText(j)
+    // Unsaved edits can't go live, so say that first instead of "up to date".
+    : unsaved.length ? `Save your changes first (${unsaved.map((x) => x.title).join(', ')}), then put them live`
     : n ? `${n} change${n === 1 ? '' : 's'} saved but not live yet`
     : ctx.notLive.size ? 'Some published changes are not live yet'
     : 'Your website is up to date ✓';
@@ -273,14 +288,17 @@ function openPreview() {
   dlg.showModal();
 }
 
-function validate(section, value) {
+function validate(section, value, badItems = []) {
   const problems = [];
   const check = (item, fields, where) => {
     for (const f of fields) {
       if (!f.key) continue;
       const v = getPath(item, f.key);
       const empty = v == null || v === '' || (Array.isArray(v) && !v.length);
-      if (f.required && empty) problems.push(`${where}: "${f.label}" is required.`);
+      // A code made from another field (web address name ← English name) is filled in on save; when that
+      // field is empty too, report only it, not a second error about a field folded under "More options".
+      const fromEmpty = f.type === 'slug' && f.from && !getPath(item, f.from);
+      if (f.required && empty && !fromEmpty) problems.push(`${where}: "${f.label}" is required.`);
       if (f.pattern && !empty && !new RegExp(f.pattern).test(String(v))) problems.push(`${where}: "${f.label}" looks wrong.`);
       if (f.type === 'list' && Array.isArray(v)) v.forEach((sub, i) => check(sub, f.of, `${where} → ${f.label} ${i + 1}`));
     }
@@ -288,8 +306,14 @@ function validate(section, value) {
   if (section.kind === 'list') {
     const ids = new Map();
     value.forEach((item, i) => {
-      const where = section.itemTitle(item) || `Item ${i + 1}`;
+      const title = section.itemTitle(item);
+      const unnamed = !title || /^New /.test(title);
+      // Say where an unnamed item is, since "New product" alone can't be found in a long list.
+      const noun = /^\w+s$/.test(section.title) ? section.title.slice(0, -1) : 'Item'; // Products → Product
+      const where = unnamed ? `${noun} ${i + 1} of ${value.length} (no name yet)` : title;
+      const before = problems.length;
       check(item, section.fields, where);
+      if (problems.length > before) badItems.push(i);
       if (item.id) {
         if (ids.has(item.id)) problems.push(`"${where}" and "${ids.get(item.id)}" share the same code "${item.id}".`);
         ids.set(item.id, where);
@@ -314,38 +338,114 @@ function fillCodes(section, value) {
 async function save(section) {
   fillCodes(section, ctx.data[section.key]);
   let value = clone(ctx.data[section.key]);
-  const problems = validate(section, value);
+  const badItems = [];
+  const problems = validate(section, value, badItems);
   if (problems.length) {
     moreOpen = true; // a problem may be in a folded field
+    if (section.kind === 'list' && badItems.length) ctx.index = badItems[0]; // open the first item to fix
     render();
     alert(`Please fix these before saving:\n\n• ${problems.slice(0, 12).join('\n• ')}`);
     return;
   }
   if (section.normalize && section.kind === 'list') value = value.map(section.normalize);
-  const { data, error } = await sb.rpc('save_draft', { p_key: section.key, p_data: value, p_expected_version: ctx.version[section.key] });
-  if (error) return toast(`Could not save: ${explain(error)}`, 'err');
+  let { data, error } = await sb.rpc('save_draft', { p_key: section.key, p_data: value, p_expected_version: ctx.version[section.key] });
+  let merged = false;
+  if (error && /CONTENT_CONFLICT/.test(error.message || '')) {
+    // Saved on another device (or by someone else) since this one loaded it: combine both sets of edits.
+    const latest = await latestHead(section.key);
+    if (latest) {
+      const base = ctx.saved[section.key] ? JSON.parse(ctx.saved[section.key]) : section.defaults();
+      value = mergeEdits(section.kind, base, value, latest.draft ?? section.defaults());
+      if (section.normalize && section.kind === 'list') value = value.map(section.normalize);
+      ctx.version[section.key] = latest.version;
+      ({ data, error } = await sb.rpc('save_draft', { p_key: section.key, p_data: value, p_expected_version: latest.version }));
+      merged = !error;
+    }
+  }
+  if (error) {
+    toast(`Could not save: ${explain(error)}`, 'err');
+    return false;
+  }
   ctx.data[section.key] = value;
   ctx.saved[section.key] = JSON.stringify(value);
   ctx.version[section.key] = data.version;
   ctx.updated[section.key] = { at: new Date().toISOString(), by: ctx.user.email };
   writeBackup(section.key);
-  toast(`${section.title} saved. Press “Put changes live” at the top when you are ready.`);
+  ctx.index = Math.min(ctx.index, Array.isArray(value) ? Math.max(0, value.length - 1) : 0);
+  toast(merged
+    ? `${section.title} saved, together with the changes made on your other device.`
+    : `${section.title} saved. Press “Put changes live” at the top when you are ready.`);
+  render();
+  return true;
+}
+
+/* ---------- 3D models: one screen that edits two sections (models, and products when moved) ---------- */
+const sectionOf = (key) => SECTIONS.find((s) => s.key === key);
+// A section never saved counts as changed once it differs from the built-in content.
+const changed = (key) => (ctx.saved[key] ? isDirty(key) : JSON.stringify(ctx.data[key]) !== JSON.stringify(sectionOf(key).defaults()));
+async function saveModels() {
+  // Models first: products may point at a model that was just uploaded.
+  for (const key of ['models', 'products']) {
+    if (changed(key) && !(await save(sectionOf(key)))) return;
+  }
+}
+function undoModels() {
+  for (const key of ['models', 'products']) {
+    ctx.data[key] = ctx.saved[key] ? JSON.parse(ctx.saved[key]) : sectionOf(key).defaults();
+    writeBackup(key);
+  }
   render();
 }
 
-/** Resizes a photo in the browser (max 1600px, WebP) and uploads it to Supabase storage. */
+async function latestHead(key) {
+  const { data: rows, error } = await sb.rpc('get_heads');
+  return error ? null : rows.find((r) => r.key === key) || { key, version: 0, draft: null };
+}
+
+/* Coming back to this tab (say, after editing on your phone) brings in what the other device saved.
+   Sections with unsaved edits here are left alone; Save merges them. */
+async function pullOtherDevice() {
+  if (document.hidden || !ctx.user) return;
+  const { data: rows, error } = await sb.rpc('get_heads');
+  if (error || !rows) return;
+  let changed = 0;
+  for (const row of rows) {
+    const s = SECTIONS.find((x) => x.key === row.key);
+    if (!s || row.version === ctx.version[s.key] || isDirty(s.key)) continue;
+    ctx.data[s.key] = row.draft ?? s.defaults();
+    ctx.saved[s.key] = row.draft ? JSON.stringify(row.draft) : '';
+    ctx.published[s.key] = row.published ? JSON.stringify(row.published) : '';
+    ctx.version[s.key] = row.version;
+    ctx.updated[s.key] = row.draft ? { at: row.updated_at, by: row.updated_by } : null;
+    changed++;
+  }
+  if (!changed) return;
+  render();
+  toast('Updated with changes saved on your other device.');
+}
+document.addEventListener('visibilitychange', pullOtherDevice);
+
+/** Resizes a photo in the browser to 400, 800 and 1600px WebP copies and uploads them to Supabase storage.
+ *  Phones then download the small copy instead of the full-size one. */
 async function uploadPhoto(file) {
   const bmp = await createImageBitmap(file);
-  const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
-  const w = Math.round(bmp.width * scale);
-  const hgt = Math.round(bmp.height * scale);
-  const canvas = Object.assign(document.createElement('canvas'), { width: w, height: hgt });
-  canvas.getContext('2d').drawImage(bmp, 0, 0, w, hgt);
-  const blob = await new Promise((r) => canvas.toBlob(r, 'image/webp', 0.85));
-  const path = `photos/${Date.now()}-${slugify(file.name.replace(/\.\w+$/, '')) || 'photo'}.webp`;
-  const { error } = await sb.storage.from('media').upload(path, blob, { contentType: 'image/webp', cacheControl: '31536000' });
-  if (error) throw error;
-  return { url: sb.storage.from('media').getPublicUrl(path).data.publicUrl, w, h: hgt };
+  const base = `photos/${Date.now()}-${slugify(file.name.replace(/\.\w+$/, '')) || 'photo'}`;
+  let full;
+  for (const size of [1600, 800, 400]) {
+    const scale = Math.min(1, size / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale);
+    const hgt = Math.round(bmp.height * scale);
+    const canvas = Object.assign(document.createElement('canvas'), { width: w, height: hgt });
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bmp, 0, 0, w, hgt);
+    const blob = await new Promise((r) => canvas.toBlob(r, 'image/webp', size === 400 ? 0.8 : 0.85));
+    const path = `${base}-${size}.webp`;
+    const { error } = await sb.storage.from('media').upload(path, blob, { contentType: 'image/webp', cacheControl: '31536000' });
+    if (error) throw error;
+    full ||= { url: sb.storage.from('media').getPublicUrl(path).data.publicUrl, w, h: hgt };
+  }
+  return full;
 }
 
 /* ---------- fields ---------- */
@@ -357,7 +457,7 @@ function field(f, item, onChange, rerender) {
     setPath(item, f.key, v);
     onChange();
   };
-  const label = h('label', { class: 'field__label', for: id }, f.label, f.required ? h('span', { class: 'req', text: ' *' }) : null);
+  const label = h('label', { class: 'field__label', for: id }, f.label, f.required && !f.noStar ? h('span', { class: 'req', text: ' *' }) : null);
   const help = f.help ? h('p', { class: 'field__help', text: f.help }) : null;
   let control;
 
@@ -537,7 +637,7 @@ const HOME = 'home';
 // The menu, grouped by how often each part is used. Anything not listed falls under "More".
 const GROUPS = [
   { title: 'Every day', keys: [ORDERS, 'products'] },
-  { title: 'Your website', keys: ['sets', 'reviews', 'lookbook', 'announcement', 'homepage'] },
+  { title: 'Your website', keys: ['sets', 'reviews', 'models', 'lookbook', 'announcement', 'homepage'] },
   { title: 'Shop details', keys: ['settings', 'stores', 'socials'] },
 ];
 GROUPS.push({ title: 'More', keys: SECTIONS.map((s) => s.key).filter((k) => !GROUPS.some((g) => g.keys.includes(k))) });
@@ -548,6 +648,7 @@ const TILE_TEXT = {
   products: 'Add a product, change a price or a photo, or hide one.',
   sets: 'Bundles sold together at one price.',
   reviews: 'Every review, kept. Choose which ones show on the website.',
+  models: 'Every 3D model, where it is used, and your own uploads.',
   lookbook: 'The photo gallery on the website.',
   announcement: 'A one-line message across the top of the website.',
   homepage: 'The big headline and photo at the top of the home page.',
@@ -617,6 +718,8 @@ function render() {
       clerk ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) toLogin('?signout'); } })));
 
   root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === HOME ? homeView() : ctx.section === ORDERS ? ordersView(sb, { h, toast, explain })
+    : ctx.section === 'models' ? modelsView({ h, toast, sb, ctx, slugify, changed, saveAll: saveModels, undoAll: undoModels,
+      edited: () => { writeBackup('models'); writeBackup('products'); paintPublishBar(); } })
     : ctx.section === 'reviews' ? reviewsView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), onCount: setReviewCount })
     : sectionView(section))));
   if (clerk) {
@@ -671,6 +774,7 @@ function sectionView(section) {
     saveBar.classList.toggle('is-dirty', d);
     saveBar.querySelector('.btn--gold').disabled = !d;
     saveBar.querySelector('.savebar__state').textContent = d ? 'You have changes. Press Save.' : 'Saved.';
+    paintPublishBar();
     const navBtn = document.querySelector('.side__btn.is-active');
     const dot = navBtn?.querySelector('.dot');
     if (d && navBtn && !dot) navBtn.append(h('span', { class: 'dot', title: 'Unsaved changes', text: '●' }));

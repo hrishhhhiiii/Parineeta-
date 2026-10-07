@@ -1,4 +1,5 @@
-import { byId, isSet } from '../data/products.js';
+import { byId, isSet, productHref, has3d } from '../data/products.js';
+import { photoSrc, reelStill } from '../data/site.js';
 import { store, lineInfo, cartTotal, MAX } from './store.js';
 import { h, icon, inr, $, $$ } from './dom.js';
 import { openDialog, closeDialog, scrollToHash } from './dialogs.js';
@@ -25,6 +26,15 @@ export function thumbImg(product, style, cls = 'thumb') {
   const img = h('img', { class: cls, alt: '', width: 360, height: 440, decoding: 'async' });
   const id = isSet(product.id) ? product.items[0] : product.id;
   const p = byId(id);
+  if (!has3d(p)) {
+    // No 3D model: the shop's own photo (or film still), else the brand mark.
+    const photo = p?.media?.find((m) => m.type === 'photo');
+    const reel = p?.media?.find((m) => m.type === 'reel');
+    img.src = photo ? photoSrc(photo.id, 400) : reel ? reelStill(reel.id) : '/brand/favicon-192x192.png';
+    img.loading = 'lazy';
+    img.classList.add('thumb--photo');
+    return img;
+  }
   pending.set(img, () => loadThumbs()
     .then(({ getThumb }) => getThumb(p, isSet(product.id) ? undefined : style))
     .then((url) => {
@@ -59,7 +69,7 @@ function renderCart() {
     list.append(h('li', { class: 'line' },
       h('div', { class: 'line__thumb' }, thumbImg(p, l.style)),
       h('div', { class: 'line__info' },
-        h('p', { class: 'line__name' }, isSet(p.id) ? p.en : h('a', { href: `#/p/${p.id}`, text: p.en }), h('span', { class: 'bn', lang: 'bn', text: p.bn })),
+        h('p', { class: 'line__name' }, isSet(p.id) ? p.en : h('a', { href: productHref(p.id), text: p.en }), h('span', { class: 'bn', lang: 'bn', translate: 'no', text: p.bn })),
         meta ? h('p', { class: 'line__meta', text: meta }) : null,
         l.custom ? h('p', { class: 'line__meta', text: `Personalise: “${l.custom}”` }) : null,
         h('div', { class: 'line__row' },
@@ -93,12 +103,12 @@ function renderWish() {
     list.append(h('li', { class: 'line' },
       h('div', { class: 'line__thumb' }, thumbImg(p)),
       h('div', { class: 'line__info' },
-        h('p', { class: 'line__name' }, p.en, h('span', { class: 'bn', lang: 'bn', text: p.bn })),
+        h('p', { class: 'line__name' }, p.en, h('span', { class: 'bn', lang: 'bn', translate: 'no', text: p.bn })),
         h('p', { class: 'line__meta', text: `from ${inr(set ? p.price : p.priceFrom)}` }),
         h('div', { class: 'line__row' },
           set
             ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => { store.add({ id, qty: 1 }); toast(`${p.en} added to your enquiry cart.`); } }, 'Add to cart')
-            : h('a', { class: 'btn btn--ghost btn--sm', href: `#/p/${id}` }, 'View details'))),
+            : h('a', { class: 'btn btn--ghost btn--sm', href: productHref(id) }, 'View details'))),
       h('button', { type: 'button', class: 'icon-btn line__remove', 'aria-label': `Remove ${p.en} from wishlist`, onclick: () => {
         store.toggleWish(id);
         toast(`${p.en} removed from your wishlist.`, { iconName: 'heart', action: 'Undo', onAction: () => { if (!store.hasWish(id)) store.toggleWish(id); } });

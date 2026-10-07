@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { TessellateModifier } from 'three/addons/modifiers/TessellateModifier.js';
 import { PALETTES } from '../data/products.js';
+import { isCustomKind, customModel } from '../data/shapes.js';
 import { bandTexture, kunkeTexture, kunkeRimTexture, kuloTexture, KULO_SIZE, alpanaTexture, leafTexture, fabricTexture, matTexture, LEAF_BOUNDS, KURTA_BOUNDS } from './textures.js';
 import { M } from './materials.js';
 
@@ -666,11 +667,58 @@ const FIT = {
   kulo: { h: 2.0, w: 1.6 },
 };
 
+/* ---------- the shop's own uploaded models (.glb) ---------- */
+const CUSTOM_FIT = { h: 1.9, w: 1.9 };
+const gltfCache = new Map(); // file → Promise<scene>, loaded once and shared by every copy
+function loadGltf(file) {
+  if (!gltfCache.has(file)) {
+    gltfCache.set(file, import('three/addons/loaders/GLTFLoader.js').then(({ GLTFLoader }) => new GLTFLoader().loadAsync(file)).then((gltf) => {
+      // Copies share these, so disposing one copy must not free them for the others.
+      gltf.scene.traverse((o) => { if (o.geometry) o.geometry.userData.shared = true; });
+      return gltf.scene;
+    }));
+  }
+  return gltfCache.get(file);
+}
+
+/** An uploaded model, sized like the built-in shapes: standing on the pedestal, about 1.9 units tall. */
+function buildCustom(file) {
+  const wrapper = new THREE.Group();
+  wrapper.userData.height = CUSTOM_FIT.h;
+  wrapper.userData.ready = loadGltf(file).then((scene) => {
+    const inner = scene.clone(true);
+    inner.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(inner);
+    const size = box.getSize(new THREE.Vector3());
+    const s = Math.min(CUSTOM_FIT.h / (size.y || 1), CUSTOM_FIT.w / (Math.max(size.x, size.z) || 1));
+    inner.scale.multiplyScalar(s);
+    inner.updateMatrixWorld(true);
+    box.setFromObject(inner);
+    const c = box.getCenter(new THREE.Vector3());
+    inner.position.sub(new THREE.Vector3(c.x, box.min.y, c.z));
+    wrapper.add(inner);
+    wrapper.userData.height = box.max.y - box.min.y;
+  }).catch((err) => console.warn('[3d] could not load the uploaded model', file, err));
+  return wrapper;
+}
+
 export function buildModel(product, styleId) {
+  const kind = product.model?.kind;
+  if (isCustomKind(kind)) {
+    const m = customModel(kind) || (product.model?.file ? { file: product.model.file } : null);
+    if (m) return buildCustom(m.file);
+  }
+  // "None" in the admin, or an uploaded model that is gone: nothing is drawn (never a stand-in shape).
+  if (kind === 'none' || isCustomKind(kind)) {
+    const empty = new THREE.Group();
+    empty.userData.ready = Promise.resolve();
+    empty.userData.height = 0;
+    return empty;
+  }
   const pal = PALETTES[styleId] || PALETTES[product.styles[0]];
-  const kind = BUILD[product.model?.kind] ? product.model.kind : 'kunke';
-  const inner = BUILD[kind](pal, product.model);
-  const fit = FIT[kind];
+  const shape = BUILD[kind] ? kind : 'kunke';
+  const inner = BUILD[shape](pal, product.model);
+  const fit = FIT[shape];
   if (fit.tilt) inner.rotation.x = fit.tilt;
   inner.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(inner);

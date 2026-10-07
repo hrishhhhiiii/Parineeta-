@@ -2,6 +2,7 @@
 // the shop's real photos and films first, the 3D model as the last option
 // (and the only one for products with no real media yet).
 import { photoSrc, photoSrcset, reelSrc, reelPoster } from '../data/site.js';
+import { has3d } from '../data/products.js';
 import { h, icon } from './dom.js';
 import { openLightbox, describeMedia } from './lightbox.js';
 import { thumbImg } from './drawers.js';
@@ -18,7 +19,8 @@ import { thumbImg } from './drawers.js';
  */
 export function mediaStage(p, o) {
   const real = [...p.media.filter((m) => m.type === 'photo'), ...p.media.filter((m) => m.type === 'reel')];
-  const items = [...real, { type: '3d' }];
+  // Products set to "None" in the admin have no 3D option.
+  const items = has3d(p) ? [...real, { type: '3d' }] : real;
   const thumbs = h('div', { class: 'ppage__thumbs', role: 'group', 'aria-label': 'Photos and films' });
   const { stage } = o;
   let active = -1;
@@ -27,6 +29,11 @@ export function mediaStage(p, o) {
     if (i === active) return;
     active = i;
     const it = items[i];
+    if (!it) {
+      // No 3D and no photos yet: the brand mark holds the space.
+      stage.replaceChildren(h('span', { class: 'empty__mark brand-mask ppage__nomedia', 'aria-hidden': 'true' }));
+      return;
+    }
     stage.querySelector('video')?.pause();
     if (it.type !== '3d') o.viewer()?.stop();
     stage.classList.toggle('is-3d', it.type === '3d');
@@ -62,14 +69,15 @@ export function mediaStage(p, o) {
     }
     const m = describeMedia(it);
     return h('button', { type: 'button', class: 'ppage__thumb', 'aria-label': `${it.type === 'reel' ? 'Film' : 'Photo'}: ${m.title || p.en}`, onclick: () => show(i) },
-      h('img', { src: m.thumb, alt: '', loading: 'lazy', width: 360, height: 640 }),
+      // The tile shimmers until its picture arrives (is-loaded stops it).
+      h('img', { src: m.thumb, alt: '', loading: 'lazy', width: 360, height: 640, onload: (e) => e.target.parentElement.classList.add('is-loaded'), onerror: (e) => e.target.parentElement.classList.add('is-loaded') }),
       it.type === 'reel' ? h('span', { class: 'pp__play' }, icon('play', 'fill')) : null);
   }));
 
   show(0);
   return {
     thumbs: items.length > 1 ? thumbs : null,
-    show3d: () => show(items.length - 1),
+    show3d: () => (has3d(p) ? show(items.length - 1) : undefined),
     stop: () => {
       stage.querySelector('video')?.pause();
       o.viewer()?.stop();

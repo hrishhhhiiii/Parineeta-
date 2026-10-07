@@ -21,6 +21,8 @@
 
   --r-card: 20px;
   --r-input: 12px;
+  --heart: #ff6b76; /* wishlisted */
+  --sindoor-deep: #8e1b1b; /* announcement bar */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --nav-h: 68px;
   --gutter: clamp(16px, 4vw, 48px);
@@ -43,7 +45,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
-  scroll-padding-top: var(--nav-h);
+  scroll-padding-top: calc(var(--nav-h) + var(--announce-h, 0px));
 }
 html.lenis,
 html.lenis body {
@@ -307,7 +309,7 @@ body {
   flex: none;
 }
 .icon-btn[aria-pressed='true'] {
-  color: #ff6b76;
+  color: var(--heart);
   border-color: rgba(255, 107, 118, 0.5);
 }
 .badge {
@@ -540,17 +542,6 @@ body {
   align-items: center;
   overflow: clip;
 }
-.hero__glow {
-  position: absolute;
-  right: -10%;
-  top: 5%;
-  width: 70vw;
-  height: 70vw;
-  max-width: 1000px;
-  max-height: 1000px;
-  background: radial-gradient(circle, rgba(200, 40, 40, 0.22), transparent 62%);
-  pointer-events: none;
-}
 .hero__grid {
   position: relative;
   display: grid;
@@ -602,43 +593,6 @@ body {
   flex-wrap: wrap;
   gap: 12px;
 }
-.hero__stage {
-  position: relative;
-  height: min(80dvh, 780px);
-  min-height: 420px;
-}
-.hero__canvas {
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  transform: scale(0.97);
-  transition: opacity 1.1s var(--ease), transform 1.4s var(--ease);
-  cursor: grab;
-  touch-action: pan-y;
-}
-.hero__stage.is-ready .hero__canvas {
-  opacity: 1;
-  transform: none;
-}
-.hero__canvas:active {
-  cursor: grabbing;
-}
-.hero__stage.is-fallback {
-  background: url('/brand/parineeta_monogram_initial_transparent.png') center / 40% no-repeat;
-  opacity: 0.2;
-}
-.hero__style-name {
-  position: absolute;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  margin: 0;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.15rem;
-  color: var(--gold-2);
-  white-space: nowrap;
-}
 .stage-hint {
   position: absolute;
   right: 12px;
@@ -685,11 +639,6 @@ body {
   }
   .hero__sub {
     margin-bottom: 24px;
-  }
-  .hero__stage {
-    height: 52dvh;
-    min-height: 340px;
-    margin-inline: calc(var(--gutter) * -1);
   }
 }
 
@@ -2389,7 +2338,7 @@ input[type='date'].input {
   align-items: center;
   gap: 12px;
   padding: 12px 14px 12px 16px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   border: 1px solid var(--line-strong);
   background: rgba(36, 10, 15, 0.95);
   backdrop-filter: blur(12px);
@@ -2420,7 +2369,7 @@ input[type='date'].input {
   color: var(--gold-2);
   font-weight: 700;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: 999px;
 }
 .toast__action:hover {
   background: var(--surface-2);
@@ -2821,7 +2770,7 @@ input[type='date'].input {
   display: block;
   width: 52px;
   height: 68px;
-  border-radius: 10px;
+  border-radius: var(--r-input);
   overflow: hidden;
   border: 1px solid var(--line-strong);
   flex: none;
@@ -3143,7 +3092,7 @@ dialog.sheet--lightbox::backdrop {
   inset: 0 0 auto;
   z-index: calc(var(--z-nav) + 1);
   padding: 7px 16px;
-  background: #8e1b1b;
+  background: var(--sindoor-deep);
   color: #fff8ec;
   font-size: 0.875rem;
   line-height: 1.35;
@@ -3156,7 +3105,7 @@ dialog.sheet--lightbox::backdrop {
 /* ---------- YouTube videos (admin-edited) ---------- */
 .yt { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 24px; }
 .yt__item { margin: 0; }
-.yt__play, .yt__frame { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; overflow: hidden; background: #000; padding: 0; cursor: pointer; }
+.yt__play, .yt__frame { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: var(--r-input); overflow: hidden; background: #000; padding: 0; cursor: pointer; }
 .yt__play img { width: 100%; height: 100%; object-fit: cover; }
 .yt__icon { position: absolute; inset: 50% auto auto 50%; translate: -50% -50%; display: grid; place-items: center; width: 56px; height: 40px; border-radius: 10px; background: #c4302b; color: #fff; font-size: 18px; }
 .yt__play:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
@@ -3176,7 +3125,7 @@ dialog.sheet--lightbox::backdrop {
   border-radius: 999px;
   background: var(--gold-2, #f3cd74);
   color: #1d0a06;
-  font: 700 9px/1.4 var(--font-body, system-ui), sans-serif;
+  font: 700 11px/1.4 var(--font-body, system-ui), sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   pointer-events: none;

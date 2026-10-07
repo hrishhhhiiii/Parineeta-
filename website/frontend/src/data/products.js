@@ -1,4 +1,5 @@
 // Single source of truth for the catalogue. Prices are indicative placeholders: edit them here.
+import { MODELS, isCustomKind, customModel } from './shapes.js';
 
 export const PALETTES = {
   sindoor: { label: 'Sindoor red', base: '#A8161F', deep: '#5E0A10', accent: '#E3AA3E', detail: '#F7EEDC', leaf: '#2E6B3F' },
@@ -310,5 +311,14 @@ export const STORY = [
   },
 ];
 
+/** False when the product shows its photos and films only: 3D shape set to "None", a built-in shape
+ *  switched off under "3D models", or an uploaded model that was deleted or switched off. */
+export const has3d = (p) => {
+  const kind = p?.model?.kind;
+  if (!kind || kind === 'none' || MODELS.off.includes(kind)) return false;
+  return isCustomKind(kind) ? !!customModel(kind) : true;
+};
+/** A product's own web address: a prebuilt page that search engines can read. */
+export const productHref = (id) => `/p/${id}/`;
 export const byId = (id) => PRODUCTS.find((p) => p.id === id) || SETS.find((s) => s.id === id);
 export const isSet = (id) => SETS.some((s) => s.id === id);

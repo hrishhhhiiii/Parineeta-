@@ -31,8 +31,32 @@ await mkdir(OUT, { recursive: true });
 const mirrored = new Map();
 let missing = 0;
 
+// Uploaded 3D models (.glb from "3D models" in the admin) are copied too, so the site serves them itself.
+const MODELS_OUT = 'frontend/public/media/models/cms';
+async function mirrorModel(url) {
+  const name = url.slice(BUCKET.length).match(/^(?:models\/)?([\w-]+)\.glb$/)?.[1];
+  if (!name) return url;
+  await mkdir(MODELS_OUT, { recursive: true });
+  const file = `${MODELS_OUT}/${name}.glb`;
+  if (!existsSync(file)) {
+    const res = await fetch(url);
+    if (!res.ok) {
+      missing++;
+      console.log(`::warning::3D model missing from storage, left as a link: ${url}`);
+      return url;
+    }
+    await writeFile(file, Buffer.from(await res.arrayBuffer()));
+  }
+  return `/media/models/cms/${name}.glb`;
+}
+
 async function mirror(url) {
   if (mirrored.has(url)) return mirrored.get(url);
+  if (/\.glb$/i.test(url)) {
+    const out = await mirrorModel(url);
+    mirrored.set(url, out);
+    return out;
+  }
   const m = url.slice(BUCKET.length).match(/^(?:photos\/)?([\w-]+?)(?:-(?:400|800|1600))?\.webp$/);
   if (!m) return url;
   const id = m[1];

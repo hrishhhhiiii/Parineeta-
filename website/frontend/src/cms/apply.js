@@ -5,6 +5,7 @@ import { SITE, PAYMENTS, TRUST, LOOKBOOK, SERVICES } from '../data/site.js';
 import { WRITTEN_REVIEWS } from '../data/reviews.js';
 import { ANNOUNCEMENT } from '../data/announcement.js';
 import { HOMEPAGE, SOCIALS, STORES, VIDEOS, SEO } from '../data/homepage.js';
+import { MODELS } from '../data/shapes.js';
 
 const hasProduct = (id) => PRODUCTS.some((p) => p.id === id);
 
@@ -12,7 +13,7 @@ const replace = (arr, next) => {
   if (Array.isArray(next)) arr.splice(0, arr.length, ...next);
 };
 
-/** Keeps only products the site can render: a known 3D shape and at least one known colourway. */
+/** Keeps only products the site can render: a name, a code and at least one known colourway (3D is optional). */
 function cleanProducts(list) {
   return list
     .filter((p) => p && p.id && p.en && !p.hidden)
@@ -25,12 +26,16 @@ function cleanProducts(list) {
         media: (p.media || []).filter((m) => m && m.id),
         priceFrom: Number(p.priceFrom) || 0,
         leadDays: Number(p.leadDays) || 7,
-        model: p.model?.kind ? p.model : { kind: 'kunke' },
+        model: p.model?.kind ? p.model : { kind: 'none' }, // no 3D chosen: photos and films only
       };
     });
 }
 
 export const CONTENT_APPLY = {
+  models: (d) => {
+    replace(MODELS.off, (d?.off || []).filter((k) => typeof k === 'string'));
+    replace(MODELS.custom, (d?.custom || []).filter((m) => m && m.id && m.file));
+  },
   products: (d) => replace(PRODUCTS, cleanProducts(d)),
   categories: (d) => replace(CATEGORIES, [{ id: 'all', label: 'Everything' }, ...d.filter((c) => c.id && c.id !== 'all')]),
   sets: (d) => replace(SETS, d.filter((s) => s.id && !s.hidden)

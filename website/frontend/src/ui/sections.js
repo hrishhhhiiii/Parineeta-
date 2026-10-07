@@ -1,4 +1,4 @@
-import { PRODUCTS, SETS, STORY, CATEGORIES, byId } from '../data/products.js';
+import { PRODUCTS, SETS, STORY, CATEGORIES, byId, productHref } from '../data/products.js';
 import { REELS, REVIEWS, SERVICES, TRUST, LOOKBOOK, FILMS, ytThumb, ytEmbed, photoSrc, photoSrcset, reelPreview, reelPosterSmall, reelStill } from '../data/site.js';
 import { openLightbox, describeMedia } from './lightbox.js';
 import { h, icon, inr, $ } from './dom.js';
@@ -28,11 +28,11 @@ export function renderStory() {
         h('h3', { class: 'chapter__title', text: c.title }),
         h('p', { class: 'chapter__body', text: c.body }),
         h('p', { class: 'chapter__object' },
-          h('span', { class: 'bn', lang: 'bn', text: p.bn }),
+          h('span', { class: 'bn', lang: 'bn', translate: 'no', text: p.bn }),
           h('span', { text: p.en })),
         h('div', { class: 'chapter__foot' },
           c.photo ? realThumb(c.photo, c.photo.type === 'reel' ? 'Watch the real one' : 'See it in a real wedding') : null,
-          h('a', { class: 'link-btn', href: `#/p/${p.id}` }, `See the ${p.en}`, icon('arrow-up-right'))))));
+          h('a', { class: 'link-btn', href: productHref(p.id) }, `See the ${p.en}`, icon('arrow-up-right'))))));
   });
 }
 
@@ -141,7 +141,7 @@ export function renderGrid() {
 
 function tileCard(p) {
   return h('article', { class: 'tile-card' },
-    h('a', { class: 'tile-card__link', href: `#/p/${p.id}` },
+    h('a', { class: 'tile-card__link', href: productHref(p.id) },
       tileImage(p),
       h('span', { class: 'tile-card__info' },
         h('span', { class: 'tile-card__names' },
@@ -160,7 +160,7 @@ export function renderSets() {
     rail.append(h('article', { class: 'set' },
       fan,
       h('div', { class: 'set__body' },
-        h('p', { class: 'set__bn bn', lang: 'bn', text: s.bn }),
+        h('p', { class: 'set__bn bn', lang: 'bn', translate: 'no', text: s.bn }),
         h('h3', { class: 'set__title', text: s.en }),
         h('p', { class: 'set__line', text: s.line }),
         h('ul', { class: 'set__items', 'aria-label': 'Included' }, ...items.map((p) => h('li', { text: p.en }))),
@@ -244,6 +244,18 @@ export function renderReels() {
 
 /** The newest written reviews the shop chose to show (admin → Customer reviews), above the films. */
 function renderWrittenReviews(films) {
+  // Fetched only when "Visit us" comes near, so the database isn't asked during the first screen.
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting) return;
+      io.disconnect();
+      showWrittenReviews(films);
+    }, { rootMargin: '900px 0px' });
+    io.observe(films);
+  } else showWrittenReviews(films);
+}
+
+function showWrittenReviews(films) {
   loadReviews().then(() => {
     const list = latestReviews(3);
     if (!list.length) return;

@@ -147,7 +147,7 @@ function render() {
   body.querySelectorAll('input[name="co-amount"], input[name="co-method"]').forEach((r) => r.addEventListener('change', renderMethodDetail));
   renderMethodDetail();
   $('#co-status').textContent = '';
-  $('#co-mail').disabled = !SITE.web3formsKey;
+  $('#co-mail').hidden = !SITE.web3formsKey; // shown once an email service is set up in the admin
   $('#co-actions').hidden = false;
   $('#co-done').hidden = true;
 }
@@ -279,7 +279,7 @@ export function setupCheckout() {
       status.className = 'enq__status is-error';
       status.textContent = 'We could not send that just now. Please use WhatsApp instead.';
     } finally {
-      btn.disabled = !SITE.web3formsKey;
+      btn.disabled = false;
     }
   });
   $('#co-close').addEventListener('click', () => closeDialog(dialog()));

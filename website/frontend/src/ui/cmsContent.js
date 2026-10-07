@@ -124,16 +124,22 @@ function applyStores() {
     wa.textContent = n.startsWith('91') && n.length === 12 ? `+91 ${n.slice(2, 7)} ${n.slice(7)}` : `+${n}`;
   }
   const first = stores.find((s) => directionsHref(s));
-  const dir = $('#visit .visit__ctas a[href*="google.com/maps"]');
+  const dirs = document.querySelectorAll('#visit a[data-directions]'); // "Get directions" and the link over the map
   const frame = $('#visit .visit__map iframe');
   if (first) {
-    if (dir) dir.href = directionsHref(first);
+    dirs.forEach((a) => { a.href = directionsHref(first); });
     if (frame && mapsPlace(first)) {
-      frame.src = mapsEmbed(mapsPlace(first));
+      // The map only loads when the visitor asks for it (see setupVisitMap in main.js).
+      frame.dataset.src = mapsEmbed(mapsPlace(first));
+      if (frame.src) frame.src = frame.dataset.src;
       frame.title = `Map showing ${mapsPlace(first)}`;
+      const place = $('#visit .visit__map-place');
+      if (place) place.textContent = mapsPlace(first);
     }
   }
-  if (dir) dir.hidden = !first;
+  // The "Get directions" button; the link over the map hides with the map itself.
+  const ctaDir = $('#visit .visit__ctas a[data-directions]');
+  if (ctaDir) ctaDir.hidden = !first;
   if (frame) frame.parentElement.hidden = !first;
 }
 

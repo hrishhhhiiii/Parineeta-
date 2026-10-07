@@ -1,0 +1,11 @@
+{
+  "name": "Parineeta | Hand-painted Bengali Wedding Heirlooms",
+  "short_name": "Parineeta",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#150507",
+  "theme_color": "#150507",
+  "icons": [
+    { "src": "/brand/favicon-192x192.png", "sizes": "192x192", "type": "image/png" }
+  ]
+}

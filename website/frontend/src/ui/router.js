@@ -2,8 +2,10 @@ import { byId, isSet } from '../data/products.js';
 import { $ } from './dom.js';
 import { jumpTo, closeAllDialogs, scrollToHash } from './dialogs.js';
 
+// Old shared links (#/p/<id>) still open the product, then the address is tidied to /p/<id>/.
 const PRODUCT_ROUTE = /^#\/p\/([a-z0-9-]+)$/;
-// Real product URLs (/p/<id>/) are prebuilt pages for search engines; in-page links keep the hash form.
+// Product links are real URLs (/p/<id>/): prebuilt pages search engines can crawl. Clicks on them are
+// handled here without a page load.
 const PATH_ROUTE = /^\/p\/([a-z0-9-]+)\/?(?:index\.html)?$/;
 // Prebuilt product pages carry the landing page's title and description on <html>.
 const landing = document.documentElement.dataset;
@@ -12,12 +14,15 @@ const metaDesc = document.querySelector('meta[name="description"]');
 const baseDesc = landing.landingDesc || metaDesc?.content || '';
 
 let inPage = false;
+let shownId = null;
 let landingY = 0;
 let hooks = null;
 
 export const isProductRoute = () => inPage;
 
 function enter(p) {
+  if (inPage && shownId === p.id) return;
+  shownId = p.id;
   closeAllDialogs();
   if (!inPage) landingY = window.scrollY;
   inPage = true;
@@ -33,6 +38,7 @@ function enter(p) {
 
 function leave(hash) {
   inPage = false;
+  shownId = null;
   hooks.stop();
   const page = $('#product-page');
   page.hidden = true;
@@ -59,7 +65,10 @@ function leave(hash) {
 /** Product id from #/p/<id>, or from a /p/<id>/ path when no other hash is set. */
 function currentId() {
   const m = location.hash.match(PRODUCT_ROUTE);
-  if (m) return m[1];
+  if (m) {
+    history.replaceState(history.state, '', `/p/${m[1]}/`);
+    return m[1];
+  }
   const pm = location.pathname.match(PATH_ROUTE);
   if (!pm) return null;
   // Any other hash on a product path means the visitor is heading back to the landing page.
@@ -77,8 +86,24 @@ function route() {
   else if (inPage) leave(location.hash);
 }
 
+/** Opens product links in place: same tab, plain left click, a /p/<id>/ path on this site. */
+function onClick(e) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest?.('a[href]');
+  if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+  // In-page links (#collection) resolve to the current path too; those are left to the hash handling.
+  if (a.getAttribute('href').startsWith('#')) return;
+  const url = new URL(a.href, location.href);
+  if (url.origin !== location.origin || url.hash || !PATH_ROUTE.test(url.pathname)) return;
+  e.preventDefault();
+  if (url.pathname !== location.pathname || location.hash) history.pushState(null, '', url.pathname);
+  route();
+}
+
 export function initRouter(h) {
   hooks = h;
   window.addEventListener('hashchange', route);
+  window.addEventListener('popstate', route);
+  document.addEventListener('click', onClick);
   route();
 }

@@ -9,6 +9,7 @@
   <meta name="color-scheme" content="dark" />
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32x32.png" />
   <link rel="apple-touch-icon" href="/brand/favicon-192x192.png" />
+  <link rel="manifest" href="/site.webmanifest" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Parineeta | Hand-painted Bengali Wedding Heirlooms" />
   <meta property="og:description" content="Crowns, ritual boxes and painted keepsakes, made to order in Patuli, West Bengal." />
@@ -20,7 +21,11 @@
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="The Parineeta wordmark in Bengali beside a hand-made shola mukut in pearl and silver" />
   <meta name="twitter:card" content="summary_large_image" />
-  <link rel="preconnect" href="https://i.ytimg.com" crossorigin />
+  <!-- The fonts the first screen needs, fetched straight away instead of after the stylesheet. -->
+  <link rel="preload" href="/fonts/cormorant-garamond-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/cormorant-garamond-latin-500-italic.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/plus-jakarta-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/noto-serif-bengali-bengali-500-normal.woff2" as="font" type="font/woff2" crossorigin />
   <!-- Critical CSS: in dev, Vite injects main.css from JavaScript, so without this the first paint is raw
        unstyled HTML (and the preloader itself, which main.css styles, shows as a giant black circle).
        Mirrors the preloader rules in src/styles/main.css, which take over once loaded. -->
@@ -39,13 +44,16 @@
   {
     "@context": "https://schema.org",
     "@type": "Store",
-    "name": "Parineeta365",
-    "alternateName": "পরিণীতা",
+    "name": "Parineeta",
+    "alternateName": ["পরিণীতা", "Parineeta365"],
+    "logo": "/brand/favicon-192x192.png",
+    "priceRange": "₹₹",
     "description": "Hand-painted and customised Bengali wedding items: gach kouto, kunke, darpan, biyer piri, paan pata, shola mukut, topor, hand-painted thala sets, painted punjabi, wall and floor alpana.",
     "image": "/brand/og-image.jpg",
     "telephone": "+91-9734241918",
     "email": "debrajnandi2004@gmail.com",
-    "address": { "@type": "PostalAddress", "addressLocality": "Patuli", "addressRegion": "West Bengal", "addressCountry": "IN" },
+    "address": { "@type": "PostalAddress", "addressLocality": "Patuli, Purba Bardhaman", "addressRegion": "West Bengal", "addressCountry": "IN" },
+    "hasMap": "https://maps.app.goo.gl/Y8ZALcNNKavd6VSk9",
     "sameAs": [
       "https://www.facebook.com/people/Parineeta365/61585270277510/",
       "https://www.instagram.com/parineeta_365/",
@@ -77,7 +85,7 @@
       <nav class="nav__links" aria-label="Primary">
         <a href="#story">The rituals</a>
         <a href="#collection">Collection</a>
-        <a href="#sets">Bridal sets</a>
+        <a href="#sets" hidden>Bridal sets</a>
         <a href="#studio">Alpana</a>
         <a href="#invitations">Invitations</a>
         <a href="#visit">Visit</a>
@@ -108,7 +116,7 @@
     <!-- HERO -->
     <section class="hero hero--photo" id="top">
       <figure class="hero__photo">
-        <img src="/media/photos/mukut-noir-1600.webp" srcset="/media/photos/mukut-noir-800.webp 800w, /media/photos/mukut-noir-1600.webp 1600w" sizes="(max-width: 900px) 100vw, 64vw" alt="A white shola mukut, the Bengali bridal crown, hand-cut from reed pith and set with pearls, carrying the Parineeta seal" width="1600" height="1488" fetchpriority="high" />
+        <img src="/media/photos/mukut-noir-1600.webp" srcset="/media/photos/mukut-noir-400.webp 400w, /media/photos/mukut-noir-800.webp 800w, /media/photos/mukut-noir-1600.webp 1600w" sizes="(max-width: 900px) 100vw, 64vw" alt="A white shola mukut, the Bengali bridal crown, hand-cut from reed pith and set with pearls, carrying the Parineeta seal" width="1600" height="1488" fetchpriority="high" />
       </figure>
       <div class="container hero__grid">
         <div class="hero__copy">
@@ -229,7 +237,7 @@
     </section>
 
     <!-- SETS -->
-    <section class="sets surface-sindoor" id="sets" aria-labelledby="sets-title">
+    <section class="sets surface-sindoor" id="sets" aria-labelledby="sets-title" hidden>
       <div class="container sets__head">
         <div>
           <h2 class="h2" id="sets-title" data-reveal>Bridal sets</h2>
@@ -281,7 +289,7 @@
           <p class="fineprint">Love your pattern? We paint alpana on walls, floors and backdrops for weddings.</p>
         </div>
         <div class="studio__canvas-wrap">
-          <canvas id="alpana-canvas" aria-label="Alpana drawing canvas. Draw with mouse or finger; your stroke repeats with radial symmetry."></canvas>
+          <canvas id="alpana-canvas" role="img" aria-label="Alpana drawing canvas. Draw with mouse or finger; your stroke repeats with radial symmetry."></canvas>
         </div>
       </div>
     </section>
@@ -424,13 +432,19 @@
           </dl>
           <div class="visit__ctas">
             <a class="btn btn--gold" data-wa href="#" target="_blank" rel="noopener"><i class="ph-fill ph-whatsapp-logo" aria-hidden="true"></i>WhatsApp us</a>
-            <a class="btn btn--ghost" href="https://www.google.com/maps/search/?api=1&query=Patuli%2C%20Purba%20Bardhaman%2C%20West%20Bengal" target="_blank" rel="noopener"><i class="ph-light ph-map-pin" aria-hidden="true"></i>Get directions</a>
+            <a class="btn btn--ghost" data-directions href="https://maps.app.goo.gl/Y8ZALcNNKavd6VSk9" target="_blank" rel="noopener"><i class="ph-light ph-map-pin" aria-hidden="true"></i>Get directions</a>
           </div>
           <h3 class="h3 reviews__title">Customer reviews</h3>
           <div class="reviews" id="reviews"></div>
         </div>
         <div class="visit__map">
-          <iframe title="Map showing Patuli, Purba Bardhaman, West Bengal" src="https://www.google.com/maps?q=Patuli,+Purba+Bardhaman,+West+Bengal&z=14&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <iframe title="Map showing PARINEETA, Patuli, Purba Bardhaman, West Bengal" data-src="https://www.google.com/maps?q=PARINEETA,+Patuli,+Purba+Bardhaman,+West+Bengal&z=14&output=embed" referrerpolicy="no-referrer-when-downgrade" tabindex="-1" hidden></iframe>
+          <a class="visit__map-open" data-directions href="https://maps.app.goo.gl/Y8ZALcNNKavd6VSk9" target="_blank" rel="noopener" hidden><span class="visit__map-open-label"><i class="ph-light ph-arrow-up-right" aria-hidden="true"></i>Open in Google Maps</span></a>
+          <button type="button" class="visit__map-load" id="visit-map-load">
+            <i class="ph-light ph-map-pin" aria-hidden="true"></i>
+            <span class="visit__map-place">Patuli, Purba Bardhaman</span>
+            <span class="visit__map-cta">Show the map</span>
+          </button>
         </div>
       </div>
     </section>
@@ -447,7 +461,7 @@
       <nav class="footer__nav" aria-label="Footer">
         <a href="#story">The rituals</a>
         <a href="#collection">Collection</a>
-        <a href="#sets">Bridal sets</a>
+        <a href="#sets" hidden>Bridal sets</a>
         <a href="#lookbook">Lookbook</a>
         <a href="#studio">Alpana studio</a>
         <a href="#invitations">Invitation studio</a>
@@ -467,7 +481,7 @@
     </div>
   </footer>
 
-  <a class="fab" data-wa href="#" target="_blank" rel="noopener" aria-label="WhatsApp Us"><i class="ph-fill ph-whatsapp-logo" aria-hidden="true"></i></a>
+  <a class="fab" data-wa href="#" target="_blank" rel="noopener" aria-label="WhatsApp us"><i class="ph-fill ph-whatsapp-logo" aria-hidden="true"></i></a>
 
   <!-- PRODUCT PANEL -->
   <dialog class="sheet sheet--product" id="product-dialog" aria-labelledby="pp-en" data-lenis-prevent>
@@ -513,7 +527,7 @@
             <button type="button" class="icon-btn icon-btn--ring icon-btn--lg" id="pp-wish" aria-pressed="false" aria-label="Save to wishlist"><i class="ph-light ph-heart" aria-hidden="true"></i></button>
           </div>
           <button type="button" class="btn btn--ghost btn--wide" id="pp-enquire"><i class="ph-light ph-chat-circle-text" aria-hidden="true"></i>Enquire</button>
-          <p class="fineprint">No payment online. Your cart is sent to us as an enquiry and we confirm the final price with you.</p>
+          <p class="fineprint">Pay a booking advance or the full estimate by UPI or bank transfer, or pay when you collect. We confirm the final price with you on WhatsApp.</p>
         </form>
       </div>
     </div>
@@ -530,7 +544,7 @@
       <div class="drawer__foot" id="cart-foot">
         <div class="drawer__total"><span>Estimated total</span><strong id="cart-total"></strong></div>
         <p class="fineprint">Indicative prices. We confirm the final quote, timing and delivery on WhatsApp or email.</p>
-        <button type="button" class="btn btn--gold btn--wide" id="cart-checkout"><i class="ph-light ph-shopping-bag-open" aria-hidden="true"></i>Checkout and pay</button>
+        <button type="button" class="btn btn--gold btn--wide" id="cart-checkout"><i class="ph-light ph-shopping-bag-open" aria-hidden="true"></i>Book and pay</button>
         <button type="button" class="btn btn--ghost btn--wide cart-send" id="cart-send"><i class="ph-light ph-paper-plane-tilt" aria-hidden="true"></i>Send an enquiry</button>
       </div>
     </div>
@@ -608,7 +622,7 @@
       <nav class="menu__links" aria-label="Mobile">
         <a href="#story" data-close-nav>The rituals</a>
         <a href="#collection" data-close-nav>Collection</a>
-        <a href="#sets" data-close-nav>Bridal sets</a>
+        <a href="#sets" data-close-nav hidden>Bridal sets</a>
         <a href="#lookbook" data-close-nav>Lookbook</a>
         <a href="#studio" data-close-nav>Alpana studio</a>
         <a href="#invitations" data-close-nav>Invitation studio</a>

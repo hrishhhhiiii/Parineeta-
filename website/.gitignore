@@ -4,6 +4,7 @@ node_modules
 dist
 frontend/src/data/published.json
 frontend/public/media/photos/cms/
+frontend/public/media/models/cms/
 .env.*
 !.env.example
 *.pem
