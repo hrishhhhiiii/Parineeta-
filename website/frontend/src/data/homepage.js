@@ -2,7 +2,7 @@
 // Edited in the admin; these are also what "Set to default" restores.
 
 export const HOMEPAGE_SECTIONS = [
-  ['trust', 'Celebrity visits'], ['story', 'Wedding story'], ['filmband', 'Film band'],
+  ['trust', 'Celebrity visits'], ['story', 'The rituals (3D scroll)'], ['filmband', 'Film band'],
   ['collection', 'Collection'], ['sets', 'Bridal sets'], ['lookbook', 'Lookbook'],
   ['studio', 'Alpana studio'], ['invitations', 'Invitation studio'], ['services', 'Services'],
   ['reels', 'Films and social'], ['visit', 'Visit us'],

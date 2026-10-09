@@ -820,8 +820,8 @@ html {
 /* ---------- polish (Oct 2026 audit) ---------- */
 /* Readable small text: the Bengali name under the logo. */
 .nav__bn { font-size: 0.8rem; }
-/* The collection's last row no longer sits flush against the next band. */
-.grid-view { padding-bottom: var(--section-y); }
+/* The collection's last row (photo grid, results or the 3D pavilion's buttons) no longer sits flush against the next band. */
+.collection { padding-bottom: var(--section-y); }
 /* Phones: every tappable thing at least 44px. */
 @media (pointer: coarse) {
   .contact a { display: inline-flex; align-items: center; min-height: 44px; }
@@ -1406,6 +1406,14 @@ img.thumb--photo {
   .banners__dot::after {
     transition: none;
   }
+}
+
+/* Category pages: the "About this category" paragraph under the heading. */
+.cat-about {
+  max-width: 68ch;
+  margin: 14px 0 0;
+  color: var(--ink-2);
+  line-height: 1.65;
 }
 
 /* Category pages before the script starts: the written-in list (removed by main.js). */

@@ -15,12 +15,18 @@ export const PALETTES = {
 
 export const CATEGORIES = [
   { id: 'all', label: 'Everything' },
-  { id: 'ritual', label: 'Wedding rituals', bn: 'বিয়ের আচার', line: 'The painted pieces every Bengali wedding ritual calls for.' },
-  { id: 'crown', label: 'Crowns', bn: 'মুকুট', line: 'Shola crowns for the bride and the groom, cut from reed pith.' },
-  { id: 'clay', label: 'Thala sets', bn: 'মাটি ও থালা', line: 'Hand-painted thala and bowls for the aiburobhat and the feast.' },
-  { id: 'apparel', label: 'Clothing', bn: 'পোশাক', line: 'Hand-painted cloth for the wedding day.' },
-  { id: 'art', label: 'Devotional art', bn: 'ভক্তি শিল্প', line: 'Painted art for the home shrine and the ceremony.' },
-  { id: 'decor', label: 'Decor', bn: 'সাজসজ্জা', line: 'Alpana and decor to dress the venue and the home.' },
+  { id: 'ritual', label: 'Wedding rituals', bn: 'বিয়ের আচার', line: 'The painted pieces every Bengali wedding ritual calls for.',
+    about: "A Bengali Hindu wedding moves through a string of rituals, and each has its own object. The gach kouto holds the bride's sindoor, the kunke measures rice for a full home and the darpan travels with the couple. The bride sits on the biyer piri for saat paak, hides behind paan pata until shubho drishti, and offers khoi into the fire from the kulo. We paint every piece by hand in Patuli and match them to each other, so the whole set is yours." },
+  { id: 'crown', label: 'Crowns', bn: 'মুকুট', line: 'Shola crowns for the bride and the groom, cut from reed pith.',
+    about: "Bengali brides and grooms are crowned in shola, the soft white pith of a marsh reed, carved into filigree as fine as lace. The bride wears the shola mukut with her red and white sari; the groom arrives in the tall, conical topor. Both weigh almost nothing, and most families keep them long after the wedding. Ours are cut and finished by hand in Patuli and made to order for your wedding date." },
+  { id: 'clay', label: 'Thala sets', bn: 'মাটি ও থালা', line: 'Hand-painted thala and bowls for the aiburobhat and the feast.',
+    about: "The day before the wedding, the family serves the bride aiburobhat, her last meal at home as an unmarried daughter, on a thala with a small bowl for every dish. Our thala sets are painted by hand with alpana motifs in the colours of your wedding, and many brides keep them as a memory of that meal." },
+  { id: 'apparel', label: 'Clothing', bn: 'পোশাক', line: 'Hand-painted cloth for the wedding day.',
+    about: "Hand-painted clothing for the wedding day and the ceremonies around it. Our cotton punjabi (kurta) is painted with alpana borders and small flower buttis, made to your size and coloured to match the rest of the wedding, so the groom can wear the same motifs as the bride's kouto and piri." },
+  { id: 'art', label: 'Devotional art', bn: 'ভক্তি শিল্প', line: 'Painted art for the home shrine and the ceremony.',
+    about: "Painted panels for the home shrine, the wedding altar and the couple's new home. Har Parvati, Shiva and Parvati as the ideal married couple, is a traditional blessing for newlyweds, and our devotional series also includes Maa Shyamsundari. Every face is painted freehand on an arched panel in Patuli, so no two are alike, and they make a lasting wedding gift." },
+  { id: 'decor', label: 'Decor', bn: 'সাজসজ্জা', line: 'Alpana and decor to dress the venue and the home.',
+    about: "Decor to dress the venue and the home for the engagement and the wedding. The engagement platter carries the rings: a round tray wrapped in silk and lace, with a hoop of roses and strings of pearls. We also paint wall and floor alpana to order. Everything is made in your colours in Patuli, West Bengal." },
 ];
 
 const single = { id: 'single', label: 'Single piece', add: 0 };

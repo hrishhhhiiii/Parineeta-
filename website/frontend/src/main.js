@@ -9,6 +9,7 @@ import Lenis from 'lenis';
 
 import { PRODUCTS, STORY, byId, has3d, categoryOf, parentOf, categoryBySlug } from './data/products.js';
 import { waLink, photoSrc, reelStill } from './data/site.js';
+import { HOMEPAGE } from './data/homepage.js';
 import { $, $$, reduceMotion, inr, icon } from './ui/dom.js';
 import { hydrateIcons } from './ui/icons.js';
 import { store, droppedLines, onDropped } from './ui/store.js';
@@ -316,6 +317,20 @@ $$('.view-toggle__btn').forEach((b) => b.addEventListener('click', () => setView
 /** Category chips show the grouped grid; a search, sub-category, price, "Ready now" or sort shows one flat list. */
 function showCollectionState(st) {
   gallery?.setFilter(st.cat);
+  // Category pages (/c/…) carry the category as the collection's <h1>; it follows the visitor's choice.
+  const heading = $('#collection-title');
+  const chosen = st.sub || st.cat;
+  if (heading?.tagName === 'H1') {
+    const c = chosen && chosen !== 'all' ? categoryOf(chosen) : null;
+    heading.textContent = c?.label || HOMEPAGE.collection.title;
+    const lede = $('#collection .lede');
+    if (lede) lede.textContent = c ? c.line || '' : HOMEPAGE.collection.lede;
+    const about = $('#cat-about');
+    if (about) {
+      about.textContent = c?.about || '';
+      about.hidden = !c?.about;
+    }
+  }
   const refined = isRefined(st);
   $('#grid-view').hidden = view !== 'grid' || refined;
   $('#grid-results').hidden = view !== 'grid' || !refined;

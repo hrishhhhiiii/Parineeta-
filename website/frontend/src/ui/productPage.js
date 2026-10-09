@@ -13,6 +13,7 @@ import { thumbImg } from './drawers.js';
 import { videoTile, realPhoto, wholePhoto } from './sections.js';
 import { toast } from './toast.js';
 import { mediaStage } from './mediaStage.js';
+import { productSchema, breadcrumbSchema } from '../data/seo.js';
 
 const canvas = h('canvas', { class: 'ppage__canvas', role: 'img', 'aria-label': 'Interactive 3D view. Drag to rotate, scroll or pinch to zoom.' });
 let viewer = null;
@@ -423,30 +424,27 @@ function detailsSection(p) {
       h('li', { class: 'details-grid__item' }, icon(ic), h('strong', { text: title }), h('span', { text: body })))));
 }
 
-function setJsonLd(p, summary) {
-  document.getElementById('pg-jsonld')?.remove();
-  const photo = p.media.find((m) => m.type === 'photo');
-  const data = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: p.en,
-    alternateName: p.bn,
-    sku: p.id,
-    description: p.story,
-    brand: { '@type': 'Brand', name: 'Parineeta' },
-    image: photo ? new URL(photoSrc(photo.id, 1600), location.origin).href : `${location.origin}/brand/og-image.jpg`,
-    offers: { '@type': 'Offer', priceCurrency: 'INR', price: fromPrice(p), availability: 'https://schema.org/MadeToOrder', seller: { '@type': 'Organization', name: 'Parineeta' }, url: pageUrl(p.id) },
-  };
-  if (summary.total) data.aggregateRating = { '@type': 'AggregateRating', ratingValue: summary.avg.toFixed(1), reviewCount: summary.total };
+function ldScript(id, data) {
+  document.getElementById(id)?.remove();
   const s = document.createElement('script');
   s.type = 'application/ld+json';
-  s.id = 'pg-jsonld';
+  s.id = id;
   s.textContent = JSON.stringify(data);
   document.head.append(s);
 }
 
+/** The same Product and breadcrumb data the build writes into /p/<id>/ (data/seo.js), plus the star rating. */
+function setJsonLd(p, summary) {
+  const photos = p.media.filter((m) => m.type === 'photo').slice(0, 4).map((m) => photoSrc(m.id, 1600));
+  const data = productSchema(p, { origin: location.origin, images: photos });
+  if (summary.total) data.aggregateRating = { '@type': 'AggregateRating', ratingValue: summary.avg.toFixed(1), reviewCount: summary.total };
+  ldScript('pg-jsonld', data);
+  ldScript('pg-crumbs-ld', breadcrumbSchema(location.origin, { category: p.category, product: p }));
+}
+
 export function clearProductPage(root) {
   document.getElementById('pg-jsonld')?.remove();
+  document.getElementById('pg-crumbs-ld')?.remove();
   root.replaceChildren();
 }
 

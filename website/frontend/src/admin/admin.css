@@ -108,7 +108,12 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
 .field, .sublist, .subitem__body { min-width: 0; }
 .form__tools { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-.form-heading { font-size: 1.4rem; margin-top: 8px; color: var(--gold-2); }
+.form-heading { font-size: 1.4rem; margin-top: 8px; color: var(--gold-2); scroll-margin-top: 96px; }
+/* Reached from a shortcut on another screen: a brief highlight shows where to look. */
+.form-heading.is-flash { animation: heading-flash 1.6s ease-out; }
+@keyframes heading-flash { 0%, 40% { background: rgba(212, 175, 55, 0.22); box-shadow: 0 0 0 8px rgba(212, 175, 55, 0.22); border-radius: 6px; } 100% { background: transparent; box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .form-heading.is-flash { animation: none; } }
+.sec-head__link { margin-top: 10px; }
 .field { display: grid; gap: 6px; }
 .field__label { font-weight: 600; font-size: 0.9rem; color: var(--ink-2); }
 .req { color: var(--gold); }

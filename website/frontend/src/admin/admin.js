@@ -713,7 +713,7 @@ const canOpen = (k) => (SCREENS[k] ? !SCREENS[k].ownerOnly || ctx.role === 'owne
 // The menu, grouped by how often each part is used. Anything not listed falls under "More".
 const GROUPS = [
   { title: 'Every day', keys: [ORDERS, 'products', DEMAND] },
-  { title: 'Your website', keys: ['banners', 'sets', 'reviews', 'models', 'lookbook', 'announcement', 'homepage'] },
+  { title: 'Your website', keys: ['banners', 'story', 'sets', 'reviews', 'models', 'lookbook', 'announcement', 'homepage'] },
   { title: 'Shop details', keys: ['settings', 'stores', 'socials'] },
 ];
 GROUPS.push({ title: 'More', keys: SECTIONS.map((s) => s.key).filter((k) => !GROUPS.some((g) => g.keys.includes(k))) });
@@ -727,6 +727,7 @@ const TILE_TEXT = {
   reviews: 'Every review, kept. Choose which ones show on the website.',
   models: 'Every 3D model, where it is used, and your own uploads.',
   banners: 'Big pictures under the homepage photo that open a product, a category or a search.',
+  story: 'The wedding-day chapters visitors scroll through, each with a piece turning in 3D.',
   lookbook: 'The photo gallery on the website.',
   announcement: 'A one-line message across the top of the website.',
   homepage: 'The big headline and photo at the top of the home page.',
@@ -734,6 +735,19 @@ const TILE_TEXT = {
   stores: 'Shop addresses, phone numbers and opening hours.',
   socials: 'Your Instagram and Facebook links.',
 };
+
+/** Opens another section and scrolls to one of its form headings. */
+function goToHeading(key, heading) {
+  go(key);
+  // After the new screen has drawn and go() has reset the scroll.
+  setTimeout(() => {
+    const el = [...document.querySelectorAll('.form-heading')].find((x) => x.textContent === heading);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start' });
+    el.classList.add('is-flash');
+    setTimeout(() => el.classList.remove('is-flash'), 1600);
+  }, 120);
+}
 
 function go(key) {
   ctx.section = key;
@@ -865,7 +879,9 @@ function sectionView(section) {
   };
   let refreshListLabels = null;
 
-  const head = h('div', { class: 'sec-head' }, h('div', {}, h('h1', { text: section.title }), h('p', { class: 'muted', text: section.intro })), saveBar);
+  // Shortcuts to related fields kept in another section (e.g. this section's heading, in Homepage text).
+  const links = (section.links || []).map((l) => h('button', { type: 'button', class: 'btn btn--ghost btn--sm sec-head__link', text: `${l.text} →`, onclick: () => goToHeading(l.to, l.heading) }));
+  const head = h('div', { class: 'sec-head' }, h('div', {}, h('h1', { text: section.title }), h('p', { class: 'muted', text: section.intro }), ...links), saveBar);
 
   if (section.kind === 'object') {
     const obj = ctx.data[section.key];
@@ -906,13 +922,13 @@ This changes your draft only.`)) return;
   ctx.index = Math.min(ctx.index, list.length - 1);
   const items = h('ol', { class: 'items' });
   // Thumbnail: the section's photo field, or the first photo of a product; otherwise the section's icon.
-  const thumbOf = (it) => (section.thumb ? section.thumb(it) : section.thumbKey ? it[section.thumbKey] : null);
+  const thumbOf = (it) => (section.thumb ? section.thumb(it, ctx) : section.thumbKey ? it[section.thumbKey] : null);
   const thumb = (it, size) => {
     const id = thumbOf(it);
     const icon = () => h('span', { class: 'item__thumb item__thumb--icon', 'aria-hidden': 'true', text: section.icon });
     return id ? h('img', { class: 'item__thumb', width: size, height: size, src: /^\//.test(id) ? id : photoSrc(id, 400), alt: '', loading: 'lazy', onerror: (e) => e.target.replaceWith(icon()) }) : icon();
   };
-  const subOf = (it) => (section.itemSub ? section.itemSub(it).replace(/ · hidden$/, '') : '');
+  const subOf = (it) => (section.itemSub ? section.itemSub(it, ctx).replace(/ · hidden$/, '') : '');
   const paintItems = () => items.replaceChildren(...list.map((it, i) => h('li', {},
     h('button', { type: 'button', class: `item${i === ctx.index ? ' is-active' : ''}${it.hidden ? ' is-hidden' : ''}`, 'aria-current': i === ctx.index ? 'true' : null, onclick: () => select(i) },
       thumb(it, 44),

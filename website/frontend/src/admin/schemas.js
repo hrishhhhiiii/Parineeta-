@@ -155,7 +155,7 @@ export const SECTIONS = [
     itemTitle: (c) => c.label || 'New category',
     itemSub: (c) => [c.parent ? 'sub-category' : '', c.bn || ''].filter(Boolean).join(' · '),
     defaults: () => clone(CATEGORIES.filter((c) => c.id !== 'all')),
-    blank: () => ({ id: '', label: '', bn: '', line: '', parent: '' }),
+    blank: () => ({ id: '', label: '', bn: '', line: '', about: '', parent: '' }),
     // One level only, and no sub-category may be left pointing at a deleted (or nested) parent.
     check: (cats) => {
       const problems = [];
@@ -173,6 +173,7 @@ export const SECTIONS = [
       { key: 'bn', label: 'Name (Bengali)', type: 'text', lang: 'bn' },
       { advanced: true, key: 'id', label: 'Category code', type: 'slug', from: 'label', required: true, help: 'Products point at this code. Avoid changing it.' },
       { key: 'line', label: 'Short description', type: 'text' },
+      { key: 'about', label: 'About this category (optional)', type: 'textarea', help: 'A short paragraph shown on the category page (e.g. /c/crowns/) under its name: what these pieces are and when they are used. Google reads it, so name the pieces the way customers search for them. Three or four sentences is plenty.' },
       { key: 'parent', label: 'Inside category (optional)', type: 'select', options: parentOptions, help: 'Make this a sub-category, e.g. "Bridal crowns" inside "Crowns". Customers pick sub-categories in Filters.' },
       { key: 'image', label: 'Tile picture (optional)', type: 'media', photoOnly: true, help: 'Shown on the category tiles under the homepage photo. Without one, the first product photo in the category is used.' },
     ],
@@ -301,22 +302,30 @@ export const SECTIONS = [
   },
   {
     key: 'story',
-    title: 'Wedding story',
-    icon: '📖',
+    title: 'The rituals (3D scroll)',
+    icon: '🪔',
     kind: 'list',
-    intro: 'The chapters of the wedding day, each tied to a product.',
+    intro: 'The homepage section visitors scroll through ("A Bengali wedding, in seven objects"). Each chapter is one moment of the wedding day, with one product turning in 3D beside your words; a product without a 3D model shows its photo instead. Use Move up and Move down to change the order. If you add or remove chapters, change the number in the heading too.',
     itemTitle: (c) => c.title || 'New chapter',
-    itemSub: (c) => c.moment || '',
+    // "The day before · Matir Thala Set", noting a product that has no 3D model (its photo shows instead).
+    itemSub: (c, ctx) => {
+      const p = (ctx?.data?.products || []).find((x) => x.id === c.product);
+      const no3d = p && (!p.model?.kind || p.model.kind === 'none');
+      return [c.moment, p ? `${p.en || p.id}${no3d ? ' (photo, no 3D)' : ''}` : 'choose a product'].filter(Boolean).join(' · ');
+    },
+    // The chapter's own photo, else the featured product's first photo.
+    thumb: (c, ctx) => (c.photo?.type === 'photo' && c.photo.id) || ((ctx?.data?.products || []).find((x) => x.id === c.product)?.media || []).find((m) => m?.id && m.type !== 'reel')?.id,
+    links: [{ text: 'Change the heading, intro or hide this section', to: 'homepage', heading: 'The rituals (3D scroll)' }],
     defaults: () => clone(STORY),
     blank: () => ({ product: '', moment: '', title: '', body: '', photo: null }),
     normalize: (c) => ({ ...c, photo: c.photo?.type && c.photo?.id ? c.photo : null }),
     fields: [
-      { key: 'moment', label: 'Moment (small heading)', type: 'text' },
+      { key: 'moment', label: 'Moment (small italic line, e.g. "The day before")', type: 'text' },
       { key: 'title', label: 'Title', type: 'text', required: true },
       { key: 'body', label: 'Text', type: 'textarea', required: true },
-      { key: 'product', label: 'Product featured', type: 'select', options: productOptions, required: true },
-      { key: 'photo.type', label: 'Real photo kind', type: 'select', options: [['', 'None'], ['photo', 'Photo'], ['reel', 'Film']] },
-      { key: 'photo.id', label: 'Real photo or film', type: 'media' },
+      { key: 'product', label: 'Product shown in 3D', type: 'select', options: productOptions, required: true, help: 'Its 3D model turns on the stage while this chapter is on screen. Set or change the model in Products → 3D model. With no model, its first photo shows instead.' },
+      { key: 'photo.type', label: 'Real photo or film of this moment (optional)', type: 'select', options: [['', 'None'], ['photo', 'Photo'], ['reel', 'Film']] },
+      { key: 'photo.id', label: 'Which photo or film', type: 'media' },
     ],
   },
   {

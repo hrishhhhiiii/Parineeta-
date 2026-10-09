@@ -12,6 +12,7 @@ import { photoSrc } from '../src/data/site.js';
 import { applyAll } from '../src/cms/apply.js';
 import { SEO, SOCIALS, STORES, socialUrlOk, phoneList } from '../src/data/homepage.js';
 import { SITE } from '../src/data/site.js';
+import { productTitle, productDescription, categoryDescription, productSchema, breadcrumbSchema } from '../src/data/seo.js';
 
 // Same published content the browser bundle bakes in, so /p/ pages never go stale.
 const PUBLISHED_FILE = new URL('../src/data/published.json', import.meta.url);
@@ -19,8 +20,17 @@ if (existsSync(PUBLISHED_FILE)) applyAll(JSON.parse(readFileSync(PUBLISHED_FILE,
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const DEFAULT_IMAGE = '/brand/og-image.jpg';
+const ldTag = (data, id) => `  <script type="application/ld+json"${id ? ` id="${id}"` : ''}>${JSON.stringify(data).replace(/</g, '\\u003c')}</script>\n`;
+// On product and category pages the page's own name is the one <h1>; the homepage headline becomes a paragraph.
+const demoteHero = (html) => html.replace(/<h1 class="hero__title"([^>]*)>([\s\S]*?)<\/h1>/, '<p class="hero__title"$1>$2</p>');
 
 export const routableProducts = () => PRODUCTS.filter((p) => !isSet(p.id) && p.model);
+
+/** Up to four of the product's photos (or its film still) for the Product data. */
+function productImages(p) {
+  const photos = (p.media || []).filter((m) => m.type === 'photo').slice(0, 4).map((m) => photoSrc(m.id, 1600));
+  return photos.length ? photos : [productImage(p)];
+}
 
 function productImage(p) {
   const photo = p.media?.find((m) => m.type === 'photo');
@@ -74,7 +84,8 @@ function setUrls(html, site, path, image) {
 /** The product's name, words and photo, written into the page so search engines and no-script visitors
  *  see it straight away. The browser then draws the full product page over it with the same classes. */
 function productBody(p, image, cat) {
-  const crumbs = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/#collection">Collection</a> / <span aria-current="page">${esc(p.en)}</span></nav>`;
+  const c = CATEGORIES.find((x) => x.id === p.category);
+  const crumbs = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${c ? categoryPath(c) : '/#collection'}">${esc(c?.label || 'Collection')}</a> / <span aria-current="page">${esc(p.en)}</span></nav>`;
   const img = `<div class="ppage__viewer"><img src="${esc(image)}" alt="${esc(`${p.en} (${p.bn}), hand-painted by Parineeta`)}" fetchpriority="high" /></div>`;
   const from = fromPrice(p);
   const price = from ? `<p class="ppage__line">From ₹${from.toLocaleString('en-IN')}${cat ? ` · ${esc(cat)}` : ''}</p>` : '';
@@ -84,8 +95,8 @@ function productBody(p, image, cat) {
 
 function productHtml(base, p, site) {
   const path = `/p/${p.id}/`;
-  const title = `${p.en} (${p.bn}) | Parineeta, Patuli`;
-  const desc = `${p.line} ${p.story}`.slice(0, 300);
+  const title = productTitle(p);
+  const desc = productDescription(p);
   const image = productImage(p);
   const cat = CATEGORIES.find((c) => c.id === p.category)?.label;
   const landingTitle = base.match(/<title>([^<]*)<\/title>/)?.[1] || '';
@@ -99,21 +110,12 @@ function productHtml(base, p, site) {
   html = setMeta(html, 'property', 'og:image:alt', `${p.en} (${p.bn}), hand-painted by Parineeta`);
   html = html.replace(/\s*<meta property="og:image:(width|height)" content="[^"]*" \/>/g, '');
   html = setUrls(html, site, path, image);
+  html = demoteHero(html);
   // The product shows first; the landing page stays in the HTML for when the visitor goes back.
   html = html.replace('<main id="main">', '<main id="main" hidden>').replace('<main class="ppage" id="product-page" hidden></main>', productBody(p, image, cat));
-  const ld = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: p.en,
-    alternateName: p.bn,
-    sku: p.id,
-    description: p.story,
-    category: cat,
-    brand: { '@type': 'Brand', name: 'Parineeta' },
-    image: abs(site, image),
-    offers: { '@type': 'Offer', priceCurrency: 'INR', price: fromPrice(p), availability: 'https://schema.org/MadeToOrder', seller: { '@type': 'Organization', name: 'Parineeta' }, ...(site ? { url: site + path } : {}) },
-  };
-  return html.replace('</head>', `  <script type="application/ld+json" id="pg-jsonld">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>\n</head>`);
+  const ld = productSchema(p, { origin: site, images: productImages(p) });
+  const crumbs = breadcrumbSchema(site, { category: p.category, product: p });
+  return html.replace('</head>', `${ldTag(ld, 'pg-jsonld')}${ldTag(crumbs, 'pg-crumbs-ld')}</head>`);
 }
 
 /* ---------- category pages: /c/<id>/ (shop catalogue, phase 5) ----------
@@ -127,8 +129,8 @@ function categoryHtml(base, c, site) {
   const parent = CATEGORIES.find((x) => x.id === parentOf(c.id));
   const name = parent ? `${parent.label}: ${c.label}` : c.label;
   const items = PRODUCTS.filter((p) => !isSet(p.id) && inCategory(p, c.id));
-  const title = `${name} | Parineeta, Patuli`;
-  const desc = (c.line || `${name} from Parineeta: hand-painted Bengali wedding pieces made to order in Patuli, West Bengal.`).slice(0, 300);
+  const title = `${name} | Bengali Wedding Pieces from Parineeta, Patuli`;
+  const desc = categoryDescription(c, name);
   const image = items.map(productImage).find((x) => x !== DEFAULT_IMAGE) || DEFAULT_IMAGE;
   const landingTitle = base.match(/<title>([^<]*)<\/title>/)?.[1] || '';
   const landingDesc = base.match(/<meta name="description" content="([^"]*)"/)?.[1] || '';
@@ -138,10 +140,18 @@ function categoryHtml(base, c, site) {
   html = setMeta(html, 'property', 'og:title', `${name} | Parineeta`);
   html = setMeta(html, 'property', 'og:description', desc);
   html = html.replace(/\s*<meta property="og:image:(width|height|alt)" content="[^"]*" \/>/g, '');
+  html = setMeta(html, 'property', 'og:image:alt', `${name}, hand-painted by Parineeta`);
   html = setUrls(html, site, path, image);
+  html = demoteHero(html);
+  // The collection's heading becomes the category's own <h1>, with its line under it; it stays after the
+  // script starts (main.js keeps it in step when the visitor picks another category).
+  // Under it, the category's "About" paragraph from the admin, for Google and for customers.
+  const about = String(c.about || '').trim();
+  html = html.replace(/<h2 class="h2" id="collection-title"([^>]*)>[^<]*<\/h2>(\s*)<p class="lede"([^>]*)>[^<]*<\/p>/,
+    (m, a, gap, b) => `<h1 class="h2" id="collection-title"${a}>${esc(name)}</h1>${gap}<p class="lede"${b}>${esc(c.line || desc)}</p>${gap}<p class="cat-about" id="cat-about"${about ? '' : ' hidden'}>${esc(about)}</p>`);
   // What a search engine (or a visitor without JavaScript) reads; main.js removes it once the page starts.
   const list = items.map((p) => `<li><a href="/p/${p.id}/">${esc(p.en)}</a> <span lang="bn">${esc(p.bn)}</span> · from ₹${fromPrice(p).toLocaleString('en-IN')}</li>`).join('');
-  const block = `<section class="container cat-static" id="cat-static"><h1>${esc(name)}</h1>${c.line ? `<p>${esc(c.line)}</p>` : ''}<ul>${list}</ul></section>`;
+  const block = `<section class="container cat-static" id="cat-static"><ul>${list}</ul></section>`;
   html = html.replace('<div class="rails" id="rails"></div>', `${block}<div class="rails" id="rails"></div>`);
   const ld = {
     '@context': 'https://schema.org',
@@ -154,7 +164,7 @@ function categoryHtml(base, c, site) {
       itemListElement: items.map((p, i) => ({ '@type': 'ListItem', position: i + 1, name: p.en, url: abs(site, `/p/${p.id}/`) })),
     },
   };
-  return html.replace('</head>', `  <script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>\n</head>`);
+  return html.replace('</head>', `${ldTag(ld)}${ldTag(breadcrumbSchema(site, { category: c.id }))}</head>`);
 }
 
 export function productPages({ site = '' } = {}) {

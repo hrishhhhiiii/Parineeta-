@@ -55,7 +55,8 @@ function applySections() {
     const sec = document.getElementById(id);
     if (!d || !sec) continue;
     setTitle(sec.querySelector('h2'), d.title, d.titleEm);
-    const lede = sec.querySelector('.lede');
+    // A category page (/c/…) makes the collection's heading an <h1> with the category's own line; keep that line.
+    const lede = sec.querySelector('h1') ? null : sec.querySelector('.lede');
     if (lede) lede.textContent = d.lede || '';
     sec.hidden = Boolean(d.hidden);
     // Keep nav and footer links from pointing at a hidden section.

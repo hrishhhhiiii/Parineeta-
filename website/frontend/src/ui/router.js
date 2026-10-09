@@ -1,4 +1,5 @@
 import { byId, isSet } from '../data/products.js';
+import { productTitle, productDescription } from '../data/seo.js';
 import { $ } from './dom.js';
 import { jumpTo, closeAllDialogs, scrollToHash } from './dialogs.js';
 import { toast } from './toast.js';
@@ -35,8 +36,8 @@ function enter(p) {
     page.hidden = false;
     hooks.render(page, p);
   }
-  document.title = `${p.en} (${p.bn}) | Parineeta, Patuli`;
-  if (metaDesc) metaDesc.content = `${p.line} ${p.story}`.slice(0, 300);
+  document.title = productTitle(p);
+  if (metaDesc) metaDesc.content = productDescription(p);
   if (switched) return;
   jumpTo(0);
   requestAnimationFrame(() => $('#pg-en')?.focus({ preventScroll: true }));
