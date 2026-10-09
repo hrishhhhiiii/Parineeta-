@@ -1,7 +1,7 @@
 import { STORY, PALETTES, CATEGORIES, productHref, variantsOf, parentOf } from '../data/products.js';
 import { fromPrice, stockText } from '../data/pricing.js';
 import { builderProducts, defaultLine } from '../data/builder.js';
-import { choiceFields, firstPick, paintStock, paintNotify } from './productPanel.js';
+import { choiceFields, firstPick, paintStock } from './productPanel.js';
 import { REVIEWS as FILM_REVIEWS, waLink, photoSrc, reelStill } from '../data/site.js';
 import { reviewsFor, ratingSummary, myReviews, saveMyReview, loadReviews, SOURCE_LABELS } from '../data/reviews.js';
 import { h, icon, inr, reduceMotion } from './dom.js';
@@ -75,7 +75,6 @@ function paintTotal() {
   refs.add.lastChild.textContent = out ? 'Sold out' : 'Add to cart';
   refs.book.disabled = out;
   refs.ask.lastChild.textContent = out ? 'Ask on WhatsApp' : 'Enquire';
-  paintNotify(refs.notify, cur.p, cur.pick, out);
   refs.total.replaceChildren(h('span', { class: 'price__from', text: cur.qty > 1 ? `${cur.qty} × ${inr(unit)} =` : 'from' }), ' ', inr(total));
   refs.qty.textContent = String(cur.qty);
   refs.minus.disabled = cur.qty <= 1;
@@ -150,7 +149,6 @@ function configurator(p) {
     h('div', { class: 'pp__total' }, refs.total, refs.stock)),
   h('div', { class: 'builder__buy' }, refs.add, refs.book),
   h('div', { class: 'builder__more' }, refs.ask, refs.wish, share),
-  (refs.notify = h('div', { class: 'ppage__notify' })),
   h('p', { class: 'fineprint', text: 'Pay a booking advance or the full estimate by UPI or bank transfer, or pay when you collect. We confirm the final price with you on WhatsApp.' }));
   return form;
 }

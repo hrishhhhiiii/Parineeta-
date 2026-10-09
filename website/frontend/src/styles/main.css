@@ -352,10 +352,11 @@ body {
 
 /* ---------- brand mark via mask (recolours the monogram to gold) ---------- */
 .brand-mask {
+  /* The Parineeta seal (round crop of the logo artwork). The class name stays for the markup that uses it. */
   display: inline-block;
-  background: linear-gradient(160deg, #f8dc92, #e3aa3e 50%, #b87c1c);
-  -webkit-mask: url('/brand/monogram-mask.png') center / contain no-repeat;
-  mask: url('/brand/monogram-mask.png') center / contain no-repeat;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: url('/brand/seal-256.webp') center / contain no-repeat;
 }
 
 /* ---------- preloader ---------- */
@@ -400,8 +401,8 @@ body {
   animation: draw 1.6s var(--ease) forwards;
 }
 .preloader__mono {
-  width: 58px;
-  height: 66px;
+  width: 72px;
+  height: 72px;
   opacity: 0;
   animation: fade-up 0.9s 0.35s var(--ease) forwards;
 }
@@ -457,8 +458,8 @@ body {
   margin-right: auto;
 }
 .nav__mono {
-  width: 34px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   flex: none;
 }
 .nav__word {
@@ -1643,7 +1644,7 @@ iframe.video {
   align-items: start;
 }
 .footer__lockup {
-  width: 92px;
+  width: 104px;
   height: 104px;
 }
 .footer__line {
@@ -2174,8 +2175,8 @@ input[type='date'].input {
   padding: 64px 12px;
 }
 .empty__mark {
-  width: 64px;
-  height: 72px;
+  width: 68px;
+  height: 68px;
   opacity: 0.8;
   margin-bottom: 8px;
 }
@@ -2287,8 +2288,8 @@ input[type='date'].input {
   padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
 .menu .drawer__head .nav__mono {
-  width: 34px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
 }
 /* The links scroll on short screens; the logo bar and WhatsApp button stay put. */
 .menu__links {

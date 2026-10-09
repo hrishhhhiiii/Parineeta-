@@ -940,8 +940,8 @@ img.thumb--photo {
   position: absolute;
   inset: 0;
   margin: auto;
-  width: 96px;
-  height: 108px;
+  width: 104px;
+  height: 104px;
   opacity: 0.35;
 }
 
@@ -1432,52 +1432,6 @@ img.thumb--photo {
 }
 .cat-static a {
   color: var(--ink);
-}
-
-/* ---------- "Notify me when it's back" (sold-out pieces) ---------- */
-.notify {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-}
-.notify__form {
-  display: grid;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-card);
-  background: var(--surface);
-}
-.notify__form[hidden] {
-  display: none;
-}
-.notify__row {
-  display: flex;
-  gap: 8px;
-}
-.notify__row .input {
-  flex: 1;
-  min-width: 0;
-}
-.notify__trap {
-  position: absolute;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-.notify__msg {
-  margin: 0;
-  color: var(--ink-2);
-}
-.notify__msg.is-ok {
-  color: #8fd19e;
-}
-.notify__msg.is-err {
-  color: var(--heart);
-}
-.notify__msg a {
-  color: var(--gold);
 }
 
 /* ---------- Order-by line with the wedding date ---------- */

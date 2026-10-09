@@ -31,7 +31,6 @@ import userCircle from '@phosphor-icons/core/assets/light/user-circle-light.svg?
 import envelope from '@phosphor-icons/core/assets/light/envelope-simple-light.svg?raw';
 import playFill from '@phosphor-icons/core/assets/fill/play-fill.svg?raw';
 import pauseFill from '@phosphor-icons/core/assets/fill/pause-fill.svg?raw';
-import bell from '@phosphor-icons/core/assets/light/bell-light.svg?raw';
 import lotus from '@phosphor-icons/core/assets/light/flower-lotus-light.svg?raw';
 import check from '@phosphor-icons/core/assets/light/check-circle-light.svg?raw';
 import trash from '@phosphor-icons/core/assets/light/trash-light.svg?raw';
@@ -87,7 +86,6 @@ const ICONS = {
   'light:envelope-simple': envelope,
   'fill:play': playFill,
   'fill:pause': pauseFill,
-  'light:bell': bell,
   'light:flower-lotus': lotus,
   'light:check-circle': check,
   'light:trash': trash,

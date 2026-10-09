@@ -9,7 +9,6 @@
 import { PRODUCTS, CATEGORIES, categoryOf, parentOf, childrenOf, topCategories, inCategory, variantsOf } from '../data/products.js';
 import { fromPrice } from '../data/pricing.js';
 import { waLink, photoSrc, reelStill } from '../data/site.js';
-import { callRpc } from '../data/rpc.js';
 import { h, icon, inr, $, $$ } from './dom.js';
 import { openDialog, closeDialog, scrollToHash } from './dialogs.js';
 
@@ -262,22 +261,9 @@ function paint() {
 
 const askOnWhatsApp = (q) => h('a', { class: 'btn btn--gold', href: waLink(`Namaskar Parineeta! I searched your website for "${q}". Do you make it?`), target: '_blank', rel: 'noopener' }, icon('whatsapp-logo', 'fill'), 'Ask us on WhatsApp');
 
-/* Searches that found nothing go to the admin's "What customers want" list (014_shop.sql): words only,
-   once per term per visit. A failure here never bothers the customer. */
-const logged = new Set();
-let missTimer = 0;
-function logMiss(q) {
-  const key = normalise(q);
-  if (key.length < 2 || logged.has(key)) return;
-  logged.add(key);
-  callRpc('log_search_miss', { p_term: q }).catch((err) => console.warn('[search] missed search not recorded:', err.message));
-}
-
 /** The flat list shown when searching, filtering below a category, or sorting. */
 export function renderResults(box) {
   const list = applyFilters(state, idx());
-  // Only a search with no match anywhere counts as missed (not one emptied by filters).
-  if (state.q && !search(idx(), state.q).length) logMiss(state.q);
   if (!list.length) {
     box.replaceChildren(h('div', { class: 'results-empty' },
       h('p', { class: 'results-empty__title', text: state.q ? `Nothing matches “${state.q}” yet.` : 'Nothing matches these filters.' }),
@@ -305,7 +291,6 @@ function paintSearch() {
   const q = $('#search-input').value.trim();
   const body = $('#search-body');
   const foot = $('#search-foot');
-  clearTimeout(missTimer);
   if (!q) {
     foot.hidden = true;
     body.replaceChildren(h('p', { class: 'search__hint', text: 'Search in English or Bengali. Try “topor”, “mukut” or “কৌটো”.' }),
@@ -317,7 +302,6 @@ function paintSearch() {
   const hits = search(idx(), q);
   if (!hits.length) {
     foot.hidden = true;
-    missTimer = setTimeout(() => logMiss(q), 1500); // recorded once they stop typing
     body.replaceChildren(h('div', { class: 'results-empty' },
       h('p', { class: 'results-empty__title', text: `Nothing matches “${q}” yet.` }),
       h('p', { class: 'results-empty__body', text: 'We make pieces to order, so ask us on WhatsApp.' }),

@@ -9,8 +9,6 @@ import { avatar, profileOf } from '../auth/profile.js';
 import { ordersView } from './orders.js';
 import { reviewsView, newReviewCount } from './reviews.js';
 import { modelsView } from './modelsView.js';
-import { demandView } from './demand.js';
-import { choiceLabel } from '../data/pricing.js';
 
 const root = document.getElementById('app');
 
@@ -61,17 +59,6 @@ function demoClient() {
   const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
     total: 1450, paid_now: 725, plan: '50% advance', utr: '426512345678', event_date: '2026-12-02', address: 'Patuli, Kolkata', status: 'placed', suspect: false,
     items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null }];
-  const demoDemand = {
-    misses: [
-      { term: 'gaye holud tattva', count: 9, first_seen: '2026-09-20T10:00:00Z', last_seen: '2026-10-06T18:00:00Z' },
-      { term: 'shankha pola', count: 4, first_seen: '2026-09-28T10:00:00Z', last_seen: '2026-10-05T12:00:00Z' },
-    ],
-    requests: [
-      { id: 'rq-1', product: 'kunke', pick: { option: 'pair' }, phone: '9800012345', created_at: '2026-10-04T09:00:00Z' },
-      { id: 'rq-2', product: 'kunke', pick: { option: 'single' }, phone: '9123456780', created_at: '2026-10-06T15:00:00Z' },
-    ],
-    flags: [],
-  };
   const demoReviews = [
     { id: 'rv-1', review_date: '2026-10-03', product: 'gach-kouto', rating: 5, name: 'Moumita Ghosh', place: 'Katwa', phone: '9800012345', source: 'website',
       title: 'Beautiful work', text: 'The kouto was painted exactly as we asked, with our names on the lid. Everyone at the wedding asked where it came from.', shown: false, checked: false },
@@ -82,9 +69,6 @@ function demoClient() {
     get_heads: () => [...heads.values()],
     admin_role: () => 'owner',
     // "What customers want" (014_shop.sql), with made-up demo rows.
-    admin_demand: () => demoDemand,
-    clear_search_miss: ({ p_term }) => { demoDemand.misses = demoDemand.misses.filter((m) => m.term !== p_term); },
-    restock_done: ({ p_ids }) => { demoDemand.requests = demoDemand.requests.filter((r) => !p_ids.includes(r.id)); },
     save_draft: ({ p_key, p_data, p_expected_version }) => {
       const hd = heads.get(p_key) || { key: p_key, version: 0, published: null, draft: null };
       if (hd.version !== p_expected_version) throw { message: 'CONTENT_CONFLICT' };
@@ -698,23 +682,16 @@ async function openHistory(section) {
 const topSize = new ResizeObserver(([e]) => document.documentElement.style.setProperty('--top-h', `${Math.round(e.target.offsetHeight)}px`));
 // Owner only: orders from the website's checkout. /admin#orders opens it directly.
 const ORDERS = 'orders';
-const DEMAND = 'demand';
 const HOME = 'home';
 // Screens that aren't saved sections: their menu icon, title and who may open them.
 const SCREENS = {
   [ORDERS]: { icon: '🧾', title: 'Orders', ownerOnly: true },
-  [DEMAND]: { icon: '💬', title: 'What customers want', ownerOnly: false },
-};
-// "Size: Large" for a waiting customer's choices, from the admin's current Products.
-const demandChoiceText = (pid, pick) => {
-  const p = (ctx.data.products || []).find((x) => x.id === pid);
-  return p && pick && Object.keys(pick).length ? choiceLabel(p, pick) : '';
 };
 const canOpen = (k) => (SCREENS[k] ? !SCREENS[k].ownerOnly || ctx.role === 'owner' : SECTIONS.some((s) => s.key === k));
 
 // The menu, grouped by how often each part is used. Anything not listed falls under "More".
 const GROUPS = [
-  { title: 'Every day', keys: [ORDERS, 'products', DEMAND] },
+  { title: 'Every day', keys: [ORDERS, 'products'] },
   { title: 'Your website', keys: ['banners', 'story', 'sets', 'reviews', 'models', 'lookbook', 'announcement', 'homepage'] },
   { title: 'Shop details', keys: ['settings', 'stores', 'socials'] },
 ];
@@ -723,7 +700,6 @@ GROUPS.push({ title: 'More', keys: SECTIONS.map((s) => s.key).filter((k) => !GRO
 // What each tile on the Home screen says, in plain words.
 const TILE_TEXT = {
   [ORDERS]: 'See new orders and mark them paid, made or delivered.',
-  [DEMAND]: 'What customers searched for and didn’t find, and who is waiting for sold-out pieces.',
   products: 'Add a product, change a price or a photo, or hide one.',
   sets: 'Bundles sold together at one price.',
   reviews: 'Every review, kept. Choose which ones show on the website.',
@@ -813,7 +789,6 @@ function render() {
       clerk ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) toLogin('?signout'); } })));
 
   root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === HOME ? homeView() : ctx.section === ORDERS ? ordersView(sb, { h, toast, explain })
-    : ctx.section === DEMAND ? demandView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), choiceText: demandChoiceText })
     : ctx.section === 'models' ? modelsView({ h, toast, sb, ctx, slugify, changed, saveAll: saveModels, undoAll: undoModels,
       edited: () => { writeBackup('models'); writeBackup('products'); paintPublishBar(); } })
     : ctx.section === 'reviews' ? reviewsView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), onCount: setReviewCount })

@@ -19,7 +19,7 @@ const PUBLISHED_FILE = new URL('../src/data/published.json', import.meta.url);
 if (existsSync(PUBLISHED_FILE)) applyAll(JSON.parse(readFileSync(PUBLISHED_FILE, 'utf8')).docs || {});
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const DEFAULT_IMAGE = '/brand/og-image.jpg';
+const DEFAULT_IMAGE = '/brand/og-logo.jpg';
 const ldTag = (data, id) => `  <script type="application/ld+json"${id ? ` id="${id}"` : ''}>${JSON.stringify(data).replace(/</g, '\\u003c')}</script>\n`;
 // On product and category pages the page's own name is the one <h1>; the homepage headline becomes a paragraph.
 const demoteHero = (html) => html.replace(/<h1 class="hero__title"([^>]*)>([\s\S]*?)<\/h1>/, '<p class="hero__title"$1>$2</p>');
@@ -182,11 +182,11 @@ export function productPages({ site = '' } = {}) {
         if (!ctx.path.endsWith('/index.html')) return html;
         html = applySeo(html);
         const ogImage = SEO.ogImage ? photoSrc(SEO.ogImage, 1600) : DEFAULT_IMAGE;
-        html = setUrls(html, site, '/', ogImage).replace('"image": "/brand/og-image.jpg"', `"image": "${abs(site, DEFAULT_IMAGE)}"`);
+        html = setUrls(html, site, '/', ogImage).replace('"image": "/brand/og-logo.jpg"', `"image": "${abs(site, DEFAULT_IMAGE)}"`);
         // With the site address known, the shop gets a stable id and absolute links.
-        if (site) html = html.replace('"logo": "/brand/favicon-192x192.png"', `"@id": "${site}/#store",
+        if (site) html = html.replace('"logo": "/brand/seal-512.png"', `"@id": "${site}/#store",
   "url": "${site}/",
-  "logo": "${site}/brand/favicon-192x192.png"`);
+  "logo": "${site}/brand/seal-512.png"`);
         return html;
       },
     },

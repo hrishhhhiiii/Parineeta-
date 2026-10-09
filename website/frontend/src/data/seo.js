@@ -55,7 +55,7 @@ export function productSchema(p, { origin = '', images = [] } = {}) {
     description: p.story || p.line,
     ...(categoryLabel(p) ? { category: categoryLabel(p) } : {}),
     brand: { '@type': 'Brand', name: 'Parineeta' },
-    image: images.length > 1 ? images.map(abs) : abs(images[0] || '/brand/og-image.jpg'),
+    image: images.length > 1 ? images.map(abs) : abs(images[0] || '/brand/og-logo.jpg'),
     ...(price ? {
       offers: {
         '@type': 'Offer',

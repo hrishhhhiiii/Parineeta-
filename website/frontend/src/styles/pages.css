@@ -1160,10 +1160,6 @@ a.review__source { text-decoration: underline; text-underline-offset: 3px; }
   padding-inline: 14px;
   white-space: nowrap;
 }
-/* An empty "notify me" slot would still add a row of spacing under the buttons. */
-.builder__info .ppage__notify:empty {
-  display: none;
-}
 .builder__more {
   display: flex;
   gap: 10px;

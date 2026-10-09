@@ -1,7 +1,6 @@
 import { byId, PALETTES, productHref, variantsOf } from '../data/products.js';
 import { pickOf, stockLine, todayIso } from '../data/pricing.js';
 import { SITE, waLink } from '../data/site.js';
-import { callRpc, cleanPhone } from '../data/rpc.js';
 import { store, lineInfo, MAX, weddingDate, setWeddingDate } from './store.js';
 import { h, icon, inr, $ } from './dom.js';
 import { openDialog, closeDialog } from './dialogs.js';
@@ -40,7 +39,6 @@ function renderTotal() {
   add.disabled = out;
   add.lastChild.textContent = out ? 'Sold out' : 'Add to cart';
   $('#pp-enquire').lastChild.textContent = out ? 'Ask on WhatsApp' : 'Enquire';
-  paintNotify($('#pp-notify'), cur.p, cur.pick, out);
 }
 
 /** The stock line under the price, with the customer's wedding date: "Order by 12 Nov for your 20 Nov
@@ -65,55 +63,6 @@ export function paintStock(el, p, stock) {
   });
   el.replaceChildren(h('span', { class: 'pp__stock-text', text: line.text }), ' ',
     h('label', { class: 'wedding-date' }, h('span', { class: 'wedding-date__label', text: line.prompt ? 'Add your wedding date' : 'Wedding date' }), input));
-}
-
-/** "Notify me when it's back" for a sold-out piece (014_shop.sql). Shown in `box` only while sold out;
- *  redrawn only when the piece or its choices change, so a half-typed number isn't wiped. */
-export function paintNotify(box, p, pick, out) {
-  const key = out ? `${p.id}|${JSON.stringify(pick)}` : '';
-  if (box.dataset.key === key) return;
-  box.dataset.key = key;
-  box.replaceChildren(...(out ? [notifyForm(p, pick)] : []));
-}
-
-function notifyForm(p, pick) {
-  const id = `notify-${Math.random().toString(36).slice(2, 7)}`;
-  const phone = h('input', { class: 'input', id, type: 'tel', inputmode: 'tel', autocomplete: 'tel', maxlength: 16, placeholder: '98765 43210' });
-  // Spam trap: people never see or fill this; scripts do.
-  const trap = h('input', { class: 'notify__trap', type: 'text', name: 'website', tabindex: '-1', autocomplete: 'off', 'aria-hidden': 'true' });
-  const msg = h('p', { class: 'notify__msg', role: 'status' });
-  const send = h('button', { type: 'submit', class: 'btn btn--gold btn--sm', text: 'Notify me' });
-  const say = (text, kind, withWhatsApp) => {
-    msg.className = `notify__msg${kind ? ` is-${kind}` : ''}`;
-    msg.replaceChildren(text, ...(withWhatsApp ? [' ', h('a', { href: waLink(`Namaskar Parineeta! Please tell me when ${p.en} is back.`), target: '_blank', rel: 'noopener', text: 'Message us on WhatsApp' })] : []));
-  };
-  const form = h('form', { class: 'notify__form', hidden: true, onsubmit: async (e) => {
-    e.preventDefault();
-    const number = cleanPhone(phone.value);
-    if (!number) return say('Enter a 10-digit mobile number.', 'err');
-    send.disabled = true;
-    say('Saving…');
-    try {
-      const r = await callRpc('request_restock', { p_product: p.id, p_pick: pick, p_phone: number, p_website: trap.value });
-      say(r === 'duplicate' ? 'You are already on the list for this.' : "You're on the list. We'll message you on WhatsApp when it's back.", 'ok');
-      form.querySelectorAll('input').forEach((i) => { i.disabled = true; });
-    } catch (err) {
-      if (err.message.includes('BAD_PHONE')) say('Enter a 10-digit mobile number.', 'err');
-      else say("We couldn't save that just now.", 'err', true);
-      send.disabled = false;
-    }
-  } },
-  h('label', { class: 'field__label', for: id, text: 'Your WhatsApp number' }),
-  h('div', { class: 'notify__row' }, phone, send),
-  trap,
-  h('p', { class: 'field__help', text: "We'll message you once on WhatsApp when it's back. Your number is deleted after 90 days." }),
-  msg);
-  const open = h('button', { type: 'button', class: 'btn btn--ghost btn--wide notify__open', onclick: () => {
-    open.hidden = true;
-    form.hidden = false;
-    phone.focus();
-  } }, icon('bell'), 'Notify me when it’s back');
-  return h('div', { class: 'notify' }, open, form);
 }
 
 /** One group of radio pills per choice (Size, Type…). Sold-out options can't be picked.

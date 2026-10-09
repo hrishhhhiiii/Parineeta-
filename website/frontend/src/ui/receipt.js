@@ -26,7 +26,7 @@ export async function receiptBlob(r) {
   const paid = r.status === 'paid';
   // Canvas text only uses fonts that are already loaded, so load the two receipt faces first.
   await Promise.all([`600 64px ${SERIF}`, `400 30px ${SANS}`, `700 30px ${SANS}`].map((f) => document.fonts?.load(f).catch(() => null)));
-  const logo = await loadImage('/brand/parineeta_monogram_initial_transparent.png');
+  const logo = await loadImage('/brand/seal-400.webp');
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = 5000;
