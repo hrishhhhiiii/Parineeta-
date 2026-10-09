@@ -43,7 +43,11 @@ async function route() {
   app.replaceChildren(h('p', { text: 'Signing you in…' }));
   const sb = await getSupabase();
   const { data: role } = await sb.rpc('admin_role');
-  const next = role === 'owner' || role === 'editor' ? '/admin.html' : '/account.html';
+  // Staff always go to the admin panel. A customer returns to the page they were on when the shop asked them to sign in.
+  const saved = (() => { try { return sessionStorage.getItem('parineeta:next'); } catch { return null; } })();
+  try { sessionStorage.removeItem('parineeta:next'); } catch { /* storage blocked */ }
+  const returnTo = saved && saved.startsWith('/') && !saved.startsWith('//') && !saved.startsWith('/login') ? saved : null;
+  const next = role === 'owner' || role === 'editor' ? '/admin.html' : returnTo || '/account.html';
   if (tooManyHops()) {
     app.replaceChildren(h('h1', { text: 'You are signed in' }),
       h('p', { class: 'muted', text: 'The page kept reloading, so we stopped it. Open your page below. If it happens again, sign out and back in.' }),

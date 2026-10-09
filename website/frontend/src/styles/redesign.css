@@ -1598,3 +1598,10 @@ img.thumb--photo {
   font-variant-numeric: lining-nums tabular-nums;
   letter-spacing: 0;
 }
+
+/* Sign-in prompt for guests (ui/signInGate.js): the two buttons stack, full width. */
+.gate__actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}

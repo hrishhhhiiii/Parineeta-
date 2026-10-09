@@ -22,7 +22,8 @@ function h(tag, props = {}, ...kids) {
 
 // The order stages the shop sets in /admin → Orders.
 const STEPS = [['placed', 'Order received'], ['paid', 'Payment received'], ['making', 'Being made'], ['ready', 'Ready'], ['delivered', 'Delivered']];
-const label = (s) => (s === 'cancelled' ? 'Cancelled' : STEPS.find(([k]) => k === s)?.[1] || s);
+const OTHER = { cancelled: 'Cancelled', refund_started: 'Refund initiated', refunded: 'Refund completed' };
+const label = (s) => OTHER[s] || STEPS.find(([k]) => k === s)?.[1] || s;
 const date = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 const back = () => h('p', {}, h('a', { href: '/', text: '← Back to Parineeta' }));
@@ -32,16 +33,22 @@ function orderCard(o) {
   return h('article', { class: 'card' },
     h('p', { class: 'muted', text: `Order ${o.ref} · placed ${date(o.createdAt)}` }),
     h('p', {}, 'Stage: ', h('span', { class: 'status', text: label(o.status) })),
-    o.status !== 'cancelled' ? h('div', { class: 'steps', 'aria-hidden': 'true' }, ...STEPS.map((_, i) => h('span', { class: i <= at ? 'on' : '' }))) : null,
+    !OTHER[o.status] ? h('div', { class: 'steps', 'aria-hidden': 'true' }, ...STEPS.map((_, i) => h('span', { class: i <= at ? 'on' : '' }))) : null,
+    o.refund?.amount ? h('p', { class: 'refund-line', text: o.refund.doneAt
+      ? `Refund of ${INR.format(o.refund.amount)} completed on ${date(o.refund.doneAt)}${o.refund.ref ? ` · reference ${o.refund.ref}` : ''}. It can take a few days to show in your bank account.`
+      : `Refund of ${INR.format(o.refund.amount)} started on ${date(o.refund.startedAt)}. We will update this when it has been sent.` }) : null,
     o.items?.length ? h('ul', { class: 'items' }, ...o.items.map((i) => h('li', { text: `${i.qty} × ${i.title}${i.detail ? ` (${i.detail})` : ''}` }))) : null,
     h('p', { class: 'muted', text: `Estimated total ${INR.format(o.total)}${o.paidAmount ? ` · paid ${INR.format(o.paidAmount)}` : ''}` }));
 }
 
 const demoOrder = { ref: 'PRN-261001-DEMO', createdAt: new Date().toISOString(), total: 1450, paidNow: 725, status: 'making', paidAmount: 725,
   items: [{ title: 'Gach Kouto', qty: 1, detail: 'Sindoor red, Single piece' }] };
+const demoRefunded = { ref: 'PRN-260920-RFND', createdAt: '2026-09-20T10:00:00Z', total: 900, paidNow: 450, status: 'refunded', paidAmount: 450,
+  items: [{ title: 'Kunke', qty: 1, detail: 'Haldi yellow' }] };
+const demoRefunds = { 'PRN-260920-RFND': { amount: 450, ref: '628412345678', startedAt: '2026-09-22T10:00:00Z', doneAt: '2026-09-23T10:00:00Z' } };
 const demoSession = () => ({
   user: { email: 'riya@example.com', name: 'Riya' },
-  sb: { rpc: async (fn) => ({ data: fn === 'my_orders' ? [demoOrder] : fn === 'admin_role' ? null : true, error: null }) },
+  sb: { rpc: async (fn) => ({ data: fn === 'my_orders' ? [demoOrder, demoRefunded] : fn === 'my_refunds' ? demoRefunds : fn === 'admin_role' ? null : true, error: null }) },
   deleteUser: async () => {},
 });
 
@@ -67,7 +74,10 @@ async function showAccount() {
   try { me = await connect(); } catch { return stuck(); }
   if (!me) return looping ? stuck() : location.replace('/login.html?signin');
   const { sb } = me;
-  const [{ data: orders, error }, { data: role }] = await Promise.all([sb.rpc('my_orders'), sb.rpc('admin_role')]);
+  const [{ data: orders, error }, { data: role }, refunds] = await Promise.all([sb.rpc('my_orders'), sb.rpc('admin_role'),
+    Promise.resolve(sb.rpc('my_refunds')).catch(() => ({ data: {} }))]);
+  const byRef = (!refunds?.error && refunds?.data) || {};
+  (orders || []).forEach((o) => { if (byRef[o.ref]) o.refund = byRef[o.ref]; });
   // Clerk's UserButton (Manage account, Sign out) when signed in for real; a plain button in demo mode.
   const out = me.clerk ? h('div', { class: 'user-btn' }) : h('button', { class: 'ghost', type: 'button', text: 'Sign out', onclick: () => location.replace('/login.html?signout') });
   const settings = me.clerk ? h('div', { class: 'clerk-profile' }) : null;

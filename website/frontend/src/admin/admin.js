@@ -97,6 +97,14 @@ function demoClient() {
     },
     set_order_status: ({ p_ref, p_status, p_amount }) => Object.assign(demoOrders.find((o) => o.ref === p_ref), { status: p_status, suspect: false, ...(p_amount ? { paid_amount: p_amount, paid_at: new Date().toISOString(), paid_by: user.email } : {}) }),
     delete_order: ({ p_ref }) => demoOrders.splice(demoOrders.findIndex((o) => o.ref === p_ref), 1),
+    list_refunds: () => Object.fromEntries(demoOrders.filter((o) => o.refund).map((o) => [o.ref, o.refund])),
+    set_order_refund: ({ p_ref, p_stage, p_amount, p_refund_ref, p_note }) => {
+      const o = demoOrders.find((x) => x.ref === p_ref);
+      if (p_amount > Math.max(o.paid_amount || 0, o.total)) throw { message: 'BAD_AMOUNT', hint: 'The refund is more than the customer paid.' };
+      const now = new Date().toISOString();
+      o.status = p_stage;
+      o.refund = { amount: p_amount, ref: p_refund_ref, note: p_note, startedAt: o.refund?.startedAt || now, doneAt: p_stage === 'refunded' ? now : null, by: user.email };
+    },
   };
   return {
     rpc: async (name, args) => {

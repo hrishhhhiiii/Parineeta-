@@ -212,6 +212,11 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .inbox__head strong, .inbox__item a { overflow-wrap: anywhere; }
 .inbox__item .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .inbox__item .row .input { flex: 1 1 180px; }
+.inbox__item [hidden] { display: none !important; }
+/* Refund: recorded after it is sent from the bank or UPI app. */
+.refund { display: grid; gap: 8px; padding: 12px; border: 1px dashed var(--line); border-radius: 12px; }
+.refund p { margin: 0; }
+.refund__line { margin: 0; padding: 8px 12px; border-left: 3px solid var(--gold); border-radius: 0 8px 8px 0; background: rgba(0, 0, 0, 0.2); }
 
 /* ---------- signed-in user ---------- */
 .top__user { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }

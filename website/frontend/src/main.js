@@ -34,6 +34,7 @@ import { applyPublished } from './cms/published.js';
 import { IS_PREVIEW, receivePreview } from './cms/preview.js';
 import { renderAnnouncement } from './ui/announcement.js';
 import { renderCmsContent } from './ui/cmsContent.js';
+import { requireSignIn } from './ui/signInGate.js';
 
 // Content published from the admin is baked into the build; preview swaps in the admin's drafts.
 applyPublished();
@@ -282,7 +283,7 @@ function onFocus(p) {
 store.subscribe(paintFocusWish);
 focusEls.wish.addEventListener('click', () => {
   const p = gallery?.focused;
-  if (p) store.toggleWish(p.id);
+  if (p && requireSignIn('save pieces to your wishlist')) store.toggleWish(p.id);
 });
 $('#focus-open').addEventListener('click', () => {
   const p = gallery?.focused;

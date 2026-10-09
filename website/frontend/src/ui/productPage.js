@@ -14,6 +14,7 @@ import { videoTile, realPhoto, wholePhoto } from './sections.js';
 import { toast } from './toast.js';
 import { mediaStage } from './mediaStage.js';
 import { productSchema, breadcrumbSchema } from '../data/seo.js';
+import { requireSignIn } from './signInGate.js';
 
 const canvas = h('canvas', { class: 'ppage__canvas', role: 'img', 'aria-label': 'Interactive 3D view. Drag to rotate, scroll or pinch to zoom.' });
 let viewer = null;
@@ -116,6 +117,7 @@ function configurator(p) {
   refs.plus = h('button', { type: 'button', class: 'qty__btn', 'aria-label': 'Increase quantity', onclick: () => { cur.qty = Math.min(MAX, cur.qty + 1); paintTotal(); } }, icon('plus'));
   refs.total = h('p', { class: 'price price--lg' });
   refs.wish = h('button', { type: 'button', class: 'icon-btn icon-btn--ring icon-btn--lg', onclick: () => {
+    if (!requireSignIn('save pieces to your wishlist')) return;
     const added = store.toggleWish(p.id);
     paintWish();
     toast(added ? `${p.en} saved to your wishlist.` : `${p.en} removed from your wishlist.`, { iconName: 'heart' });
@@ -135,6 +137,7 @@ function configurator(p) {
 
   const form = h('form', { class: 'pp__form', onsubmit: (e) => {
     e.preventDefault();
+    if (!requireSignIn('add pieces to your cart')) return;
     store.add(line());
     toast(`${p.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() });
   } },
@@ -484,6 +487,7 @@ function builderCard(x) {
     ? [h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => openEnquiry({ lines: [line()] }) }, icon('chat-circle-text'), 'Ask on WhatsApp')]
     : [
       h('button', { type: 'button', class: 'btn btn--gold btn--sm', 'aria-label': `Add ${x.en} to cart`, onclick: () => {
+        if (!requireSignIn('add pieces to your cart')) return;
         store.add(line());
         toast(`${x.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() });
       } }, icon('shopping-bag-open'), 'Add to cart'),

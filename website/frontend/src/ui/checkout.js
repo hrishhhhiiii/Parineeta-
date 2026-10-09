@@ -7,6 +7,7 @@ import { openDialog, closeDialog } from './dialogs.js';
 import { postForm } from './enquiry.js';
 import { toast } from './toast.js';
 import { downloadReceipt, shareReceipt, canShareFiles } from './receipt.js';
+import { requireSignIn } from './signInGate.js';
 
 const dialog = () => $('#checkout-dialog');
 let ctx = { lines: [], fromCart: false, ref: '', requestId: '', receipt: null };
@@ -15,13 +16,26 @@ let ctx = { lines: [], fromCart: false, ref: '', requestId: '', receipt: null };
 // customer's confirmation, so a failed save never blocks them. database/migrations/009_simple_orders.sql
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-function saveOrder(receipt) {
+// Signed-in customers: their Clerk token is fetched as checkout opens (so it is ready before the
+// WhatsApp window takes over the phone), and the order is saved against their account.
+const SIGNED_IN = /(?:^|;\s*)__client_uat(?:_[\w-]+)?=[1-9]/;
+let authToken = null;
+function prepareToken() {
+  authToken = null;
+  if (!SIGNED_IN.test(document.cookie)) return;
+  authToken = import('../auth/client.js')
+    .then(async ({ getClerk }) => (await getClerk()).session?.getToken() ?? null)
+    .catch(() => null);
+}
+
+async function saveOrder(receipt) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
   try {
+    const token = authToken ? await authToken : null;
     fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_order`, {
       method: 'POST',
       keepalive: true, // finishes even if the phone switches to WhatsApp
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token || SUPABASE_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ p: { ...receipt, requestId: ctx.requestId } }),
     }).catch(() => {});
   } catch {
@@ -232,6 +246,8 @@ function done(v) {
 }
 
 export function openCheckout({ lines, fromCart = false }) {
+  if (!requireSignIn('check out')) return;
+  prepareToken();
   // Sold-out choices can't be ordered; they stay in the cart and can still be asked about on WhatsApp.
   const sold = lines.filter((l) => lineInfo(l).stock.status === 'out');
   const ok = lines.filter((l) => !sold.includes(l));

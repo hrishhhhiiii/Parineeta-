@@ -9,7 +9,15 @@ export const ORDER_STATUS = [
   ['ready', 'Ready'],
   ['delivered', 'Delivered'],
   ['cancelled', 'Cancelled'],
+  ['refund_started', 'Refund initiated'],
+  ['refunded', 'Refund completed'],
 ];
+const REFUND = ['refund_started', 'refunded'];
+const CLOSED = ['delivered', 'cancelled', 'refunded'];
+const waTo = (phone, text) => {
+  const d = String(phone || '').replace(/[^\d]/g, '');
+  return d.length >= 10 ? `https://wa.me/${d.length === 10 ? `91${d}` : d}?text=${encodeURIComponent(text)}` : '';
+};
 const METHOD = { upi: 'UPI', bank: 'Bank transfer', gateway: 'Payment page', later: 'Pay at the shop or on delivery' };
 const rupees = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 const when = (d) => new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
@@ -21,7 +29,7 @@ export function ordersView(sb, { h, toast, explain }) {
   let rows = [];
 
   const paint = () => {
-    const list = rows.filter((o) => (filter === 'all' ? true : filter === 'open' ? !['delivered', 'cancelled'].includes(o.status) : o.status === filter));
+    const list = rows.filter((o) => (filter === 'all' ? true : filter === 'open' ? !CLOSED.includes(o.status) : o.status === filter));
     body.replaceChildren(
       h('div', { class: 'inbox__tools' },
         h('select', { class: 'input', 'aria-label': 'Show', onchange: (e) => { filter = e.target.value; paint(); } },
@@ -37,17 +45,67 @@ export function ordersView(sb, { h, toast, explain }) {
       ...ORDER_STATUS.map(([v, t]) => h('option', { value: v, text: t, selected: v === o.status })));
     const amount = h('input', { class: 'input', type: 'number', min: 0, step: 1, inputmode: 'numeric', placeholder: 'Amount received ₹',
       value: o.paid_amount ?? '', 'aria-label': `Amount received for ${o.ref}` });
+    // Refunds are sent by hand from the bank or UPI app; these boxes record them (016_refunds.sql).
+    const r = o.refund || {};
+    const refundAmt = h('input', { class: 'input', type: 'number', min: 1, step: 1, inputmode: 'numeric', placeholder: 'Refund amount ₹',
+      value: r.amount ?? o.paid_amount ?? o.paid_now ?? '', 'aria-label': `Refund amount for ${o.ref}` });
+    const refundRef = h('input', { class: 'input', maxlength: 60, autocomplete: 'off', spellcheck: 'false', placeholder: 'Refund UPI / bank reference',
+      value: r.ref || '', 'aria-label': `Refund reference for ${o.ref}` });
+    const refundNote = h('input', { class: 'input', maxlength: 300, placeholder: 'Reason (optional, only you see it)', value: r.note || '', 'aria-label': `Refund reason for ${o.ref}` });
+    const askUpi = h('a', { target: '_blank', rel: 'noopener', text: 'Ask the customer for their UPI ID on WhatsApp ↗' });
+    const paintAsk = () => {
+      const url = waTo(o.phone, `Namaskar ${o.name}, this is Parineeta about order ${o.ref}. We are refunding ${rupees(Number(refundAmt.value) || 0)}. Please send us the UPI ID to send it to.`);
+      askUpi.hidden = !url;
+      if (url) askUpi.href = url;
+    };
+    refundAmt.addEventListener('input', paintAsk);
+    paintAsk();
+    const refundBox = h('div', { class: 'refund' },
+      h('p', { class: 'muted', text: 'Send the refund from your bank or UPI app first, then record it here. The customer sees it on their account page.' }),
+      h('div', { class: 'row' }, refundAmt, refundRef),
+      refundNote,
+      h('p', {}, askUpi));
+    const showFields = () => {
+      const refund = REFUND.includes(status.value);
+      refundBox.hidden = !refund;
+      amount.hidden = refund;
+    };
+    status.addEventListener('change', showFields);
+    showFields();
     const save = h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: 'Save', onclick: async () => {
-      const amt = amount.value === '' ? null : Math.round(Number(amount.value));
-      if (status.value === 'paid' && !(amt > 0)) return toast('Enter the amount you received.', 'err');
-      save.disabled = true;
-      const { error } = await sb.rpc('set_order_status', { p_ref: o.ref, p_status: status.value, p_amount: amt });
+      let error;
+      if (REFUND.includes(status.value)) {
+        const amt = Math.round(Number(refundAmt.value));
+        if (!(amt > 0)) return toast('Enter the amount you are refunding.', 'err');
+        if (status.value === 'refunded' && !refundRef.value.trim() && !confirm('Save the refund as completed without its UPI / bank reference?')) return;
+        save.disabled = true;
+        ({ error } = await sb.rpc('set_order_refund', { p_ref: o.ref, p_stage: status.value, p_amount: amt, p_refund_ref: refundRef.value, p_note: refundNote.value }));
+        if (!error) {
+          const now = new Date().toISOString();
+          o.refund = { ...r, amount: amt, ref: refundRef.value.trim(), note: refundNote.value.trim(), startedAt: r.startedAt || now, doneAt: status.value === 'refunded' ? r.doneAt || now : null };
+        }
+      } else {
+        const amt = amount.value === '' ? null : Math.round(Number(amount.value));
+        if (status.value === 'paid' && !(amt > 0)) return toast('Enter the amount you received.', 'err');
+        save.disabled = true;
+        ({ error } = await sb.rpc('set_order_status', { p_ref: o.ref, p_status: status.value, p_amount: amt }));
+        if (!error && amt > 0) o.paid_amount = amt;
+      }
       save.disabled = false;
-      if (error) return toast(explain(error), 'err');
-      Object.assign(o, { status: status.value, suspect: false, ...(amt > 0 ? { paid_amount: amt } : {}) });
+      if (error) {
+        const missing = /set_order_refund|does not exist|schema cache|orders_status_check/i.test(error.message || '');
+        return toast(missing ? 'Refunds need a one-time database update: run database/migrations/016_refunds.sql in Supabase, then try again.' : error.hint || explain(error), 'err');
+      }
+      Object.assign(o, { status: status.value, suspect: false });
       toast(`Order ${o.ref} saved.`);
       paint();
     } });
+    const confirmUrl = r.doneAt ? waTo(o.phone, `Namaskar ${o.name}, your refund of ${rupees(r.amount)} for Parineeta order ${o.ref} has been sent${r.ref ? ` (reference ${r.ref})` : ''}. It can take a few days to show in your account.`) : '';
+    const refundLine = r.amount
+      ? h('p', { class: 'refund__line' },
+        `${r.doneAt ? 'Refund completed' : 'Refund initiated'}: ${rupees(r.amount)} · ${when(r.doneAt || r.startedAt)}${r.ref ? ` · ref ${r.ref}` : ''}${r.by ? ` (${r.by})` : ''}${r.note ? ` · ${r.note}` : ''}`,
+        ...(confirmUrl ? [' · ', h('a', { href: confirmUrl, target: '_blank', rel: 'noopener', text: 'Send confirmation on WhatsApp ↗' })] : []))
+      : null;
     const remove = h('button', { type: 'button', class: 'linkbtn', text: 'Delete (test or spam order)', onclick: async () => {
       if (!confirm(`Delete order ${o.ref} from ${o.name}? This cannot be undone.`)) return;
       const { error } = await sb.rpc('delete_order', { p_ref: o.ref });
@@ -70,13 +128,17 @@ export function ordersView(sb, { h, toast, explain }) {
       h('p', { text: `Estimated total ${rupees(o.total)}. ${paidLine}.` }),
       o.event_date || o.address ? h('p', { class: 'muted', text: [o.event_date && `Event: ${o.event_date}`, o.address && `Deliver to: ${o.address}`].filter(Boolean).join(' · ') }) : null,
       o.paid_amount ? h('p', { class: 'muted', text: `Received ${rupees(o.paid_amount)}${o.paid_at ? ` on ${when(o.paid_at)}` : ''}${o.paid_by ? ` (${o.paid_by})` : ''}` }) : null,
+      refundLine,
       h('div', { class: 'row' }, status, amount, save),
+      refundBox,
       h('p', {}, remove));
   };
 
-  sb.rpc('list_orders').then(({ data, error }) => {
+  // Refund details come from their own function, so the Orders list still loads before 016 is run.
+  Promise.all([sb.rpc('list_orders'), Promise.resolve(sb.rpc('list_refunds')).catch(() => ({ data: {} }))]).then(([{ data, error }, refunds]) => {
     if (error) return body.replaceChildren(h('p', { class: 'form-msg', text: `Could not load orders: ${explain(error)}` }));
-    rows = data || [];
+    const byRef = (!refunds?.error && refunds?.data) || {};
+    rows = (data || []).map((o) => (byRef[o.ref] ? { ...o, refund: byRef[o.ref] } : o));
     paint();
   });
   return h('div', {}, h('div', { class: 'sec-head' }, h('div', {}, h('h1', { text: 'Orders' }),

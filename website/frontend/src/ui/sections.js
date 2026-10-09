@@ -8,6 +8,7 @@ import { openEnquiry } from './enquiry.js';
 import { thumbImg } from './drawers.js';
 import { toast } from './toast.js';
 import { loadReviews, latestReviews, SOURCE_LABELS } from '../data/reviews.js';
+import { requireSignIn } from './signInGate.js';
 
 export function renderMarquee() {
   const words = ['গাছকৌটো', 'Gach Kouto', 'টোপর', 'Topor', 'শোলার মুকুট', 'Shola Mukut', 'পানপাতা', 'Paan Pata', 'আলপনা', 'Alpana', 'বিয়ের পিঁড়ি', 'Biyer Piri', 'কুনকে', 'Kunke'];
@@ -96,6 +97,7 @@ function wishButton(id, name) {
     btn.replaceChildren(icon('heart', on ? 'fill' : 'light'));
   };
   btn.addEventListener('click', () => {
+    if (!requireSignIn('save pieces to your wishlist')) return;
     const added = store.toggleWish(id);
     toast(added ? `${name} saved to your wishlist.` : `${name} removed from your wishlist.`, { iconName: 'heart' });
   });
@@ -180,7 +182,7 @@ export function renderSets() {
           h('p', { class: 'price' }, h('span', { class: 'price__from', text: 'from' }), ` ${inr(s.price)}`),
           h('div', { class: 'card__btns' },
             wishButton(s.id, s.en),
-            h('button', { type: 'button', class: 'btn btn--gold btn--sm', onclick: () => { store.add({ id: s.id, qty: 1 }); toast(`${s.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() }); } }, 'Add to cart'))))));
+            h('button', { type: 'button', class: 'btn btn--gold btn--sm', onclick: () => { if (!requireSignIn('add pieces to your cart')) return; store.add({ id: s.id, qty: 1 }); toast(`${s.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() }); } }, 'Add to cart'))))));
   }
   document.querySelectorAll('[data-rail]').forEach((b) =>
     b.addEventListener('click', () => {

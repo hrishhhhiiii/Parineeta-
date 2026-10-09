@@ -7,6 +7,7 @@ import { openDialog, closeDialog } from './dialogs.js';
 import { openEnquiry } from './enquiry.js';
 import { toast } from './toast.js';
 import { mediaStage } from './mediaStage.js';
+import { requireSignIn } from './signInGate.js';
 
 let viewer = null;
 let viewerLoading = null;
@@ -172,6 +173,7 @@ export function setupProductPanel() {
     }));
   $('#pp-form').addEventListener('submit', (e) => {
     e.preventDefault();
+    if (!requireSignIn('add pieces to your cart')) return;
     store.add(line());
     toast(`${cur.p.en} added to your enquiry cart.`, {
       action: 'View cart',
@@ -182,6 +184,7 @@ export function setupProductPanel() {
     });
   });
   $('#pp-wish').addEventListener('click', () => {
+    if (!requireSignIn('save pieces to your wishlist')) return;
     const added = store.toggleWish(cur.p.id);
     renderWish();
     toast(added ? `${cur.p.en} saved to your wishlist.` : `${cur.p.en} removed from your wishlist.`, { iconName: 'heart' });
