@@ -16,6 +16,7 @@ import { thumbImg } from './drawers.js';
  * @param {() => object|null} o.viewer            the viewer, once loaded
  * @param {() => string} o.style                  current colourway
  * @param {() => boolean} o.isCurrent             false once another product is shown
+ * @param {boolean} [o.start3d]                     open on the 3D model (the product builder); photos stay one tap away
  */
 export function mediaStage(p, o) {
   const real = [...p.media.filter((m) => m.type === 'photo'), ...p.media.filter((m) => m.type === 'reel')];
@@ -25,10 +26,10 @@ export function mediaStage(p, o) {
   const { stage } = o;
   let active = -1;
 
-  const show = (i) => {
-    if (i === active) return;
+  const show = (i, extra = null) => {
+    if (i === active && !extra) return;
     active = i;
-    const it = items[i];
+    const it = extra || items[i];
     if (!it) {
       // No 3D and no photos yet: the brand mark holds the space.
       stage.replaceChildren(h('span', { class: 'empty__mark brand-mask ppage__nomedia', 'aria-hidden': 'true' }));
@@ -55,7 +56,7 @@ export function mediaStage(p, o) {
       const m = describeMedia(it);
       stage.replaceChildren(
         h('img', { class: 'ppage__backdrop', src: photoSrc(it.id, 400), alt: '', 'aria-hidden': 'true' }),
-        h('button', { type: 'button', class: 'ppage__photo', 'aria-label': `Enlarge photo: ${m.title || p.en}`, onclick: () => openLightbox(real, real.indexOf(it), { subject: p.en }) },
+        h('button', { type: 'button', class: 'ppage__photo', 'aria-label': `Enlarge photo: ${m.title || p.en}`, onclick: () => (real.includes(it) ? openLightbox(real, real.indexOf(it), { subject: p.en }) : openLightbox([it], 0, { subject: p.en })) },
           h('img', { src: photoSrc(it.id, 1600), srcset: photoSrcset(it.id), sizes: '(max-width: 900px) 100vw, 58vw', alt: m.title || p.en, decoding: 'async' })),
         h('p', { class: 'stage-hint' }, icon('magnifying-glass-plus'), h('span', { text: 'Tap to enlarge' })));
     }
@@ -74,10 +75,16 @@ export function mediaStage(p, o) {
       it.type === 'reel' ? h('span', { class: 'pp__play' }, icon('play', 'fill')) : null);
   }));
 
-  show(0);
+  show(o.start3d && has3d(p) ? items.length - 1 : 0);
   return {
     thumbs: items.length > 1 ? thumbs : null,
     show3d: () => (has3d(p) ? show(items.length - 1) : undefined),
+    /** Shows a choice's own photo: its thumbnail if the product already has it, otherwise on its own. */
+    showPhoto: (id) => {
+      const i = items.findIndex((m) => m.type === 'photo' && m.id === id);
+      if (i >= 0) show(i);
+      else show(-1, { type: 'photo', id });
+    },
     stop: () => {
       stage.querySelector('video')?.pause();
       o.viewer()?.stop();

@@ -1,5 +1,7 @@
 import { PAYMENTS, SITE, waLink } from '../data/site.js';
 import { store, lineInfo, cartTotal } from './store.js';
+import { orderLine, orderDetail, todayIso } from '../data/pricing.js';
+import { weddingDate, setWeddingDate } from './store.js';
 import { h, icon, inr, $ } from './dom.js';
 import { openDialog, closeDialog } from './dialogs.js';
 import { postForm } from './enquiry.js';
@@ -116,8 +118,8 @@ function render() {
   const body = $('#co-body');
   body.replaceChildren();
   const list = h('ul', { class: 'enq__list' }, ...ctx.lines.map((l) => {
-    const { p, total: t, styleLabel, comboLabel } = lineInfo(l);
-    return h('li', {}, h('span', { class: 'enq__item' }, `${l.qty} × ${p.en}`, h('small', { text: [styleLabel, comboLabel].filter(Boolean).join(', ') })), h('span', { class: 'enq__price', text: inr(t) }));
+    const { p, total: t, styleLabel, choiceLabel } = lineInfo(l);
+    return h('li', {}, h('span', { class: 'enq__item' }, `${l.qty} × ${p.en}`, h('small', { text: [styleLabel, choiceLabel].filter(Boolean).join(', ') })), h('span', { class: 'enq__price', text: inr(t) }));
   }));
   const amountChoice = h('div', { class: 'options co-amounts' },
     h('label', { class: 'opt', for: 'co-amount-advance' }, h('input', { type: 'radio', name: 'co-amount', value: 'advance', id: 'co-amount-advance', checked: true }), h('span', { class: 'opt__label', text: `${PAYMENTS.advancePercent}% booking advance, ${inr(advance())}` })),
@@ -145,6 +147,12 @@ function render() {
       online ? null : h('p', { class: 'field__help', text: 'Online payment options will appear here once the shop adds them. You can still place your order now.' }),
       methodChoice, h('div', { class: 'co-method-detail', id: 'co-method-detail' })));
   body.querySelectorAll('input[name="co-amount"], input[name="co-method"]').forEach((r) => r.addEventListener('change', renderMethodDetail));
+  // The wedding date given on a product page fills in here, and a date typed here is remembered.
+  const date = body.querySelector('#co-date');
+  if (date) {
+    date.value ||= weddingDate(todayIso());
+    date.addEventListener('change', () => setWeddingDate(date.value));
+  }
   renderMethodDetail();
   $('#co-status').textContent = '';
   $('#co-mail').hidden = !SITE.web3formsKey; // shown once an email service is set up in the admin
@@ -179,10 +187,7 @@ function orderMessage(v) {
   const method = methods().find((m) => m.id === dialog().querySelector('input[name="co-method"]:checked')?.value);
   const full = dialog().querySelector('input[name="co-amount"]:checked')?.value === 'full';
   const out = ['Namaskar Parineeta! I would like to place an order.', '', `Order: ${ctx.ref}`];
-  ctx.lines.forEach((l, i) => {
-    const { p, total: t, styleLabel, comboLabel } = lineInfo(l);
-    out.push(`${i + 1}. ${p.en} | ${[styleLabel, comboLabel].filter(Boolean).join(', ')} | Qty ${l.qty}${l.custom ? ` | Personalise: “${l.custom}”` : ''} | ${inr(t)}`);
-  });
+  ctx.lines.forEach((l, i) => out.push(orderLine(l, i)));
   const paying = payLater() ? 'Paying: at the shop or on delivery' : `Paying now: ${full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`}, ${inr(amountNow())}`;
   out.push('', `Estimated total: ${inr(total())}`, paying, `Method: ${method?.label || ''}`);
   if (v.utr) out.push(`Payment reference: ${v.utr}`);
@@ -201,8 +206,8 @@ function receiptData(v) {
   return {
     ref: ctx.ref, date: new Date().toISOString(), name: v.name, phone: v.phone, email: v.email, eventDate: v.date, address: v.address,
     items: ctx.lines.map((l) => {
-      const { p, total: t, styleLabel, comboLabel } = lineInfo(l);
-      return { title: p.en, qty: l.qty, amount: t, detail: [styleLabel, comboLabel, l.custom ? `Personalise: “${l.custom}”` : ''].filter(Boolean).join(', ') };
+      const { p, total: t } = lineInfo(l);
+      return { title: p.en, qty: l.qty, amount: t, detail: orderDetail(l) };
     }),
     total: total(), paidNow: amountNow(), plan: id === 'later' ? 'pay at the shop' : full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`,
     method: { id, label: methods().find((m) => m.id === id)?.label || '' }, payTo, utr: v.utr,
@@ -227,8 +232,15 @@ function done(v) {
 }
 
 export function openCheckout({ lines, fromCart = false }) {
-  if (!lines.length) return;
-  ctx = { lines: lines.map((l) => ({ ...l })), fromCart, ref: newRef(), requestId: crypto.randomUUID(), receipt: null };
+  // Sold-out choices can't be ordered; they stay in the cart and can still be asked about on WhatsApp.
+  const sold = lines.filter((l) => lineInfo(l).stock.status === 'out');
+  const ok = lines.filter((l) => !sold.includes(l));
+  if (sold.length) {
+    const names = sold.map((l) => lineInfo(l).p.en).join(', ');
+    toast(`${names} ${sold.length > 1 ? 'are' : 'is'} sold out, so ${sold.length > 1 ? 'they were' : 'it was'} left out of this order. Ask us on WhatsApp about ${sold.length > 1 ? 'them' : 'it'}.`, { iconName: 'whatsapp-logo' });
+  }
+  if (!ok.length) return;
+  ctx = { lines: ok.map((l) => ({ ...l })), fromCart, ref: newRef(), requestId: crypto.randomUUID(), receipt: null };
   $('#co-title-ref').textContent = ctx.ref;
   render();
   openDialog(dialog());

@@ -27,10 +27,11 @@ import minus from '@phosphor-icons/core/assets/light/minus-light.svg?raw';
 import plus from '@phosphor-icons/core/assets/light/plus-light.svg?raw';
 import chat from '@phosphor-icons/core/assets/light/chat-circle-text-light.svg?raw';
 import send from '@phosphor-icons/core/assets/light/paper-plane-tilt-light.svg?raw';
-import lockSimple from '@phosphor-icons/core/assets/light/lock-simple-light.svg?raw';
 import userCircle from '@phosphor-icons/core/assets/light/user-circle-light.svg?raw';
 import envelope from '@phosphor-icons/core/assets/light/envelope-simple-light.svg?raw';
 import playFill from '@phosphor-icons/core/assets/fill/play-fill.svg?raw';
+import pauseFill from '@phosphor-icons/core/assets/fill/pause-fill.svg?raw';
+import bell from '@phosphor-icons/core/assets/light/bell-light.svg?raw';
 import lotus from '@phosphor-icons/core/assets/light/flower-lotus-light.svg?raw';
 import check from '@phosphor-icons/core/assets/light/check-circle-light.svg?raw';
 import trash from '@phosphor-icons/core/assets/light/trash-light.svg?raw';
@@ -47,10 +48,13 @@ import palette from '@phosphor-icons/core/assets/light/palette-light.svg?raw';
 import textAa from '@phosphor-icons/core/assets/light/text-aa-light.svg?raw';
 import linkSimple from '@phosphor-icons/core/assets/light/link-simple-light.svg?raw';
 import zoomIn from '@phosphor-icons/core/assets/light/magnifying-glass-plus-light.svg?raw';
+import searchIcon from '@phosphor-icons/core/assets/light/magnifying-glass-light.svg?raw';
+import sliders from '@phosphor-icons/core/assets/light/sliders-horizontal-light.svg?raw';
 
 const ICONS = {
   'light:heart': heart,
-  'light:lock-simple': lockSimple,
+  'light:magnifying-glass': searchIcon,
+  'light:sliders-horizontal': sliders,
   'light:user-circle': userCircle,
   'fill:heart': heartFill,
   'light:shopping-bag-open': bag,
@@ -82,6 +86,8 @@ const ICONS = {
   'light:paper-plane-tilt': send,
   'light:envelope-simple': envelope,
   'fill:play': playFill,
+  'fill:pause': pauseFill,
+  'light:bell': bell,
   'light:flower-lotus': lotus,
   'light:check-circle': check,
   'light:trash': trash,
@@ -99,11 +105,12 @@ const ICONS = {
   'light:link-simple': linkSimple,
 };
 
-const tpl = document.createElement('template');
+let tpl = null; // made on first use, so modules importing icons also load where there is no page (tests)
 
 export function svgIcon(name, weight = 'light') {
   const raw = ICONS[`${weight}:${name}`] || ICONS[`light:${name}`];
   if (!raw) return document.createElement('span');
+  tpl ||= document.createElement('template');
   tpl.innerHTML = raw.trim();
   const svg = tpl.content.firstElementChild;
   svg.setAttribute('class', 'ico');

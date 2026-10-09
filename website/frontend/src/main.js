@@ -7,20 +7,24 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 
-import { PRODUCTS, STORY, byId, has3d } from './data/products.js';
+import { PRODUCTS, STORY, byId, has3d, categoryOf, parentOf, categoryBySlug } from './data/products.js';
 import { waLink, photoSrc, reelStill } from './data/site.js';
 import { $, $$, reduceMotion, inr, icon } from './ui/dom.js';
 import { hydrateIcons } from './ui/icons.js';
-import { store } from './ui/store.js';
+import { store, droppedLines, onDropped } from './ui/store.js';
+import { toast } from './ui/toast.js';
+import { fromPrice } from './data/pricing.js';
+import { initCatalogue, setCatalogue, catalogueState, syncUrl, isRefined, renderResults, showCollection, emptyState } from './ui/catalogue.js';
+import { initHome, renderRails, rememberViewed } from './ui/home.js';
 import { setupDialogs, setLenis, scrollToHash, whenScrollIdle } from './ui/dialogs.js';
 import { setupEnquiry } from './ui/enquiry.js';
 import { setupProductPanel, openProduct } from './ui/productPanel.js';
 import { setupDrawers } from './ui/drawers.js';
-import { renderMarquee, renderStory, renderChips, renderGrid, filterGrid, renderSets, renderBento, renderReels, renderTrust, renderLookbook } from './ui/sections.js';
+import { renderMarquee, renderStory, renderChips, renderGrid, filterGrid, tileCard, renderSets, renderBento, renderReels, renderTrust, renderLookbook } from './ui/sections.js';
 import { setupLightbox, openLightbox } from './ui/lightbox.js';
 import { setupCheckout } from './ui/checkout.js';
-import { initRouter, isProductRoute } from './ui/router.js';
-import { renderProductPage, stopProductPage, clearProductPage, productHref, refreshWish } from './ui/productPage.js';
+import { initRouter, isProductRoute, goTo } from './ui/router.js';
+import { renderProductPage, switchProduct, stopProductPage, clearProductPage, productHref, refreshWish, miniCard } from './ui/productPage.js';
 import { initAlpana } from './ui/alpana.js';
 import { initInvite } from './ui/invite.js';
 import { motion } from './ui/motion.js';
@@ -125,6 +129,18 @@ sentinel.setAttribute('aria-hidden', 'true');
 sentinel.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:40px;pointer-events:none;';
 document.body.prepend(sentinel);
 new IntersectionObserver(([entry]) => nav.classList.toggle('is-scrolled', !entry.isIntersecting)).observe(sentinel);
+
+// The floating WhatsApp button steps aside while a section with its own WhatsApp button is on screen,
+// so on phones it never covers the hero's or the Visit section's button.
+const fab = $('.fab');
+if (fab) {
+  const showing = new Set();
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => (e.isIntersecting ? showing.add(e.target) : showing.delete(e.target)));
+    fab.classList.toggle('is-tucked', showing.size > 0);
+  }, { threshold: 0.15 });
+  $$('#top, #visit').forEach((s) => io.observe(s));
+}
 
 /* ---------- preloader + hero ---------- */
 const preloader = $('#preloader');
@@ -240,7 +256,6 @@ ScrollTrigger.create({
 /* ---------- collection ---------- */
 let gallery = null;
 let view = 'grid';
-let filter = 'all';
 const focusEls = { bn: $('#focus-bn'), en: $('#focus-en'), line: $('#focus-line'), price: $('#focus-price'), wish: $('#focus-wish'), page: $('#focus-page') };
 
 function paintFocusWish() {
@@ -256,7 +271,7 @@ function onFocus(p) {
   focusEls.bn.textContent = p.bn;
   focusEls.en.textContent = p.en;
   focusEls.line.textContent = p.line;
-  focusEls.price.textContent = inr(p.priceFrom);
+  focusEls.price.textContent = inr(fromPrice(p));
   focusEls.page.href = productHref(p.id);
   focusEls.page.setAttribute('aria-label', `View Details of ${p.en}`);
   paintFocusWish();
@@ -275,8 +290,8 @@ $('#focus-open').addEventListener('click', () => {
 function startGallery() {
   if (gallery || view !== '3d') return;
   import('./three/gallery.js').then(({ initGallery }) => {
-    gallery = initGallery({ canvas: $('#gallery-canvas'), stageEl: $('#pavilion-stage'), products: PRODUCTS.filter(has3d), onFocus, onOpen: (p) => openProduct(p.id) });
-    if (filter !== 'all') gallery.setFilter(filter);
+    gallery = initGallery({ canvas: $('#gallery-canvas'), stageEl: $('#pavilion-stage'), products: PRODUCTS.filter((p) => has3d(p) && !p.noPavilion), onFocus, onOpen: (p) => goTo(productHref(p.id)) });
+    if (catalogueState().cat !== 'all') gallery.setFilter(catalogueState().cat);
     $('#pav-prev').addEventListener('click', () => gallery.prev());
     $('#pav-next').addEventListener('click', () => gallery.next());
   });
@@ -290,39 +305,66 @@ function setView(v) {
     b.setAttribute('aria-pressed', String(on));
   });
   $('#pavilion').hidden = v !== '3d';
-  $('#grid-view').hidden = v !== 'grid';
-  syncCollectionUrl();
-  if (v === 'grid') {
-    renderGrid();
-    filterGrid(filter);
-  } else startGallery();
+  syncUrl();
+  if (v === 'grid') renderGrid();
+  else startGallery();
+  showCollectionState(catalogueState());
   whenScrollIdle(() => ScrollTrigger.refresh());
 }
 $$('.view-toggle__btn').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
-renderChips((cat) => {
-  filter = cat;
-  gallery?.setFilter(cat);
-  filterGrid(cat);
-  syncCollectionUrl();
-});
 
-// Collection filter and view live in the query string so they can be shared and survive reloads.
-function syncCollectionUrl() {
-  const q = new URLSearchParams(location.search);
-  if (filter === 'all') q.delete('cat');
-  else q.set('cat', filter);
-  if (view === 'grid') q.delete('view');
-  else q.set('view', view);
-  const qs = q.toString();
-  history.replaceState(history.state, '', `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`);
+/** Category chips show the grouped grid; a search, sub-category, price, "Ready now" or sort shows one flat list. */
+function showCollectionState(st) {
+  gallery?.setFilter(st.cat);
+  const refined = isRefined(st);
+  $('#grid-view').hidden = view !== 'grid' || refined;
+  $('#grid-results').hidden = view !== 'grid' || !refined;
+  // The Ready now / Bestsellers / Recently viewed rows belong to plain browsing, not to a search.
+  $('#rails').hidden = view !== 'grid' || refined || $('#rails').dataset.empty !== 'false';
+  if (view !== 'grid') return;
+  if (refined) renderResults($('#grid-results'));
+  else filterGrid(st.cat);
 }
-const startParams = new URLSearchParams(location.search);
-const startView = startParams.get('view');
-const startCat = startParams.get('cat');
+
+// Category pages (/c/<id>/, built by build/product-pages.js) open the collection filtered to that category.
+// The written-in list is for search engines; the live collection replaces it. The address becomes /?cat=…
+// so search, filters and Back work exactly as on the homepage.
+const catPage = location.pathname.match(/^\/c\/([a-z0-9-]+)\/?(?:index\.html)?$/);
+$('#cat-static')?.remove();
+if (catPage) {
+  const c = categoryBySlug(catPage[1]) || categoryOf(catPage[1]);
+  const q = new URLSearchParams(location.search);
+  if (c) q.set(parentOf(c.id) ? 'sub' : 'cat', c.id);
+  history.replaceState(history.state, '', `/${q.toString() ? `?${q}` : ''}#collection`);
+  addEventListener('load', () => setTimeout(() => scrollToHash('#collection'), 300), { once: true });
+}
+renderChips((cat) => setCatalogue({ cat, sub: '' }));
+// Banners and category tiles under the hero, rows at the top of the collection (ui/home.js).
+initHome({
+  card: miniCard,
+  openCategory: (cat) => showCollection({ ...emptyState(), cat }),
+  openSearch: (q) => showCollection({ ...emptyState(), q }),
+});
+// Search and filters (ui/catalogue.js) live in the address, so results can be shared and Back works.
+initCatalogue({
+  card: tileCard,
+  getView: () => view,
+  onChange: (st) => {
+    if (isRefined(st) && view !== 'grid') setView('grid');
+    else showCollectionState(st);
+    whenScrollIdle(() => ScrollTrigger.refresh());
+  },
+  showResults: () => {
+    if (view !== 'grid') setView('grid');
+  },
+});
+const startView = new URLSearchParams(location.search).get('view');
 if (startView === 'grid' || startView === '3d') view = startView;
-if (startCat && document.querySelector(`.chip[data-cat="${CSS.escape(startCat)}"]`)) document.querySelector(`.chip[data-cat="${CSS.escape(startCat)}"]`).click();
 if (view === 'grid') setView('grid');
-else whenNear($('#collection'), startGallery, '400px');
+else {
+  showCollectionState(catalogueState());
+  whenNear($('#collection'), startGallery, '400px');
+}
 
 /* ---------- reveals ---------- */
 if (!reduce) {
@@ -364,13 +406,33 @@ $('#filmband-open').addEventListener('click', () => {
   openLightbox([{ type: 'reel', id: 'kouto-river' }], 0);
 });
 
+/* ---------- cart items that could not be kept ---------- */
+// Saved cart lines for pieces that no longer exist are removed; say so instead of letting them vanish.
+const tellDropped = (n) => toast(n > 1 ? `${n} items from your earlier cart are no longer available.` : '1 item from your earlier cart is no longer available.', { iconName: 'shopping-bag-open' });
+if (droppedLines()) requestAnimationFrame(() => tellDropped(droppedLines()));
+onDropped(tellDropped);
+
 /* ---------- product pages (/p/<id>/) ---------- */
 store.subscribe(refreshWish);
 initRouter({
-  render: renderProductPage,
+  render: (root, p) => {
+    renderProductPage(root, p);
+    rememberViewed(p.id);
+  },
+  // The product builder: another card picked (or Back/Forward) switches the panel without a page load.
+  switch: (p) => {
+    const ok = switchProduct(p);
+    if (ok) rememberViewed(p.id);
+    return ok;
+  },
   stop: stopProductPage,
   clear: clearProductPage,
-  afterLeave: () => requestAnimationFrame(() => whenScrollIdle(() => ScrollTrigger.refresh())),
+  afterLeave: () => {
+    // "Recently viewed" now includes the piece just seen.
+    renderRails();
+    showCollectionState(catalogueState());
+    requestAnimationFrame(() => whenScrollIdle(() => ScrollTrigger.refresh()));
+  },
 });
 
 window.addEventListener('load', () => whenScrollIdle(() => ScrollTrigger.refresh()));

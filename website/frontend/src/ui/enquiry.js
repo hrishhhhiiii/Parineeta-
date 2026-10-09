@@ -1,22 +1,12 @@
 import { SITE, waLink } from '../data/site.js';
 import { store, lineInfo, cartTotal } from './store.js';
+import { enquiryLine } from '../data/pricing.js';
 import { h, inr, $ } from './dom.js';
 import { openDialog, closeDialog } from './dialogs.js';
 import { toast } from './toast.js';
 
 const dialog = () => $('#enquiry-dialog');
 let ctx = { lines: [], subject: '', fromCart: false };
-
-function describe(line, i) {
-  const { p, total, styleLabel, comboLabel } = lineInfo(line);
-  const parts = [`${i + 1}. ${p.en} (${p.bn})`];
-  if (styleLabel) parts.push(`Colour: ${styleLabel}`);
-  if (comboLabel) parts.push(`Option: ${comboLabel}`);
-  parts.push(`Qty: ${line.qty}`);
-  if (line.custom) parts.push(`Personalise: “${line.custom}”`);
-  parts.push(`Est. ${inr(total)}`);
-  return parts.join(' | ');
-}
 
 function formValues() {
   const f = $('#enq-form');
@@ -28,7 +18,7 @@ function buildMessage(v) {
   const lines = ['Namaskar Parineeta! I found you on your website.'];
   if (ctx.lines.length) {
     lines.push('', 'I would like to enquire about:');
-    ctx.lines.forEach((l, i) => lines.push(describe(l, i)));
+    ctx.lines.forEach((l, i) => lines.push(enquiryLine(l, i)));
     lines.push(`Estimated total: ${inr(cartTotal(ctx.lines))} (indicative)`);
   } else if (ctx.subject) {
     lines.push('', `I would like to ask about: ${ctx.subject}`);
@@ -92,9 +82,9 @@ function renderSummary() {
   if (ctx.lines.length) {
     const list = h('ul', { class: 'enq__list' });
     for (const l of ctx.lines) {
-      const { p, total, styleLabel, comboLabel } = lineInfo(l);
+      const { p, total, styleLabel, choiceLabel } = lineInfo(l);
       list.append(h('li', {},
-        h('span', { class: 'enq__item' }, `${l.qty} × ${p.en}`, h('small', { text: [styleLabel, comboLabel].filter(Boolean).join(', ') })),
+        h('span', { class: 'enq__item' }, `${l.qty} × ${p.en}`, h('small', { text: [styleLabel, choiceLabel].filter(Boolean).join(', ') })),
         h('span', { class: 'enq__price', text: inr(total) })));
     }
     box.append(list, h('p', { class: 'enq__total' }, h('span', { text: 'Estimated total' }), h('strong', { text: inr(cartTotal(ctx.lines)) })));

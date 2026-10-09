@@ -1685,21 +1685,6 @@ iframe.video {
 .footer__base p {
   margin: 0;
 }
-/* Staff entrance to /admin: present but quiet, so customers don't mistake it for their own sign-in. */
-.footer__admin {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  color: var(--ink-3);
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 4px;
-}
-.footer__admin:hover {
-  color: var(--gold-2);
-  text-decoration-color: currentColor;
-}
 @media (max-width: 800px) {
   .footer__grid {
     grid-template-columns: minmax(0, 1fr);
@@ -2305,8 +2290,14 @@ input[type='date'].input {
   width: 34px;
   height: 38px;
 }
+/* The links scroll on short screens; the logo bar and WhatsApp button stay put. */
 .menu__links {
   display: grid;
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 16px 20px 24px;
 }
 .menu__links a {
@@ -3129,4 +3120,7 @@ dialog.sheet--lightbox::backdrop {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   pointer-events: none;
+}
+.line__meta--out {
+  color: var(--heart);
 }

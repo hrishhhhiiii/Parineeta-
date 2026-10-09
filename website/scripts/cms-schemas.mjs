@@ -17,6 +17,7 @@ function leaf(f) {
     case 'multi': return { type: t('array'), items: { type: 'string' } };
     case 'slug': return f.required ? { type: 'string', pattern: SLUG } : { type: ['string', 'null'] };
     case 'list': return { type: t('array'), items: objectOf(f.of) };
+    case 'exact-prices': return { type: t('array'), items: { type: 'object', properties: { pick: { type: 'object' }, price: { type: 'number', minimum: 0 } }, required: ['pick', 'price'] } };
     default: return { type: t('string'), maxLength: TEXT_MAX }; // text, textarea, select, media, date
   }
 }

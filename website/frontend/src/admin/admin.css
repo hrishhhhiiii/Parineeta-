@@ -180,6 +180,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .preview::backdrop { background: rgba(0, 0, 0, 0.6); }
 .preview__bar { display: flex; gap: 8px; align-items: center; padding: 10px 14px; background: #f3ead9; color: #1d1a17; }
 .preview__bar strong { margin-right: auto; }
+.preview__size-label { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; }
+.preview__size { min-height: 40px; padding: 0 36px 0 14px; border: 1px solid #8a6a3a; border-radius: 999px; background: #fffaf0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231d1a17' stroke-width='1.8'/%3E%3C/svg%3E") no-repeat right 14px center; color: #1d1a17; font: inherit; font-weight: 600; appearance: none; cursor: pointer; }
+.preview__size:focus-visible { outline: 2px solid #b8862b; outline-offset: 2px; }
 .preview__frame { display: block; width: 100%; height: calc(100% - 52px); margin: 0 auto; border: 0; background: #fff; }
 
 /* ---------- reset, history, inbox ---------- */
@@ -327,3 +330,23 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .mdl__card .row { display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 520px) { .mdl__card { grid-template-columns: 84px minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .mdl__card { transition: none; } }
+
+/* What customers want: missed searches and waiting lists. */
+.demand__block { display: grid; gap: 10px; margin-bottom: 16px; }
+.demand__block h2 { font-size: 1.3rem; margin: 0; }
+.demand__flag { border-color: var(--gold); margin-bottom: 16px; }
+.demand__table { width: 100%; border-collapse: collapse; }
+.demand__table th, .demand__table td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+.demand__table td:nth-child(2), .demand__table td:nth-child(3) { white-space: nowrap; color: var(--ink-3); }
+.demand__groups { display: grid; gap: 14px; }
+.demand__group { border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.demand__group-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.demand__group-head h3 { margin: 0; font-size: 1.05rem; }
+.demand__list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.demand__list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line); }
+.demand__who { display: grid; gap: 2px; }
+.demand__list .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Exact prices: one dropdown per choice group, then the price. */
+.exact-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) auto; gap: 8px 12px; align-items: end; padding: 10px; }
+.exact-row .field { margin: 0; }

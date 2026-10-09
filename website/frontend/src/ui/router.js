@@ -1,6 +1,7 @@
 import { byId, isSet } from '../data/products.js';
 import { $ } from './dom.js';
 import { jumpTo, closeAllDialogs, scrollToHash } from './dialogs.js';
+import { toast } from './toast.js';
 
 // Old shared links (#/p/<id>) still open the product, then the address is tidied to /p/<id>/.
 const PRODUCT_ROUTE = /^#\/p\/([a-z0-9-]+)$/;
@@ -22,16 +23,21 @@ export const isProductRoute = () => inPage;
 
 function enter(p) {
   if (inPage && shownId === p.id) return;
+  // Already on a product page: the product builder switches to p in place when p is in its grid.
+  const switched = inPage && hooks.switch?.(p);
   shownId = p.id;
-  closeAllDialogs();
-  if (!inPage) landingY = window.scrollY;
-  inPage = true;
-  $('#main').hidden = true;
-  const page = $('#product-page');
-  page.hidden = false;
-  hooks.render(page, p);
+  if (!switched) {
+    closeAllDialogs();
+    if (!inPage) landingY = window.scrollY;
+    inPage = true;
+    $('#main').hidden = true;
+    const page = $('#product-page');
+    page.hidden = false;
+    hooks.render(page, p);
+  }
   document.title = `${p.en} (${p.bn}) | Parineeta, Patuli`;
   if (metaDesc) metaDesc.content = `${p.line} ${p.story}`.slice(0, 300);
+  if (switched) return;
   jumpTo(0);
   requestAnimationFrame(() => $('#pg-en')?.focus({ preventScroll: true }));
 }
@@ -83,7 +89,13 @@ function route() {
   const id = currentId();
   const p = id ? byId(id) : null;
   if (p && !isSet(p.id) && p.model) enter(p);
-  else if (inPage) leave(location.hash);
+  else if (id) {
+    // An old link to a piece that was removed or renamed: say so and show the collection instead.
+    history.replaceState(history.state, '', '/#collection');
+    if (inPage) leave('#collection');
+    else requestAnimationFrame(() => scrollToHash('#collection'));
+    toast('That piece is no longer on the website. Here is everything else we make.', { iconName: 'magnifying-glass' });
+  } else if (inPage) leave(location.hash);
 }
 
 /** Opens product links in place: same tab, plain left click, a /p/<id>/ path on this site. */
@@ -96,7 +108,12 @@ function onClick(e) {
   const url = new URL(a.href, location.href);
   if (url.origin !== location.origin || url.hash || !PATH_ROUTE.test(url.pathname)) return;
   e.preventDefault();
-  if (url.pathname !== location.pathname || location.hash) history.pushState(null, '', url.pathname);
+  goTo(url.pathname);
+}
+
+/** Opens a /p/<id>/ page in place, the same way clicking its link does. */
+export function goTo(path) {
+  if (path !== location.pathname || location.hash) history.pushState(null, '', path);
   route();
 }
 

@@ -1,6 +1,7 @@
 import { byId, isSet, productHref, has3d } from '../data/products.js';
 import { photoSrc, reelStill } from '../data/site.js';
 import { store, lineInfo, cartTotal, MAX } from './store.js';
+import { fromPrice } from '../data/pricing.js';
 import { h, icon, inr, $, $$ } from './dom.js';
 import { openDialog, closeDialog, scrollToHash } from './dialogs.js';
 import { openEnquiry } from './enquiry.js';
@@ -64,14 +65,15 @@ function renderCart() {
   }
   const list = h('ul', { class: 'lines' });
   for (const l of lines) {
-    const { p, total, styleLabel, comboLabel } = lineInfo(l);
-    const meta = [styleLabel, comboLabel].filter(Boolean).join(', ');
+    const { p, total, styleLabel, choiceLabel, stock } = lineInfo(l);
+    const meta = [styleLabel, choiceLabel].filter(Boolean).join(', ');
     list.append(h('li', { class: 'line' },
       h('div', { class: 'line__thumb' }, thumbImg(p, l.style)),
       h('div', { class: 'line__info' },
         h('p', { class: 'line__name' }, isSet(p.id) ? p.en : h('a', { href: productHref(p.id), text: p.en }), h('span', { class: 'bn', lang: 'bn', translate: 'no', text: p.bn })),
         meta ? h('p', { class: 'line__meta', text: meta }) : null,
         l.custom ? h('p', { class: 'line__meta', text: `Personalise: “${l.custom}”` }) : null,
+        stock.status === 'out' ? h('p', { class: 'line__meta line__meta--out', text: 'Sold out: remove it, or ask us on WhatsApp.' }) : null,
         h('div', { class: 'line__row' },
           h('div', { class: 'qty qty--sm', 'aria-label': `Quantity of ${p.en}` },
             h('button', { type: 'button', class: 'qty__btn', 'aria-label': 'Decrease quantity', disabled: l.qty <= 1 || null, onclick: () => store.setQty(l.key, l.qty - 1) }, icon('minus')),
@@ -104,7 +106,7 @@ function renderWish() {
       h('div', { class: 'line__thumb' }, thumbImg(p)),
       h('div', { class: 'line__info' },
         h('p', { class: 'line__name' }, p.en, h('span', { class: 'bn', lang: 'bn', translate: 'no', text: p.bn })),
-        h('p', { class: 'line__meta', text: `from ${inr(set ? p.price : p.priceFrom)}` }),
+        h('p', { class: 'line__meta', text: `from ${inr(fromPrice(p))}` }),
         h('div', { class: 'line__row' },
           set
             ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => { store.add({ id, qty: 1 }); toast(`${p.en} added to your enquiry cart.`); } }, 'Add to cart')
@@ -138,7 +140,12 @@ export function setupDrawers() {
   });
   const map = { cart: '#cart-dialog', wishlist: '#wishlist-dialog', menu: '#menu-dialog' };
   for (const btn of $$('[data-open]')) {
-    btn.addEventListener('click', () => openDialog($(map[btn.dataset.open])));
+    btn.addEventListener('click', () => {
+      // From the menu, the menu closes first so only one panel is open.
+      const menu = btn.closest('#menu-dialog');
+      if (menu) closeDialog(menu);
+      openDialog($(map[btn.dataset.open]));
+    });
   }
   $('#cart-send').addEventListener('click', () => openEnquiry({ lines: store.cart, fromCart: true }));
   $('#cart-checkout').addEventListener('click', () => openCheckout({ lines: store.cart, fromCart: true }));

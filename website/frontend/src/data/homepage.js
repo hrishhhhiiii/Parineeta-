@@ -60,6 +60,10 @@ export const STORES = [
 
 export const VIDEOS = [];
 
+/** Promo banners under the hero (admin → Promo banners). Each: { photo, title, line, linkType: 'product' |
+ *  'category' | 'search' | 'url', linkProduct, linkCategory, linkSearch, linkUrl, start, end, hidden }. */
+export const BANNERS = [];
+
 export const SEO = {
   title: 'Parineeta | Hand-painted Bengali Wedding Heirlooms, Patuli',
   description: '',

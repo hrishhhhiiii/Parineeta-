@@ -1,0 +1,41 @@
+[
+  {
+    "line": {
+      "id": "gach-kouto",
+      "style": "sindoor",
+      "combo": null,
+      "qty": 1,
+      "custom": ""
+    },
+    "enquiry": "1. Gach Kouto (গাছকৌটো) | Colour: Sindoor red | Option: Single piece | Qty: 1 | Est. ₹1,450",
+    "order": "1. Gach Kouto | Sindoor red, Single piece | Qty 1 | ₹1,450",
+    "detail": "Sindoor red, Single piece",
+    "total": 1450
+  },
+  {
+    "line": {
+      "id": "gach-kouto",
+      "style": "haldi",
+      "combo": "single",
+      "qty": 2,
+      "custom": "Riya & Arjun"
+    },
+    "enquiry": "2. Gach Kouto (গাছকৌটো) | Colour: Haldi yellow | Option: Single piece | Qty: 2 | Personalise: “Riya & Arjun” | Est. ₹2,900",
+    "order": "2. Gach Kouto | Haldi yellow, Single piece | Qty 2 | Personalise: “Riya & Arjun” | ₹2,900",
+    "detail": "Haldi yellow, Single piece, Personalise: “Riya & Arjun”",
+    "total": 2900
+  },
+  {
+    "line": {
+      "id": "kunke",
+      "style": "sindoor",
+      "combo": "pair",
+      "qty": 1,
+      "custom": ""
+    },
+    "enquiry": "3. Kunke (কুনকে) | Colour: Sindoor red | Option: Pair | Qty: 1 | Est. ₹720",
+    "order": "3. Kunke | Sindoor red, Pair | Qty 1 | ₹720",
+    "detail": "Sindoor red, Pair",
+    "total": 720
+  }
+]

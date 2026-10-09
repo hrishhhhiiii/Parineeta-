@@ -11,7 +11,8 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain; /* the whole photo, as uploaded */
+  background: var(--bg);
   opacity: 0;
   transition: opacity 0.5s var(--ease);
 }
@@ -867,3 +868,378 @@ a.review__source { text-decoration: underline; text-underline-offset: 3px; }
 .review--compact .review__title { font-size: 1.15rem; }
 .review--compact .review__text { margin: 8px 0 10px; }
 .review__stars { margin: 0; color: var(--gold); letter-spacing: 2px; }
+
+/* Product page: "More …" and "You may also like" rows scroll sideways like a shop app. */
+.ppage__rail {
+  margin-top: 28px;
+}
+.ppage__rail-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.35rem;
+}
+.mini-grid--rail {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 8px;
+  margin-top: 14px;
+}
+.mini-grid--rail > * {
+  scroll-snap-align: start;
+}
+@media (max-width: 1000px) {
+  .mini-grid--rail {
+    grid-template-columns: none;
+    grid-auto-columns: 46%;
+  }
+}
+
+/* Choices: a sold-out option is shown but can't be picked. */
+.opt.is-out {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  text-decoration-color: rgba(246, 237, 219, 0.4);
+}
+.pp__stock[data-stock='ready'] {
+  color: #8fd19e;
+}
+.pp__stock[data-stock='out'] {
+  color: var(--heart, #ff6b76);
+}
+#pp-lead[data-stock='ready'] {
+  color: #8fd19e;
+}
+#pp-lead[data-stock='out'] {
+  color: var(--heart, #ff6b76);
+}
+
+/* ---------- the product builder (product page) ----------
+   Cards of the category on the left; the selected piece in a sticky panel on the right: 3D first,
+   then its choices and Add to cart / Buy now. Phones: the panel first, the cards below. */
+.builder {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(360px, 5fr);
+  gap: clamp(20px, 3vw, 48px);
+  align-items: start;
+}
+.builder__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 18px;
+}
+.builder__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+}
+.builder__count {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.92rem;
+}
+.bgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bgrid__divider {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+.bgrid__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.bcard {
+  position: relative;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-card);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.35s var(--ease);
+}
+.bcard:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
+}
+.bcard.is-active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold), 0 14px 32px rgba(0, 0, 0, 0.35);
+  transform: none;
+}
+.bcard__select {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--r-card) var(--r-card) 0 0;
+}
+.bcard__select:focus-visible {
+  outline: 2px solid var(--gold-2);
+  outline-offset: -2px;
+}
+.bcard__media {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 62%, rgba(168, 22, 31, 0.45), transparent 70%),
+    linear-gradient(180deg, #230910, #150507);
+}
+.bcard__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.bcard__img--render {
+  padding: 10%;
+}
+.bcard__tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s, transform 0.25s var(--ease);
+}
+.bcard.is-active .bcard__tag {
+  opacity: 1;
+  transform: none;
+}
+.bcard__text {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px 4px;
+}
+.bcard__bn {
+  color: var(--gold-2);
+  font-size: 0.85rem;
+}
+.bcard__name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1.15;
+}
+.bcard__line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.bcard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 10px;
+  margin-top: 6px;
+}
+.bcard__price {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--gold-2);
+}
+.bcard__stock {
+  color: var(--ink-3);
+  font-size: 0.75rem;
+}
+.bcard__stock.is-out {
+  color: var(--danger);
+}
+.bcard__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+.bcard__actions .btn {
+  justify-content: center;
+  gap: 7px;
+  min-height: 46px;
+  padding-inline: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.bcard__actions .btn .ico {
+  font-size: 1.15em;
+  flex: none;
+}
+.bcard__actions .btn:only-child {
+  grid-column: 1 / -1;
+}
+/* Cards too narrow for both buttons side by side (with room to breathe) stack them. */
+@container (max-width: 330px) {
+  .bcard__actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+}
+
+.builder__panel {
+  position: sticky;
+  top: calc(var(--nav-h) + 16px);
+  display: grid;
+  gap: 14px;
+  max-height: calc(100dvh - var(--nav-h) - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+  border-radius: calc(var(--r-card) + 6px);
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, var(--surface), var(--bg-2));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  scrollbar-width: thin;
+}
+.builder__panel.is-switching > * {
+  animation: builder-in 0.32s var(--ease);
+}
+@keyframes builder-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.builder__stage {
+  height: min(46vh, 460px);
+  min-height: 300px;
+}
+.builder__info {
+  display: grid;
+  gap: 6px;
+  padding: 4px 6px 6px;
+}
+.builder__info .ppage__title {
+  font-size: clamp(2rem, 3vw, 2.6rem);
+}
+.builder__buy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.builder__buy .btn {
+  justify-content: center;
+  gap: 8px;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
+/* An empty "notify me" slot would still add a row of spacing under the buttons. */
+.builder__info .ppage__notify:empty {
+  display: none;
+}
+.builder__more {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.builder__more > .btn {
+  flex: 1;
+  justify-content: center;
+}
+.builder__below .ppage__section:first-child {
+  margin-top: clamp(48px, 6vw, 80px);
+}
+
+@media (max-width: 1199px) {
+  .bgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 899px) {
+  .builder {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .builder__panel {
+    order: -1;
+    position: static;
+    max-height: none;
+    overflow: visible;
+    scroll-margin-top: calc(var(--nav-h) + 8px);
+  }
+  .builder__stage {
+    height: min(44dvh, 380px);
+    min-height: 260px;
+  }
+}
+@media (max-width: 480px) {
+  .bgrid {
+    gap: 10px;
+  }
+  .bcard__text {
+    padding: 10px 10px 2px;
+  }
+  .bcard__name {
+    font-size: 1.1rem;
+  }
+  .bcard__line {
+    display: none;
+  }
+  .bcard__actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px 10px 10px;
+  }
+  .builder__panel {
+    padding: 10px;
+  }
+}
+
+/* ---------- a product photo shown whole (cards) ----------
+   The uploaded photo is never cropped or zoomed: it sits whole in the frame, and a blurred, darkened
+   copy of itself fills the space around it. */
+.photo-whole__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(18px) brightness(0.5) saturate(1.1);
+  transform: scale(1.15);
+  pointer-events: none;
+}
+img.photo-whole {
+  position: relative;
+  object-fit: contain;
+  transform: none;
+}
+.tile-card__link {
+  position: relative;
+  overflow: hidden;
+}

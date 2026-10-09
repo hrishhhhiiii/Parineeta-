@@ -4,7 +4,8 @@ import { configured, getClerk, getSupabase } from '../auth/client.js';
 import { icon } from './dom.js';
 
 const PANEL = { owner: ['Admin', 'Admin panel'], editor: ['Editor', 'Editor panel'] };
-const iconMount = (name) => (el) => el.replaceChildren(icon(name));
+// Clerk silently drops a link item unless it has both mountIcon and unmountIcon.
+const menuIcon = (name) => ({ mountIcon: (el) => el.replaceChildren(icon(name)), unmountIcon: (el) => el?.replaceChildren() });
 
 export async function startAccountMenu() {
   const slot = document.querySelector('.nav__account');
@@ -28,17 +29,17 @@ export async function startAccountMenu() {
   slot.replaceWith(wrap);
   clerk.mountUserButton(mount, {
     customMenuItems: [
-      ...(staff ? [{ label: staff[1], href: '/admin.html', mountIcon: iconMount('pencil-simple-line') }] : []),
-      { label: 'My orders', href: '/account.html', mountIcon: iconMount('receipt') },
+      ...(staff ? [{ label: staff[1], href: '/admin.html', ...menuIcon('pencil-simple-line') }] : []),
+      { label: 'My orders', href: '/account.html', ...menuIcon('receipt') },
       { label: 'manageAccount' },
       { label: 'signOut' },
     ],
   });
 
-  // The phone menu's "Sign in" becomes a link to the account.
-  const mobile = document.querySelector('.menu__links a[href="/login.html"]');
+  // The phone menu's "Sign in" becomes "My account" for everyone; staff reach their panel from the photo menu.
+  const mobile = document.querySelector('.menu__links a[href^="/login.html"]');
   if (mobile) {
-    mobile.textContent = staff ? staff[1] : 'My account';
-    mobile.href = staff ? '/admin.html' : '/account.html';
+    mobile.textContent = 'My account';
+    mobile.href = '/account.html';
   }
 }

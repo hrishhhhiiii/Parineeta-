@@ -42,3 +42,7 @@ button.ghost:hover:not(:disabled) { border-color: var(--gold); filter: none; }
 /* Clerk's form can end up straight under .acc rather than inside .clerk-box: match it to the tabs' width either way. */
 .acc .cl-rootBox { width: 100%; margin-top: 16px; }
 .acc .cl-cardBox { width: 100%; max-width: none; }
+/* The page already titles the first step ("Sign in" / "Create your account" plus a line of intro), so Clerk's
+   own matching header is hidden there. Later steps (email code, second factor) keep theirs: it carries instructions. */
+.acc .cl-signIn-start .cl-header,
+.acc .cl-signUp-start .cl-header { display: none; }

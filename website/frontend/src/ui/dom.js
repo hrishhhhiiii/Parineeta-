@@ -19,8 +19,7 @@ export function h(tag, props = {}, ...kids) {
 
 export { svgIcon as icon } from './icons.js';
 
-const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
-export const inr = (n) => INR.format(Math.round(n));
+export { inr } from '../data/money.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];

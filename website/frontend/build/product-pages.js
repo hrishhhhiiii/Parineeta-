@@ -6,7 +6,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PRODUCTS, CATEGORIES, isSet } from '../src/data/products.js';
+import { PRODUCTS, CATEGORIES, isSet, parentOf, inCategory, categoryPath } from '../src/data/products.js';
+import { fromPrice } from '../src/data/pricing.js';
 import { photoSrc } from '../src/data/site.js';
 import { applyAll } from '../src/cms/apply.js';
 import { SEO, SOCIALS, STORES, socialUrlOk, phoneList } from '../src/data/homepage.js';
@@ -75,7 +76,8 @@ function setUrls(html, site, path, image) {
 function productBody(p, image, cat) {
   const crumbs = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/#collection">Collection</a> / <span aria-current="page">${esc(p.en)}</span></nav>`;
   const img = `<div class="ppage__viewer"><img src="${esc(image)}" alt="${esc(`${p.en} (${p.bn}), hand-painted by Parineeta`)}" fetchpriority="high" /></div>`;
-  const price = p.priceFrom ? `<p class="ppage__line">From ₹${Number(p.priceFrom).toLocaleString('en-IN')}${cat ? ` · ${esc(cat)}` : ''}</p>` : '';
+  const from = fromPrice(p);
+  const price = from ? `<p class="ppage__line">From ₹${from.toLocaleString('en-IN')}${cat ? ` · ${esc(cat)}` : ''}</p>` : '';
   const info = `<div class="ppage__info"><p class="pp__bn bn" lang="bn" translate="no">${esc(p.bn)}</p><h1 class="ppage__title" id="pg-en" tabindex="-1">${esc(p.en)}</h1><p class="ppage__line">${esc(p.line)}</p><p class="pp__story">${esc(p.story)}</p>${price}</div>`;
   return `<main class="ppage" id="product-page"><div class="container">${crumbs}<div class="ppage__top"><div class="ppage__media">${img}</div>${info}</div></div></main>`;
 }
@@ -109,9 +111,50 @@ function productHtml(base, p, site) {
     category: cat,
     brand: { '@type': 'Brand', name: 'Parineeta' },
     image: abs(site, image),
-    offers: { '@type': 'Offer', priceCurrency: 'INR', price: p.priceFrom, availability: 'https://schema.org/MadeToOrder', seller: { '@type': 'Organization', name: 'Parineeta' }, ...(site ? { url: site + path } : {}) },
+    offers: { '@type': 'Offer', priceCurrency: 'INR', price: fromPrice(p), availability: 'https://schema.org/MadeToOrder', seller: { '@type': 'Organization', name: 'Parineeta' }, ...(site ? { url: site + path } : {}) },
   };
   return html.replace('</head>', `  <script type="application/ld+json" id="pg-jsonld">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>\n</head>`);
+}
+
+/* ---------- category pages: /c/<id>/ (shop catalogue, phase 5) ----------
+   Every category with products gets its own address, title and description, with its product list written
+   into the HTML for search engines and link previews. In the browser, main.js turns /c/<id>/ into the
+   collection filtered to that category, the same way /p/<id>/ opens a product. */
+export const routableCategories = () => CATEGORIES.filter((c) => c.id && c.id !== 'all' && PRODUCTS.some((p) => !isSet(p.id) && inCategory(p, c.id)));
+
+function categoryHtml(base, c, site) {
+  const path = categoryPath(c);
+  const parent = CATEGORIES.find((x) => x.id === parentOf(c.id));
+  const name = parent ? `${parent.label}: ${c.label}` : c.label;
+  const items = PRODUCTS.filter((p) => !isSet(p.id) && inCategory(p, c.id));
+  const title = `${name} | Parineeta, Patuli`;
+  const desc = (c.line || `${name} from Parineeta: hand-painted Bengali wedding pieces made to order in Patuli, West Bengal.`).slice(0, 300);
+  const image = items.map(productImage).find((x) => x !== DEFAULT_IMAGE) || DEFAULT_IMAGE;
+  const landingTitle = base.match(/<title>([^<]*)<\/title>/)?.[1] || '';
+  const landingDesc = base.match(/<meta name="description" content="([^"]*)"/)?.[1] || '';
+  let html = base.replace(/<html lang="en">/, `<html lang="en" data-landing-title="${landingTitle}" data-landing-desc="${landingDesc}">`);
+  html = html.replace(/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>`);
+  html = setMeta(html, 'name', 'description', desc);
+  html = setMeta(html, 'property', 'og:title', `${name} | Parineeta`);
+  html = setMeta(html, 'property', 'og:description', desc);
+  html = html.replace(/\s*<meta property="og:image:(width|height|alt)" content="[^"]*" \/>/g, '');
+  html = setUrls(html, site, path, image);
+  // What a search engine (or a visitor without JavaScript) reads; main.js removes it once the page starts.
+  const list = items.map((p) => `<li><a href="/p/${p.id}/">${esc(p.en)}</a> <span lang="bn">${esc(p.bn)}</span> · from ₹${fromPrice(p).toLocaleString('en-IN')}</li>`).join('');
+  const block = `<section class="container cat-static" id="cat-static"><h1>${esc(name)}</h1>${c.line ? `<p>${esc(c.line)}</p>` : ''}<ul>${list}</ul></section>`;
+  html = html.replace('<div class="rails" id="rails"></div>', `${block}<div class="rails" id="rails"></div>`);
+  const ld = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name,
+    description: desc,
+    ...(site ? { url: site + path } : {}),
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: items.map((p, i) => ({ '@type': 'ListItem', position: i + 1, name: p.en, url: abs(site, `/p/${p.id}/`) })),
+    },
+  };
+  return html.replace('</head>', `  <script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>\n</head>`);
 }
 
 export function productPages({ site = '' } = {}) {
@@ -139,21 +182,28 @@ export function productPages({ site = '' } = {}) {
     },
     async closeBundle() {
       const base = await readFile(join(outDir, 'index.html'), 'utf8');
+      const bare = base.replace(/\s*<link rel="canonical" href="[^"]*" \/>/g, '').replace(/\s*<meta property="og:url" content="[^"]*" \/>/g, '');
       const list = routableProducts();
       for (const p of list) {
         const dir = join(outDir, 'p', p.id);
         await mkdir(dir, { recursive: true });
-        await writeFile(join(dir, 'index.html'), productHtml(base.replace(/\s*<link rel="canonical" href="[^"]*" \/>/g, '').replace(/\s*<meta property="og:url" content="[^"]*" \/>/g, ''), p, site));
+        await writeFile(join(dir, 'index.html'), productHtml(bare, p, site));
+      }
+      const cats = routableCategories();
+      for (const c of cats) {
+        const dir = join(outDir, ...categoryPath(c).split('/').filter(Boolean));
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, 'index.html'), categoryHtml(bare, c, site));
       }
       let robots = 'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nDisallow: /login\n';
       if (site) {
-        const urls = ['/', ...list.map((p) => `/p/${p.id}/`)];
+        const urls = ['/', ...cats.map(categoryPath), ...list.map((p) => `/p/${p.id}/`)];
         const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${site}${u}</loc></url>`).join('\n')}\n</urlset>\n`;
         await writeFile(join(outDir, 'sitemap.xml'), xml);
         robots += `\nSitemap: ${site}/sitemap.xml\n`;
       }
       await writeFile(join(outDir, 'robots.txt'), robots);
-      this.info?.(`product pages: ${list.length}${site ? ', sitemap.xml' : ' (set VITE_SITE_URL for canonical links and sitemap)'}`);
+      this.info?.(`product pages: ${list.length}, category pages: ${cats.length}${site ? ', sitemap.xml' : ' (set VITE_SITE_URL for canonical links and sitemap)'}`);
     },
   };
 }

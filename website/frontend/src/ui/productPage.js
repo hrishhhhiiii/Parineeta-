@@ -1,21 +1,23 @@
-import { PRODUCTS, SETS, STORY, PALETTES, CATEGORIES, productHref } from '../data/products.js';
-import { REVIEWS as FILM_REVIEWS, waLink, photoSrc } from '../data/site.js';
-import { HOMEPAGE } from '../data/homepage.js';
+import { STORY, PALETTES, CATEGORIES, productHref, variantsOf, parentOf } from '../data/products.js';
+import { fromPrice, stockText } from '../data/pricing.js';
+import { builderProducts, defaultLine } from '../data/builder.js';
+import { choiceFields, firstPick, paintStock, paintNotify } from './productPanel.js';
+import { REVIEWS as FILM_REVIEWS, waLink, photoSrc, reelStill } from '../data/site.js';
 import { reviewsFor, ratingSummary, myReviews, saveMyReview, loadReviews, SOURCE_LABELS } from '../data/reviews.js';
-import { h, icon, inr } from './dom.js';
+import { h, icon, inr, reduceMotion } from './dom.js';
 import { store, lineInfo, MAX } from './store.js';
 import { openEnquiry } from './enquiry.js';
 import { openCheckout } from './checkout.js';
 import { openLightbox, describeMedia } from './lightbox.js';
 import { thumbImg } from './drawers.js';
-import { videoTile, realPhoto } from './sections.js';
+import { videoTile, realPhoto, wholePhoto } from './sections.js';
 import { toast } from './toast.js';
 import { mediaStage } from './mediaStage.js';
 
 const canvas = h('canvas', { class: 'ppage__canvas', role: 'img', 'aria-label': 'Interactive 3D view. Drag to rotate, scroll or pinch to zoom.' });
 let viewer = null;
 let viewerLoading = null;
-const cur = { p: null, style: null, combo: null, qty: 1 };
+const cur = { p: null, style: null, pick: {}, qty: 1 };
 const refs = {};
 
 // The prebuilt /p/<id>/ page, so shared links open the product with its own title and preview.
@@ -60,11 +62,19 @@ function radio(name, value, checked, label, extra) {
 
 /* ---------------- configurator ---------------- */
 function line() {
-  return { id: cur.p.id, style: cur.style, combo: cur.combo, custom: refs.custom ? refs.custom.value.trim() : '', qty: cur.qty };
+  return { id: cur.p.id, style: cur.style, pick: { ...cur.pick }, custom: refs.custom ? refs.custom.value.trim() : '', qty: cur.qty };
 }
 
 function paintTotal() {
-  const { total, unit } = lineInfo(line());
+  const { total, unit, stock } = lineInfo(line());
+  paintStock(refs.stock, cur.p, stock);
+  // A sold-out combination can't be added or booked; asking on WhatsApp still works.
+  const out = stock.status === 'out';
+  refs.add.disabled = out;
+  refs.add.lastChild.textContent = out ? 'Sold out' : 'Add to cart';
+  refs.book.disabled = out;
+  refs.ask.lastChild.textContent = out ? 'Ask on WhatsApp' : 'Enquire';
+  paintNotify(refs.notify, cur.p, cur.pick, out);
   refs.total.replaceChildren(h('span', { class: 'price__from', text: cur.qty > 1 ? `${cur.qty} × ${inr(unit)} =` : 'from' }), ' ', inr(total));
   refs.qty.textContent = String(cur.qty);
   refs.minus.disabled = cur.qty <= 1;
@@ -90,11 +100,16 @@ function configurator(p) {
     viewer?.show(p, cur.style);
     paintTotal();
   });
-  const combos = h('div', { class: 'options' }, ...p.combos.map((c) => radio('pg-combo', c.id, c.id === cur.combo, c.add ? `${c.label} (+${inr(c.add)})` : c.label)));
-  combos.addEventListener('change', (e) => {
-    cur.combo = e.target.value;
+  const choices = choiceFields(p, cur.pick, (g, o) => {
+    cur.pick[g] = o;
+    const photo = variantsOf(p).find((x) => x.id === g)?.options.find((x) => x.id === o)?.photo;
+    if (photo) refs.showPhoto?.(photo);
     paintTotal();
-  });
+  }, 'pg');
+  refs.stock = h('p', { class: 'field__help pp__stock' });
+  refs.add = h('button', { type: 'submit', class: 'btn btn--gold btn--wide' }, icon('shopping-bag-open'), 'Add to cart');
+  refs.book = h('button', { type: 'button', class: 'btn btn--ghost btn--wide', onclick: () => openCheckout({ lines: [line()] }) }, icon('paper-plane-tilt'), 'Buy now');
+  refs.ask = h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openEnquiry({ lines: [line()] }) }, icon('chat-circle-text'), 'Enquire');
   refs.custom = p.customizable ? h('input', { class: 'input', id: 'pg-custom', type: 'text', maxlength: 80, autocomplete: 'off' }) : null;
   refs.qty = h('output', { class: 'qty__val', 'aria-live': 'polite', text: '1' });
   refs.minus = h('button', { type: 'button', class: 'qty__btn', 'aria-label': 'Decrease quantity', onclick: () => { cur.qty = Math.max(1, cur.qty - 1); paintTotal(); } }, icon('minus'));
@@ -124,21 +139,17 @@ function configurator(p) {
     toast(`${p.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() });
   } },
   h('fieldset', { class: 'field' }, h('legend', { class: 'field__label', text: 'Colourway' }), styles),
-  h('fieldset', { class: 'field' }, h('legend', { class: 'field__label', text: 'Option' }), combos),
+  ...choices,
   refs.custom ? h('div', { class: 'field' },
     h('label', { class: 'field__label', for: 'pg-custom' }, 'Personalise it ', h('span', { class: 'field__opt', text: '(optional)' })),
     refs.custom,
     h('p', { class: 'field__help', text: p.customHelp || 'Names, a date, or a line you want painted on it.' })) : null,
   h('div', { class: 'pp__buy' },
     h('div', { class: 'qty', 'aria-label': 'Quantity' }, refs.minus, refs.qty, refs.plus),
-    h('div', { class: 'pp__total' }, refs.total, h('p', { class: 'field__help', text: `Made to order in about ${p.leadDays} days.` }))),
-  h('div', { class: 'pp__actions' },
-    h('button', { type: 'submit', class: 'btn btn--gold btn--wide' }, icon('shopping-bag-open'), 'Add to cart'),
-    refs.wish,
-    share),
-  h('div', { class: 'ppage__buy2' },
-    h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openCheckout({ lines: [line()] }) }, icon('shopping-bag-open'), 'Book and pay'),
-    h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openEnquiry({ lines: [line()] }) }, icon('chat-circle-text'), 'Enquire')),
+    h('div', { class: 'pp__total' }, refs.total, refs.stock)),
+  h('div', { class: 'builder__buy' }, refs.add, refs.book),
+  h('div', { class: 'builder__more' }, refs.ask, refs.wish, share),
+  (refs.notify = h('div', { class: 'ppage__notify' })),
   h('p', { class: 'fineprint', text: 'Pay a booking advance or the full estimate by UPI or bank transfer, or pay when you collect. We confirm the final price with you on WhatsApp.' }));
   return form;
 }
@@ -346,7 +357,7 @@ function reviewsSection(p) {
       h('p', { class: `reviews-summary__avg${total ? '' : ' reviews-summary__avg--none'}`, text: total ? avg.toFixed(1) : 'No reviews yet' }),
       stars(total ? avg : 0),
       h('p', { class: 'reviews-summary__count', text: total ? `${total} written review${total > 1 ? 's' : ''}` : 'Be the first to review this piece' }),
-      total ? dist : null,
+      ...(total ? [dist] : []), // the DOM prints a bare null as text
       writeBtn);
     return { total, avg };
   }
@@ -375,30 +386,13 @@ function reviewsSection(p) {
 }
 
 /* ---------------- page ---------------- */
-function relatedSection(p) {
-  // Sets show only while the homepage's Bridal sets section is switched on.
-  const sets = HOMEPAGE.sets?.hidden ? [] : SETS.filter((s) => s.items.includes(p.id));
-  const same = PRODUCTS.filter((x) => x.id !== p.id && x.category === p.category);
-  const others = PRODUCTS.filter((x) => x.id !== p.id && x.category !== p.category);
-  const picks = [...same, ...others].slice(0, 4);
-  const card = (x) => h('a', { class: 'mini-card', href: productHref(x.id) },
+/** A small product card for the sideways rows (product page and homepage rows). */
+export function miniCard(x) {
+  return h('a', { class: 'mini-card', href: productHref(x.id) },
     h('span', { class: 'mini-card__media' }, thumbImg(x, x.styles[0], 'mini-card__img'), realPhoto(x)),
     h('span', { class: 'mini-card__bn bn', lang: 'bn', translate: 'no', text: x.bn }),
     h('span', { class: 'mini-card__title', text: x.en }),
-    h('span', { class: 'mini-card__price', text: `from ${inr(x.priceFrom)}` }));
-  return h('section', { class: 'ppage__section', 'aria-labelledby': 'pg-related-title' },
-    h('h2', { class: 'h2', id: 'pg-related-title', text: 'Pairs well with' }),
-    sets.length ? h('div', { class: 'ppage__sets' },
-      ...sets.map((s) => h('div', { class: 'ppage__set' },
-        h('div', {},
-          h('p', { class: 'set__bn bn', lang: 'bn', translate: 'no', text: s.bn }),
-          h('p', { class: 'ppage__set-title', text: s.en }),
-          h('p', { class: 'field__help', text: `${s.items.length} pieces, from ${inr(s.price)}` })),
-        h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => {
-          store.add({ id: s.id, qty: 1 });
-          toast(`${s.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() });
-        } }, 'Add set to cart')))) : null,
-    h('div', { class: 'mini-grid' }, ...picks.map(card)));
+    h('span', { class: 'mini-card__price', text: `from ${inr(fromPrice(x))}` }));
 }
 
 function ritualSection(p) {
@@ -441,7 +435,7 @@ function setJsonLd(p, summary) {
     description: p.story,
     brand: { '@type': 'Brand', name: 'Parineeta' },
     image: photo ? new URL(photoSrc(photo.id, 1600), location.origin).href : `${location.origin}/brand/og-image.jpg`,
-    offers: { '@type': 'Offer', priceCurrency: 'INR', price: p.priceFrom, availability: 'https://schema.org/MadeToOrder', seller: { '@type': 'Organization', name: 'Parineeta' }, url: pageUrl(p.id) },
+    offers: { '@type': 'Offer', priceCurrency: 'INR', price: fromPrice(p), availability: 'https://schema.org/MadeToOrder', seller: { '@type': 'Organization', name: 'Parineeta' }, url: pageUrl(p.id) },
   };
   if (summary.total) data.aggregateRating = { '@type': 'AggregateRating', ratingValue: summary.avg.toFixed(1), reviewCount: summary.total };
   const s = document.createElement('script');
@@ -456,10 +450,98 @@ export function clearProductPage(root) {
   root.replaceChildren();
 }
 
-export function renderProductPage(root, p) {
+/* ---------------- the product builder ----------------
+   Products of the same category as cards on the left; the selected one in a sticky panel on the right
+   (3D first, then its choices and Add to cart / Buy now). Picking another card switches the panel in
+   place: the 3D canvas is reused, and the address changes to that product's own /p/<id>/ page. */
+const build = { root: null, grid: null, head: null, panel: null, below: null, crumbs: null, status: null, ids: new Set(), gallery: null };
+const narrow = () => window.matchMedia('(max-width: 899px)').matches;
+const catLabel = (id) => CATEGORIES.find((c) => c.id === id)?.label || '';
+const toPanel = () => build.panel.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
+
+function builderCard(x) {
+  const line = () => defaultLine(x, firstPick);
+  const { stock } = lineInfo(line());
+  const out = stock.status === 'out';
+  // The shop's photo (else a film's still frame), whole and uncropped; without either, the 3D render.
+  const photo = x.media?.find((m) => m.type === 'photo');
+  const reel = x.media?.find((m) => m.type === 'reel');
+  const picture = photo ? wholePhoto(realPhoto(x, 'bcard__img'), photoSrc(photo.id, 400))
+    : reel ? wholePhoto(h('img', { class: 'bcard__img', src: reelStill(reel.id), alt: '', loading: 'lazy', width: 720, height: 1280 }), reelStill(reel.id))
+    : thumbImg(x, x.styles[0], 'bcard__img bcard__img--render');
+  // A real link (its own /p/<id>/ page): the router switches the panel in place on a plain click.
+  const select = h('a', { class: 'bcard__select', href: productHref(x.id), onclick: (e) => {
+    if (cur.p?.id !== x.id) return;
+    // Already in the panel; on a phone, take them up to it.
+    e.preventDefault();
+    if (narrow()) toPanel();
+  } },
+  h('span', { class: 'bcard__media' }, picture, h('span', { class: 'bcard__tag', text: 'Selected' })),
+  h('span', { class: 'bcard__text' },
+    h('span', { class: 'bcard__bn bn', lang: 'bn', translate: 'no', text: x.bn }),
+    h('span', { class: 'bcard__name', text: x.en }),
+    x.line ? h('span', { class: 'bcard__line', text: x.line }) : null,
+    h('span', { class: 'bcard__meta' },
+      h('span', { class: 'bcard__price' }, h('span', { class: 'price__from', text: 'from ' }), inr(fromPrice(x))),
+      h('span', { class: `bcard__stock${out ? ' is-out' : ''}`, text: stockText(x, stock) }))));
+  const actions = out
+    ? [h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => openEnquiry({ lines: [line()] }) }, icon('chat-circle-text'), 'Ask on WhatsApp')]
+    : [
+      h('button', { type: 'button', class: 'btn btn--gold btn--sm', 'aria-label': `Add ${x.en} to cart`, onclick: () => {
+        store.add(line());
+        toast(`${x.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() });
+      } }, icon('shopping-bag-open'), 'Add to cart'),
+      h('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': `Buy ${x.en} now`, onclick: () => openCheckout({ lines: [line()] }) }, 'Buy now'),
+    ];
+  return h('li', { class: 'bcard', 'data-id': x.id }, select, h('div', { class: 'bcard__actions' }, ...actions));
+}
+
+function paintGrid(p) {
+  const { items, family, title } = builderProducts(p);
+  build.ids = new Set(items.map((x) => x.id));
+  const cards = items.map(builderCard);
+  const more = items.length > family
+    ? [h('li', { class: 'bgrid__divider', role: 'presentation' }, h('span', { text: 'More from the collection' })), ...cards.slice(family)]
+    : [];
+  build.grid.replaceChildren(...cards.slice(0, family), ...more);
+  const parent = parentOf(p.category);
+  build.head.replaceChildren(
+    h('h2', { class: 'builder__title', id: 'builder-title', text: title || 'The collection' }),
+    h('p', { class: 'builder__count', text: `${family} piece${family === 1 ? '' : 's'}${parent ? ` in ${catLabel(parent)}` : ''}. Tap one to see it in 3D.` }));
+}
+
+function markSelected(p) {
+  for (const li of build.grid.querySelectorAll('.bcard')) {
+    const on = li.dataset.id === p.id;
+    li.classList.toggle('is-active', on);
+    const a = li.querySelector('.bcard__select');
+    if (on) a.setAttribute('aria-current', 'true');
+    else a.removeAttribute('aria-current');
+  }
+}
+
+function paintCrumbs(p) {
+  const cat = catLabel(p.category);
+  build.crumbs.replaceChildren(
+    h('a', { href: '#top', text: 'Home' }), icon('caret-right'),
+    h('a', { href: '#collection', text: 'Collection' }), icon('caret-right'),
+    ...(cat ? [h('span', { text: cat }), icon('caret-right')] : []),
+    h('span', { 'aria-current': 'page', text: p.en }));
+}
+
+function storySection(p) {
+  if (!p.story) return null;
+  return h('section', { class: 'ppage__section ppage__about', 'aria-labelledby': 'pg-about-title' },
+    h('h2', { class: 'h2', id: 'pg-about-title', text: `About the ${p.en}` }),
+    h('p', { class: 'lede', text: p.story }));
+}
+
+/** Shows product p in the panel and in the sections below the builder. */
+function activate(p, initial = false) {
+  build.gallery?.stop();
   cur.p = p;
   cur.style = p.styles[0];
-  cur.combo = p.combos[0].id;
+  cur.pick = firstPick(p);
   cur.qty = 1;
   const reviews = reviewsSection(p);
 
@@ -478,35 +560,83 @@ export function renderProductPage(root, p) {
     setJsonLd(p, reviews); // Google's star rating for the product
   });
 
-  const stage = h('div', { class: 'ppage__viewer' });
-  const gallery = mediaStage(p, { stage, canvas, ensureViewer, viewer: () => viewer, style: () => cur.style, isCurrent: () => cur.p === p });
-  refs.show3d = gallery.show3d;
+  const stage = h('div', { class: 'ppage__viewer builder__stage' });
+  build.gallery = mediaStage(p, { stage, canvas, ensureViewer, viewer: () => viewer, style: () => cur.style, isCurrent: () => cur.p === p, start3d: true });
+  refs.show3d = build.gallery.show3d;
+  refs.showPhoto = build.gallery.showPhoto;
 
-  root.replaceChildren(
-    h('div', { class: 'container' },
-      h('nav', { class: 'crumbs', 'aria-label': 'Breadcrumb' },
-        h('a', { href: '#top', text: 'Home' }), icon('caret-right'),
-        h('a', { href: '#collection', text: 'Collection' }), icon('caret-right'),
-        h('span', { 'aria-current': 'page', text: p.en })),
-      h('div', { class: 'ppage__top' },
-        h('div', { class: 'ppage__media' },
-          stage,
-          gallery.thumbs),
-        h('div', { class: 'ppage__info' },
-          h('p', { class: 'pp__bn bn', lang: 'bn', translate: 'no', text: p.bn }),
-          h('h1', { class: 'ppage__title', id: 'pg-en', tabindex: '-1', text: p.en }),
-          ratingLine,
-          h('p', { class: 'ppage__line', text: p.line }),
-          h('p', { class: 'pp__story', text: p.story }),
-          configurator(p))),
-      ritualSection(p),
-      detailsSection(p),
-      reviews.section,
-      relatedSection(p)));
-
+  build.panel.replaceChildren(...[
+    stage,
+    build.gallery.thumbs,
+    h('div', { class: 'builder__info' },
+      h('p', { class: 'pp__bn bn', lang: 'bn', translate: 'no', text: p.bn }),
+      h('h1', { class: 'ppage__title', id: 'pg-en', tabindex: '-1', text: p.en }),
+      ratingLine,
+      p.line ? h('p', { class: 'ppage__line', text: p.line }) : null,
+      configurator(p)),
+    build.status,
+  ].filter(Boolean));
+  build.below.replaceChildren(...[storySection(p), ritualSection(p), detailsSection(p), reviews.section].filter(Boolean));
+  build.status.textContent = initial ? '' : `Showing ${p.en}`;
+  paintCrumbs(p);
+  markSelected(p);
   paintTotal();
   paintWish();
   setJsonLd(p, reviews);
+
+  if (!initial) {
+    // A short fade marks the switch (none for people who turn animations off).
+    if (!reduceMotion()) {
+      build.panel.classList.remove('is-switching');
+      void build.panel.offsetWidth;
+      build.panel.classList.add('is-switching');
+    }
+    // On a phone the panel sits above the grid: bring it into view.
+    if (narrow()) toPanel();
+  }
+}
+
+export function renderProductPage(root, p) {
+  build.root = root;
+  build.crumbs = h('nav', { class: 'crumbs', 'aria-label': 'Breadcrumb' });
+  build.head = h('div', { class: 'builder__head' });
+  build.grid = h('ul', { class: 'bgrid', 'aria-labelledby': 'builder-title' });
+  // data-lenis-prevent: the page's smooth scrolling leaves the panel's own scrolling alone.
+  build.panel = h('aside', { class: 'builder__panel', 'aria-label': 'The selected piece', 'data-lenis-prevent': '' });
+  build.below = h('div', { class: 'builder__below' });
+  build.status = h('p', { class: 'sr-only', role: 'status', 'aria-live': 'polite' });
+  build.panel.addEventListener('animationend', () => build.panel.classList.remove('is-switching'));
+  // Arrow keys move between the cards.
+  build.grid.addEventListener('keydown', (e) => {
+    if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key) || !e.target.matches('.bcard__select')) return;
+    const links = [...build.grid.querySelectorAll('.bcard__select')];
+    const i = links.indexOf(e.target);
+    const cols = Math.max(1, Math.round(build.grid.clientWidth / (e.target.closest('.bcard').offsetWidth || 1)));
+    const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
+    const next = links[Math.min(links.length - 1, Math.max(0, i + step))];
+    if (next) {
+      e.preventDefault();
+      next.focus();
+    }
+  });
+
+  root.replaceChildren(
+    h('div', { class: 'container' },
+      build.crumbs,
+      h('div', { class: 'builder' },
+        h('section', { class: 'builder__main', 'aria-labelledby': 'builder-title' }, build.head, build.grid),
+        build.panel),
+      build.below));
+  paintGrid(p);
+  activate(p, true);
+}
+
+/** Switches the builder to product p without rebuilding the page. False when p isn't in the grid
+ *  (for example opened from search), so the router renders the page afresh. */
+export function switchProduct(p) {
+  if (!build.root?.isConnected || build.root.hidden || !build.ids.has(p.id)) return false;
+  activate(p);
+  return true;
 }
 
 export function refreshWish() {

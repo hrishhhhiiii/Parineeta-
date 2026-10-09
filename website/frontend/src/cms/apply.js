@@ -1,10 +1,10 @@
 // Applies published admin content over the bundled defaults in src/data. Runs at build time
 // (product pages), on page load (published.json baked into the bundle) and in admin preview.
-import { PRODUCTS, CATEGORIES, SETS, STORY, PALETTES } from '../data/products.js';
+import { PRODUCTS, CATEGORIES, SETS, STORY, PALETTES, variantsOf, DEFAULT_ALIASES } from '../data/products.js';
 import { SITE, PAYMENTS, TRUST, LOOKBOOK, SERVICES } from '../data/site.js';
 import { WRITTEN_REVIEWS } from '../data/reviews.js';
 import { ANNOUNCEMENT } from '../data/announcement.js';
-import { HOMEPAGE, SOCIALS, STORES, VIDEOS, SEO } from '../data/homepage.js';
+import { HOMEPAGE, SOCIALS, STORES, VIDEOS, SEO, BANNERS } from '../data/homepage.js';
 import { MODELS } from '../data/shapes.js';
 
 const hasProduct = (id) => PRODUCTS.some((p) => p.id === id);
@@ -22,7 +22,11 @@ function cleanProducts(list) {
       return {
         ...p,
         styles: styles.length ? styles : ['sindoor'],
-        combos: p.combos?.length ? p.combos : [{ id: 'single', label: 'Single piece', add: 0 }],
+        // Choices: the admin's choice groups, or the original option list as one group (see variantsOf).
+        variants: variantsOf(p),
+        prices: (Array.isArray(p.prices) ? p.prices : []).filter((r) => r && r.pick && typeof r.pick === 'object' && Number.isFinite(Number(r.price))),
+        stock: ['made', 'ready', 'out'].includes(p.stock) ? p.stock : 'made',
+        aliases: p.aliases ?? DEFAULT_ALIASES[p.id] ?? '',
         media: (p.media || []).filter((m) => m && m.id),
         priceFrom: Number(p.priceFrom) || 0,
         leadDays: Number(p.leadDays) || 7,
@@ -53,6 +57,11 @@ export const CONTENT_APPLY = {
   stores: (d) => replace(STORES, d.filter((s) => s && (s.name || s.address))),
   socials: (d) => replace(SOCIALS, d.filter((s) => s && s.platform && s.url)),
   videos: (d) => replace(VIDEOS, d.filter((v) => v && v.youtubeId)),
+  // Banners that have ended are dropped here; the start date is checked in the browser (ui/home.js).
+  banners: (d) => {
+    const today = new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10);
+    replace(BANNERS, d.filter((b) => b && b.photo && b.title && !b.hidden && !(b.end && b.end < today)));
+  },
   seo: (d) => Object.assign(SEO, d),
   settings: (d) => {
     if (d.site) Object.assign(SITE, d.site);

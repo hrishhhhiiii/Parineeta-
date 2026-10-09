@@ -3,10 +3,13 @@ import { configured, getClerk, getSupabase, userOf } from '../auth/client.js';
 import { SECTIONS, FILM_OPTIONS } from './schemas.js';
 import { photoSrc } from '../data/site.js';
 import { mergeEdits } from './merge.js';
+import { variantsOf } from '../data/products.js';
 import { avatar, profileOf } from '../auth/profile.js';
 import { ordersView } from './orders.js';
 import { reviewsView, newReviewCount } from './reviews.js';
 import { modelsView } from './modelsView.js';
+import { demandView } from './demand.js';
+import { choiceLabel } from '../data/pricing.js';
 
 const root = document.getElementById('app');
 
@@ -57,6 +60,17 @@ function demoClient() {
   const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
     total: 1450, paid_now: 725, plan: '50% advance', utr: '426512345678', event_date: '2026-12-02', address: 'Patuli, Kolkata', status: 'placed', suspect: false,
     items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null }];
+  const demoDemand = {
+    misses: [
+      { term: 'gaye holud tattva', count: 9, first_seen: '2026-09-20T10:00:00Z', last_seen: '2026-10-06T18:00:00Z' },
+      { term: 'shankha pola', count: 4, first_seen: '2026-09-28T10:00:00Z', last_seen: '2026-10-05T12:00:00Z' },
+    ],
+    requests: [
+      { id: 'rq-1', product: 'kunke', pick: { option: 'pair' }, phone: '9800012345', created_at: '2026-10-04T09:00:00Z' },
+      { id: 'rq-2', product: 'kunke', pick: { option: 'single' }, phone: '9123456780', created_at: '2026-10-06T15:00:00Z' },
+    ],
+    flags: [],
+  };
   const demoReviews = [
     { id: 'rv-1', review_date: '2026-10-03', product: 'gach-kouto', rating: 5, name: 'Moumita Ghosh', place: 'Katwa', phone: '9800012345', source: 'website',
       title: 'Beautiful work', text: 'The kouto was painted exactly as we asked, with our names on the lid. Everyone at the wedding asked where it came from.', shown: false, checked: false },
@@ -66,6 +80,10 @@ function demoClient() {
   const rpcs = {
     get_heads: () => [...heads.values()],
     admin_role: () => 'owner',
+    // "What customers want" (014_shop.sql), with made-up demo rows.
+    admin_demand: () => demoDemand,
+    clear_search_miss: ({ p_term }) => { demoDemand.misses = demoDemand.misses.filter((m) => m.term !== p_term); },
+    restock_done: ({ p_ids }) => { demoDemand.requests = demoDemand.requests.filter((r) => !p_ids.includes(r.id)); },
     save_draft: ({ p_key, p_data, p_expected_version }) => {
       const hd = heads.get(p_key) || { key: p_key, version: 0, published: null, draft: null };
       if (hd.version !== p_expected_version) throw { message: 'CONTENT_CONFLICT' };
@@ -134,9 +152,13 @@ const ctx = {
   section: 'home', // the Home screen; otherwise a section key or 'orders'
   index: 0, // selected item in a list section
 };
+// Sections may reshape stored data for editing (Products: old option lists become choice groups).
+const prep = (s, value) => (s.prepare && s.kind === 'list' && Array.isArray(value) ? value.map(s.prepare) : value);
+const defaultsOf = (s) => prep(s, s.defaults());
 const isDirty = (key) => JSON.stringify(ctx.data[key]) !== ctx.saved[key];
 // Real edits only: a section never saved counts as edited once it differs from the built-in content.
-const edits = () => SECTIONS.filter((x) => (ctx.saved[x.key] ? isDirty(x.key) : JSON.stringify(ctx.data[x.key]) !== JSON.stringify(x.defaults())));
+const isEdited = (x) => (ctx.saved[x.key] ? isDirty(x.key) : JSON.stringify(ctx.data[x.key]) !== JSON.stringify(defaultsOf(x)));
+const edits = () => SECTIONS.filter(isEdited);
 const anyDirty = () => edits().length > 0;
 window.addEventListener('beforeunload', (e) => {
   if (ctx.user && anyDirty()) e.preventDefault();
@@ -155,14 +177,14 @@ async function loadAll() {
   for (const s of SECTIONS) {
     const row = byKey[s.key];
     // Sections never saved start from the site's current built-in content, and count as unsaved.
-    ctx.data[s.key] = row?.draft ?? s.defaults();
-    ctx.saved[s.key] = row?.draft ? JSON.stringify(row.draft) : '';
-    ctx.published[s.key] = row?.published ? JSON.stringify(row.published) : '';
+    ctx.data[s.key] = row?.draft ? prep(s, row.draft) : defaultsOf(s);
+    ctx.saved[s.key] = row?.draft ? JSON.stringify(ctx.data[s.key]) : '';
+    ctx.published[s.key] = row?.published ? JSON.stringify(prep(s, row.published)) : '';
     ctx.version[s.key] = row?.version ?? 0;
     ctx.updated[s.key] = row?.draft ? { at: row.updated_at, by: row.updated_by } : null;
     const backup = readBackup(s.key);
-    if (backup && backup.base === ctx.version[s.key] && JSON.stringify(backup.data) !== ctx.saved[s.key]) {
-      ctx.data[s.key] = backup.data;
+    if (backup && backup.base === ctx.version[s.key] && JSON.stringify(prep(s, backup.data)) !== ctx.saved[s.key]) {
+      ctx.data[s.key] = prep(s, backup.data);
       ctx.recovered = true;
     }
   }
@@ -186,7 +208,7 @@ const unpublished = () => SECTIONS.filter((s) => ctx.saved[s.key] && ctx.saved[s
 
 const ERRORS = {
   CONTENT_CONFLICT: 'This section was saved on another device at the same moment. Press Save again.',
-  UNKNOWN_KEY: 'This part of the admin needs a one-time database update: run 012_models.sql in Supabase, then press Save again.',
+  UNKNOWN_KEY: 'This part of the admin needs a one-time database update: run the newest SQL files in Supabase (012_models.sql for 3D models, 013_banners.sql for Promo banners), then press Save again.',
   NO_CHANGES: 'Everything is already live.',
   NOT_ALLOWED: "Your account can't do this. Ask the owner.",
   INVALID_CONTENT: 'Some values are not allowed.',
@@ -272,7 +294,9 @@ function paintPublishBar() {
 function openPreview() {
   const docs = Object.fromEntries(SECTIONS.map((s) => [s.key, clone(ctx.data[s.key])]));
   const frame = h('iframe', { src: '/?preview=1', title: 'Website preview', class: 'preview__frame' });
-  const sizes = [['Desktop', 1280], ['Tablet', 768], ['Mobile', 375]];
+  const sizes = [['Fit window', ''], ['Desktop (1280 px)', 1280], ['Laptop (1024 px)', 1024], ['Tablet (768 px)', 768], ['Mobile (390 px)', 390], ['Small phone (320 px)', 320]];
+  const size = h('select', { class: 'preview__size', 'aria-label': 'Screen size', onchange: (e) => { frame.style.width = e.target.value ? `${e.target.value}px` : ''; } },
+    ...sizes.map(([t, w]) => h('option', { value: w, text: t })));
   const onMsg = (e) => {
     if (e.origin !== location.origin || e.source !== frame.contentWindow || e.data?.type !== 'cms-preview-ready') return;
     frame.contentWindow.postMessage({ type: 'cms-preview', docs, at: Date.now() }, location.origin);
@@ -281,7 +305,7 @@ function openPreview() {
   const dlg = h('dialog', { class: 'preview', onclose: () => { window.removeEventListener('message', onMsg); dlg.remove(); } },
     h('div', { class: 'preview__bar' },
       h('strong', { text: 'Preview, including changes that are not published' }),
-      ...sizes.map(([t, w]) => h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: t, onclick: () => { frame.style.width = `${w}px`; } })),
+      h('label', { class: 'preview__size-label' }, h('span', { text: 'Screen size' }), size),
       h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: 'Close', onclick: () => dlg.close() })),
     frame);
   document.body.append(dlg);
@@ -303,6 +327,7 @@ function validate(section, value, badItems = []) {
       if (f.type === 'list' && Array.isArray(v)) v.forEach((sub, i) => check(sub, f.of, `${where} → ${f.label} ${i + 1}`));
     }
   };
+  if (section.check) problems.push(...section.check(value));
   if (section.kind === 'list') {
     const ids = new Map();
     value.forEach((item, i) => {
@@ -335,7 +360,16 @@ function fillCodes(section, value) {
   }
 }
 
+// Fields left empty take their default when saved (the form only shows it).
+function fillDefaults(section, value) {
+  const items = section.kind === 'list' ? value : [value];
+  for (const it of items) {
+    for (const f of section.fields) if (f.default != null && getPath(it, f.key) == null) setPath(it, f.key, f.default);
+  }
+}
+
 async function save(section) {
+  fillDefaults(section, ctx.data[section.key]);
   fillCodes(section, ctx.data[section.key]);
   let value = clone(ctx.data[section.key]);
   const badItems = [];
@@ -354,8 +388,8 @@ async function save(section) {
     // Saved on another device (or by someone else) since this one loaded it: combine both sets of edits.
     const latest = await latestHead(section.key);
     if (latest) {
-      const base = ctx.saved[section.key] ? JSON.parse(ctx.saved[section.key]) : section.defaults();
-      value = mergeEdits(section.kind, base, value, latest.draft ?? section.defaults());
+      const base = ctx.saved[section.key] ? JSON.parse(ctx.saved[section.key]) : defaultsOf(section);
+      value = mergeEdits(section.kind, base, value, latest.draft ? prep(section, latest.draft) : defaultsOf(section));
       if (section.normalize && section.kind === 'list') value = value.map(section.normalize);
       ctx.version[section.key] = latest.version;
       ({ data, error } = await sb.rpc('save_draft', { p_key: section.key, p_data: value, p_expected_version: latest.version }));
@@ -382,7 +416,7 @@ async function save(section) {
 /* ---------- 3D models: one screen that edits two sections (models, and products when moved) ---------- */
 const sectionOf = (key) => SECTIONS.find((s) => s.key === key);
 // A section never saved counts as changed once it differs from the built-in content.
-const changed = (key) => (ctx.saved[key] ? isDirty(key) : JSON.stringify(ctx.data[key]) !== JSON.stringify(sectionOf(key).defaults()));
+const changed = (key) => (ctx.saved[key] ? isDirty(key) : JSON.stringify(ctx.data[key]) !== JSON.stringify(defaultsOf(sectionOf(key))));
 async function saveModels() {
   // Models first: products may point at a model that was just uploaded.
   for (const key of ['models', 'products']) {
@@ -391,7 +425,7 @@ async function saveModels() {
 }
 function undoModels() {
   for (const key of ['models', 'products']) {
-    ctx.data[key] = ctx.saved[key] ? JSON.parse(ctx.saved[key]) : sectionOf(key).defaults();
+    ctx.data[key] = ctx.saved[key] ? JSON.parse(ctx.saved[key]) : defaultsOf(sectionOf(key));
     writeBackup(key);
   }
   render();
@@ -412,9 +446,9 @@ async function pullOtherDevice() {
   for (const row of rows) {
     const s = SECTIONS.find((x) => x.key === row.key);
     if (!s || row.version === ctx.version[s.key] || isDirty(s.key)) continue;
-    ctx.data[s.key] = row.draft ?? s.defaults();
-    ctx.saved[s.key] = row.draft ? JSON.stringify(row.draft) : '';
-    ctx.published[s.key] = row.published ? JSON.stringify(row.published) : '';
+    ctx.data[s.key] = row.draft ? prep(s, row.draft) : defaultsOf(s);
+    ctx.saved[s.key] = row.draft ? JSON.stringify(ctx.data[s.key]) : '';
+    ctx.published[s.key] = row.published ? JSON.stringify(prep(s, row.published)) : '';
     ctx.version[s.key] = row.version;
     ctx.updated[s.key] = row.draft ? { at: row.updated_at, by: row.updated_by } : null;
     changed++;
@@ -471,14 +505,22 @@ function field(f, item, onChange, rerender) {
     case 'date':
       control = h('input', { class: 'input', id, type: 'date', value: value ?? '', oninput: (e) => set(e.target.value) });
       break;
-    case 'bool':
-      return h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: Boolean(value), onchange: (e) => set(e.target.checked) }), h('span', { text: f.label }));
+    case 'exact-prices':
+      return h('div', { class: 'field' }, h('p', { class: 'field__label', text: f.label }), help, exactPricesEditor(item, f.key, onChange, rerender));
+    case 'bool': {
+      // invert: the box reads "on" when the stored flag is unset, so existing items count as on.
+      const on = f.invert ? !value : Boolean(value);
+      const box = h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: on, onchange: (e) => set(f.invert ? (e.target.checked ? undefined : true) : e.target.checked) }), h('span', { text: f.label }));
+      return f.help ? h('div', { class: 'field' }, box, h('p', { class: 'field__help', text: f.help })) : box;
+    }
     case 'select': {
       const list = opts(f.options, ctx);
+      // An empty value shows the field's default, but only Save writes it: drawing the form must not
+      // count as a change (it used to, and then "Put changes live" refused over edits nobody made).
+      const shown = value ?? f.default ?? '';
       control = h('select', { class: 'input', id, onchange: (e) => set(f.number ? Number(e.target.value) : e.target.value) },
-        !list.some(([v]) => String(v) === String(value ?? '')) ? h('option', { value: '', text: '— choose —' }) : null,
-        ...list.map(([v, t]) => h('option', { value: v, text: t, selected: String(v) === String(value ?? '') })));
-      if (value == null && f.default) setPath(item, f.key, f.default);
+        !list.some(([v]) => String(v) === String(shown)) ? h('option', { value: '', text: '— choose —' }) : null,
+        ...list.map(([v, t]) => h('option', { value: v, text: t, selected: String(v) === String(shown) })));
       break;
     }
     case 'multi': {
@@ -558,6 +600,28 @@ function field(f, item, onChange, rerender) {
   return h('div', { class: 'field' }, label, control, help);
 }
 
+/** Exact prices for combinations: one dropdown per choice group ("Any" leaves that group out) and a price.
+ *  Saved as { pick: { size: 'large', paint: 'gold' }, price: 2200 }. */
+function exactPricesEditor(item, key, onChange, rerender) {
+  const groups = variantsOf(item);
+  const rows = getPath(item, key) || (setPath(item, key, []), getPath(item, key));
+  if (!groups.length) return h('p', { class: 'muted', text: 'Add choices above first.' });
+  const changed = () => { onChange(); rerender(); };
+  return h('div', { class: 'sublist' },
+    ...rows.map((r, i) => {
+      r.pick ||= {};
+      return h('div', { class: 'subitem exact-row' },
+        ...groups.map((g) => h('label', { class: 'field' }, h('span', { class: 'field__label', text: g.name }),
+          h('select', { class: 'input', onchange: (e) => { if (e.target.value) r.pick[g.id] = e.target.value; else delete r.pick[g.id]; onChange(); } },
+            h('option', { value: '', text: 'Any' }),
+            ...g.options.map((o) => h('option', { value: o.id, text: o.label || o.id, selected: r.pick[g.id] === o.id }))))),
+        h('label', { class: 'field' }, h('span', { class: 'field__label', text: 'Price (₹)' }),
+          h('input', { class: 'input', type: 'number', min: 0, inputmode: 'numeric', value: r.price ?? '', oninput: (e) => { r.price = e.target.value === '' ? null : Number(e.target.value); onChange(); } })),
+        h('button', { type: 'button', class: 'iconbtn iconbtn--danger', title: 'Remove', 'aria-label': 'Remove this exact price', text: '✕', onclick: () => { rows.splice(i, 1); changed(); } }));
+    }),
+    h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '+ Add an exact price', onclick: () => { rows.push({ pick: {}, price: null }); changed(); } }));
+}
+
 /** An inline, reorderable list of small sub-forms (photos of a product, add-on options). */
 function listEditor(f, arr, onChange, rerender) {
   const move = (i, d) => {
@@ -590,7 +654,7 @@ function listEditor(f, arr, onChange, rerender) {
 
 /* ---------- set to default, history ---------- */
 function setToDefault(section) {
-  const def = section.defaults();
+  const def = defaultsOf(section);
   const cur = ctx.data[section.key];
   const count = section.kind === 'list'
     ? `${cur.length} item${cur.length === 1 ? '' : 's'} now → ${def.length} built-in`
@@ -632,12 +696,24 @@ async function openHistory(section) {
 /* ---------- layout ---------- */
 // Owner only: orders from the website's checkout. /admin#orders opens it directly.
 const ORDERS = 'orders';
+const DEMAND = 'demand';
 const HOME = 'home';
+// Screens that aren't saved sections: their menu icon, title and who may open them.
+const SCREENS = {
+  [ORDERS]: { icon: '🧾', title: 'Orders', ownerOnly: true },
+  [DEMAND]: { icon: '💬', title: 'What customers want', ownerOnly: false },
+};
+// "Size: Large" for a waiting customer's choices, from the admin's current Products.
+const demandChoiceText = (pid, pick) => {
+  const p = (ctx.data.products || []).find((x) => x.id === pid);
+  return p && pick && Object.keys(pick).length ? choiceLabel(p, pick) : '';
+};
+const canOpen = (k) => (SCREENS[k] ? !SCREENS[k].ownerOnly || ctx.role === 'owner' : SECTIONS.some((s) => s.key === k));
 
 // The menu, grouped by how often each part is used. Anything not listed falls under "More".
 const GROUPS = [
-  { title: 'Every day', keys: [ORDERS, 'products'] },
-  { title: 'Your website', keys: ['sets', 'reviews', 'models', 'lookbook', 'announcement', 'homepage'] },
+  { title: 'Every day', keys: [ORDERS, 'products', DEMAND] },
+  { title: 'Your website', keys: ['banners', 'sets', 'reviews', 'models', 'lookbook', 'announcement', 'homepage'] },
   { title: 'Shop details', keys: ['settings', 'stores', 'socials'] },
 ];
 GROUPS.push({ title: 'More', keys: SECTIONS.map((s) => s.key).filter((k) => !GROUPS.some((g) => g.keys.includes(k))) });
@@ -645,10 +721,12 @@ GROUPS.push({ title: 'More', keys: SECTIONS.map((s) => s.key).filter((k) => !GRO
 // What each tile on the Home screen says, in plain words.
 const TILE_TEXT = {
   [ORDERS]: 'See new orders and mark them paid, made or delivered.',
+  [DEMAND]: 'What customers searched for and didn’t find, and who is waiting for sold-out pieces.',
   products: 'Add a product, change a price or a photo, or hide one.',
   sets: 'Bundles sold together at one price.',
   reviews: 'Every review, kept. Choose which ones show on the website.',
   models: 'Every 3D model, where it is used, and your own uploads.',
+  banners: 'Big pictures under the homepage photo that open a product, a category or a search.',
   lookbook: 'The photo gallery on the website.',
   announcement: 'A one-line message across the top of the website.',
   homepage: 'The big headline and photo at the top of the home page.',
@@ -668,10 +746,10 @@ function go(key) {
 /** The first screen: big tiles for the common jobs, plus a 3-step reminder of how changes go live. */
 function homeView() {
   const tile = (key) => {
-    const s = SECTIONS.find((x) => x.key === key);
-    const title = key === ORDERS ? 'Orders' : s.title;
+    const s = SCREENS[key] || SECTIONS.find((x) => x.key === key);
+    const title = s.title;
     return h('button', { type: 'button', class: 'tile', 'data-key': key, onclick: () => go(key) },
-      h('span', { class: 'tile__icon', 'aria-hidden': 'true', text: key === ORDERS ? '🧾' : s.icon }),
+      h('span', { class: 'tile__icon', 'aria-hidden': 'true', text: s.icon }),
       h('span', { class: 'tile__title' }, title, key === 'reviews' && ctx.newReviews ? h('span', { class: 'count', text: `${ctx.newReviews} new` }) : null),
       h('span', { class: 'tile__text', text: TILE_TEXT[key] || s.intro || '' }));
   };
@@ -683,28 +761,29 @@ function homeView() {
       h('li', {}, h('strong', { text: 'Save' }), ' it (the gold button on each page).'),
       h('li', {}, h('strong', { text: 'Put changes live' }), ' (top of the screen). The website updates in about 2 minutes.')),
     ...GROUPS.slice(0, 3).map((g) => {
-      const keys = g.keys.filter((k) => (k === ORDERS ? ctx.role === 'owner' : SECTIONS.some((s) => s.key === k)));
+      const keys = g.keys.filter(canOpen);
       return keys.length ? h('section', { class: 'home__group' }, h('h2', { text: g.title }), h('div', { class: 'tiles' }, ...keys.map(tile))) : null;
     }),
     h('p', { class: 'muted home__more', text: 'Other parts of the website are under “More” in the menu.' }));
 }
 
 function render() {
-  if (ctx.section === ORDERS && ctx.role !== 'owner') ctx.section = HOME;
+  if (SCREENS[ctx.section] && !canOpen(ctx.section)) ctx.section = HOME;
   const section = SECTIONS.find((s) => s.key === ctx.section);
-  if (!section && ctx.section !== ORDERS) ctx.section = HOME;
+  if (!section && !SCREENS[ctx.section]) ctx.section = HOME;
   const navBtn = (key, icon, title, extra = null) => h('button', {
     type: 'button', 'data-key': key, class: `side__btn${key === ctx.section ? ' is-active' : ''}`, 'aria-current': key === ctx.section ? 'page' : null,
     onclick: () => go(key),
   }, h('span', { 'aria-hidden': 'true', text: icon }), h('span', { text: title }), extra);
-  const dirtyDot = (key) => (isDirty(key) ? h('span', { class: 'dot', title: 'Not saved yet', text: '●' }) : null);
+  // The menu dot marks real edits only, not sections that still show the built-in content.
+  const dirtyDot = (key) => (isEdited(SECTIONS.find((x) => x.key === key) || { key }) ? h('span', { class: 'dot', title: 'Not saved yet', text: '●' }) : null);
   const nav = h('nav', { class: 'side', 'aria-label': 'Sections' },
     navBtn(HOME, '🏠', 'Home'),
     ...GROUPS.flatMap((g) => {
-      const keys = g.keys.filter((k) => (k === ORDERS ? ctx.role === 'owner' : SECTIONS.some((s) => s.key === k)));
+      const keys = g.keys.filter(canOpen);
       if (!keys.length) return [];
       return [h('p', { class: 'side__group', text: g.title }),
-        ...keys.map((k) => (k === ORDERS ? navBtn(ORDERS, '🧾', 'Orders') : (() => { const s = SECTIONS.find((x) => x.key === k); return navBtn(s.key, s.icon, s.title, s.key === 'reviews' && ctx.newReviews ? h('span', { class: 'count', 'aria-label': `${ctx.newReviews} new`, text: String(ctx.newReviews) }) : dirtyDot(s.key)); })()))];
+        ...keys.map((k) => (SCREENS[k] ? navBtn(k, SCREENS[k].icon, SCREENS[k].title) : (() => { const s = SECTIONS.find((x) => x.key === k); return navBtn(s.key, s.icon, s.title, s.key === 'reviews' && ctx.newReviews ? h('span', { class: 'count', 'aria-label': `${ctx.newReviews} new`, text: String(ctx.newReviews) }) : dirtyDot(s.key)); })()))];
     }));
 
   // Clerk's UserButton: Manage account and Sign out (the browser warns first if there are unsaved changes).
@@ -718,6 +797,7 @@ function render() {
       clerk ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) toLogin('?signout'); } })));
 
   root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === HOME ? homeView() : ctx.section === ORDERS ? ordersView(sb, { h, toast, explain })
+    : ctx.section === DEMAND ? demandView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), choiceText: demandChoiceText })
     : ctx.section === 'models' ? modelsView({ h, toast, sb, ctx, slugify, changed, saveAll: saveModels, undoAll: undoModels,
       edited: () => { writeBackup('models'); writeBackup('products'); paintPublishBar(); } })
     : ctx.section === 'reviews' ? reviewsView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), onCount: setReviewCount })
@@ -777,8 +857,9 @@ function sectionView(section) {
     paintPublishBar();
     const navBtn = document.querySelector('.side__btn.is-active');
     const dot = navBtn?.querySelector('.dot');
-    if (d && navBtn && !dot) navBtn.append(h('span', { class: 'dot', title: 'Unsaved changes', text: '●' }));
-    if (!d && dot) dot.remove();
+    const edited = isEdited(section);
+    if (edited && navBtn && !dot) navBtn.append(h('span', { class: 'dot', title: 'Unsaved changes', text: '●' }));
+    if (!edited && dot) dot.remove();
     writeBackup(section.key);
     refreshListLabels?.();
   };
@@ -789,7 +870,7 @@ function sectionView(section) {
   if (section.kind === 'object') {
     const obj = ctx.data[section.key];
     const form = h('div', { class: 'card form' });
-    const defs = section.defaults();
+    const defs = defaultsOf(section);
     const paint = () => form.replaceChildren(...withMore(section.fields, (f) => {
       const node = field(f, obj, onChange, paint);
       if (!f.key || f.type === 'list') return node;

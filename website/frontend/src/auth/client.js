@@ -26,9 +26,17 @@ const appearance = {
     colorNeutral: '#f6eddb',
     colorDanger: '#ffb4a8',
     borderRadius: '10px',
+    // 16px text: smaller, and iPhones zoom the page when a field is tapped.
+    fontSize: '1rem',
   },
-  // Clerk's own "Delete account" is hidden: /account's button also removes the customer's details from their orders first.
-  elements: { profileSection__danger: { display: 'none' } },
+  elements: {
+    // Clerk's own "Delete account" is hidden: /account's button also removes the customer's details from their orders first.
+    profileSection__danger: { display: 'none' },
+    // 44px tap targets, the size used across the rest of the site.
+    formFieldInput: { minHeight: '44px' },
+    formButtonPrimary: { minHeight: '44px' },
+    socialButtonsBlockButton: { minHeight: '44px' },
+  },
 };
 
 let clerkPromise;
@@ -37,7 +45,7 @@ export function getClerk() {
   return (clerkPromise ??= (async () => {
     const clerk = new Clerk(PK);
     // Signing out anywhere (UserButton, UserProfile) lands on /login?signout, which also clears this browser's cart.
-    await clerk.load({ ui, appearance, signInUrl: '/login.html', signUpUrl: '/login.html?signup', afterSignOutUrl: '/login.html?signout' });
+    await clerk.load({ ui, appearance, signInUrl: '/login.html?signin', signUpUrl: '/login.html?signup', afterSignOutUrl: '/login.html?signout' });
     return clerk;
   })());
 }

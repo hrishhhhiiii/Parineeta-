@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "cms:schemas": "cd .. && node scripts/cms-schemas.mjs",
     "cms:fetch": "cd .. && node scripts/fetch-content.mjs",
-    "build:site": "node ../scripts/build-site.mjs"
+    "build:site": "node ../scripts/build-site.mjs",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +27,7 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
   }
 }

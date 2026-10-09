@@ -1,5 +1,8 @@
-import { byId, PALETTES, productHref } from '../data/products.js';
-import { store, lineInfo, MAX } from './store.js';
+import { byId, PALETTES, productHref, variantsOf } from '../data/products.js';
+import { pickOf, stockLine, todayIso } from '../data/pricing.js';
+import { SITE, waLink } from '../data/site.js';
+import { callRpc, cleanPhone } from '../data/rpc.js';
+import { store, lineInfo, MAX, weddingDate, setWeddingDate } from './store.js';
 import { h, icon, inr, $ } from './dom.js';
 import { openDialog, closeDialog } from './dialogs.js';
 import { openEnquiry } from './enquiry.js';
@@ -12,7 +15,7 @@ let gallery = null;
 // Kept once found: the media stage takes the canvas off the page while a photo or film is showing.
 let canvasEl = null;
 const canvas = () => (canvasEl ||= $('#viewer-canvas'));
-const cur = { p: null, style: null, combo: null, qty: 1 };
+const cur = { p: null, style: null, pick: {}, qty: 1 };
 const dialog = () => $('#product-dialog');
 
 function ensureViewer() {
@@ -24,13 +27,120 @@ function ensureViewer() {
 }
 
 function line() {
-  return { id: cur.p.id, style: cur.style, combo: cur.combo, custom: $('#pp-custom').value.trim(), qty: cur.qty };
+  return { id: cur.p.id, style: cur.style, pick: { ...cur.pick }, custom: $('#pp-custom').value.trim(), qty: cur.qty };
 }
 
 function renderTotal() {
-  const { total, unit } = lineInfo(line());
+  const { total, unit, stock } = lineInfo(line());
   $('#pp-total').replaceChildren(h('span', { class: 'price__from', text: cur.qty > 1 ? `${cur.qty} × ${inr(unit)} =` : 'from' }), ' ', inr(total));
   $('#pp-qty').textContent = String(cur.qty);
+  paintStock($('#pp-lead'), cur.p, stock);
+  const out = stock.status === 'out';
+  const add = $('#pp-form button[type="submit"]');
+  add.disabled = out;
+  add.lastChild.textContent = out ? 'Sold out' : 'Add to cart';
+  $('#pp-enquire').lastChild.textContent = out ? 'Ask on WhatsApp' : 'Enquire';
+  paintNotify($('#pp-notify'), cur.p, cur.pick, out);
+}
+
+/** The stock line under the price, with the customer's wedding date: "Order by 12 Nov for your 20 Nov
+ *  wedding", "Ready now, in time for…", "Tight for…", "Made to order…" or "Sold out". The date is kept in
+ *  this browser and shared with checkout. */
+export function paintStock(el, p, stock) {
+  const today = todayIso();
+  const wedding = weddingDate(today);
+  const line = stockLine(p, stock, wedding, today, SITE.deliveryBufferDays);
+  el.dataset.stock = line.tone;
+  el.classList.toggle('is-few', stock.few);
+  if (stock.status === 'out') {
+    el.textContent = line.text;
+    return;
+  }
+  const input = h('input', {
+    class: 'wedding-date__input', type: 'date', min: today, value: wedding, 'aria-label': 'Your wedding date',
+    onchange: (e) => {
+      setWeddingDate(e.target.value);
+      paintStock(el, p, stock);
+    },
+  });
+  el.replaceChildren(h('span', { class: 'pp__stock-text', text: line.text }), ' ',
+    h('label', { class: 'wedding-date' }, h('span', { class: 'wedding-date__label', text: line.prompt ? 'Add your wedding date' : 'Wedding date' }), input));
+}
+
+/** "Notify me when it's back" for a sold-out piece (014_shop.sql). Shown in `box` only while sold out;
+ *  redrawn only when the piece or its choices change, so a half-typed number isn't wiped. */
+export function paintNotify(box, p, pick, out) {
+  const key = out ? `${p.id}|${JSON.stringify(pick)}` : '';
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.replaceChildren(...(out ? [notifyForm(p, pick)] : []));
+}
+
+function notifyForm(p, pick) {
+  const id = `notify-${Math.random().toString(36).slice(2, 7)}`;
+  const phone = h('input', { class: 'input', id, type: 'tel', inputmode: 'tel', autocomplete: 'tel', maxlength: 16, placeholder: '98765 43210' });
+  // Spam trap: people never see or fill this; scripts do.
+  const trap = h('input', { class: 'notify__trap', type: 'text', name: 'website', tabindex: '-1', autocomplete: 'off', 'aria-hidden': 'true' });
+  const msg = h('p', { class: 'notify__msg', role: 'status' });
+  const send = h('button', { type: 'submit', class: 'btn btn--gold btn--sm', text: 'Notify me' });
+  const say = (text, kind, withWhatsApp) => {
+    msg.className = `notify__msg${kind ? ` is-${kind}` : ''}`;
+    msg.replaceChildren(text, ...(withWhatsApp ? [' ', h('a', { href: waLink(`Namaskar Parineeta! Please tell me when ${p.en} is back.`), target: '_blank', rel: 'noopener', text: 'Message us on WhatsApp' })] : []));
+  };
+  const form = h('form', { class: 'notify__form', hidden: true, onsubmit: async (e) => {
+    e.preventDefault();
+    const number = cleanPhone(phone.value);
+    if (!number) return say('Enter a 10-digit mobile number.', 'err');
+    send.disabled = true;
+    say('Saving…');
+    try {
+      const r = await callRpc('request_restock', { p_product: p.id, p_pick: pick, p_phone: number, p_website: trap.value });
+      say(r === 'duplicate' ? 'You are already on the list for this.' : "You're on the list. We'll message you on WhatsApp when it's back.", 'ok');
+      form.querySelectorAll('input').forEach((i) => { i.disabled = true; });
+    } catch (err) {
+      if (err.message.includes('BAD_PHONE')) say('Enter a 10-digit mobile number.', 'err');
+      else say("We couldn't save that just now.", 'err', true);
+      send.disabled = false;
+    }
+  } },
+  h('label', { class: 'field__label', for: id, text: 'Your WhatsApp number' }),
+  h('div', { class: 'notify__row' }, phone, send),
+  trap,
+  h('p', { class: 'field__help', text: "We'll message you once on WhatsApp when it's back. Your number is deleted after 90 days." }),
+  msg);
+  const open = h('button', { type: 'button', class: 'btn btn--ghost btn--wide notify__open', onclick: () => {
+    open.hidden = true;
+    form.hidden = false;
+    phone.focus();
+  } }, icon('bell'), 'Notify me when it’s back');
+  return h('div', { class: 'notify' }, open, form);
+}
+
+/** One group of radio pills per choice (Size, Type…). Sold-out options can't be picked.
+ *  `onPick(groupId, optionId)` runs on every change. Shared with the product page. */
+export function choiceFields(p, pick, onPick, name) {
+  return variantsOf(p).map((g) => {
+    const fs = h('fieldset', { class: 'field' }, h('legend', { class: 'field__label', text: g.name }),
+      h('div', { class: 'options' }, ...g.options.map((o) => {
+        const out = (o.stock || p.stock) === 'out';
+        const id = `${name}-${g.id}-${o.id}`;
+        return h('label', { class: `opt${out ? ' is-out' : ''}`, for: id },
+          h('input', { type: 'radio', name: `${name}-${g.id}`, value: o.id, id, checked: pick[g.id] === o.id || null, disabled: out || null }),
+          h('span', { class: 'opt__label', text: `${o.label}${o.add ? ` (+${inr(o.add)})` : ''}${out ? ' · sold out' : ''}` }));
+      })));
+    fs.addEventListener('change', (e) => onPick(g.id, e.target.value));
+    return fs;
+  });
+}
+
+/** First choices for a product: each group's first option that isn't sold out. */
+export function firstPick(p) {
+  const pick = pickOf(p, {});
+  for (const g of variantsOf(p)) {
+    const ok = g.options.find((o) => (o.stock || p.stock) !== 'out');
+    if (ok) pick[g.id] = ok.id;
+  }
+  return pick;
 }
 
 function renderWish() {
@@ -68,15 +178,17 @@ function render(p) {
     return radio('pp-style', s, s === cur.style, pal.label, dot);
   }));
 
-  const combos = $('#pp-combos');
-  combos.replaceChildren(...p.combos.map((c) =>
-    radio('pp-combo', c.id, c.id === cur.combo, c.add ? `${c.label} (+${inr(c.add)})` : c.label)));
+  $('#pp-choices').replaceChildren(...choiceFields(p, cur.pick, (g, o) => {
+    cur.pick[g] = o;
+    const photo = variantsOf(p).find((x) => x.id === g)?.options.find((x) => x.id === o)?.photo;
+    if (photo) gallery?.showPhoto(photo);
+    renderTotal();
+  }, 'pp'));
 
   const wrap = $('#pp-custom-wrap');
   wrap.hidden = !p.customizable;
   $('#pp-custom').value = '';
   $('#pp-custom-help').textContent = p.customHelp || 'Names, a date, or a line you want painted on it.';
-  $('#pp-lead').textContent = `Made to order in about ${p.leadDays} days.`;
   renderTotal();
   renderWish();
 }
@@ -86,7 +198,7 @@ export function openProduct(id, styleId) {
   if (!p || !p.model) return;
   cur.p = p;
   cur.style = styleId && p.styles.includes(styleId) ? styleId : p.styles[0];
-  cur.combo = p.combos[0].id;
+  cur.pick = firstPick(p);
   cur.qty = 1;
   render(p);
   openDialog(dialog());
@@ -102,10 +214,6 @@ export function setupProductPanel() {
     // Colourways are previewed on the 3D model; the photos show the piece as made.
     gallery?.show3d();
     viewer?.show(cur.p, cur.style);
-    renderTotal();
-  });
-  $('#pp-combos').addEventListener('change', (e) => {
-    cur.combo = e.target.value;
     renderTotal();
   });
   d.querySelectorAll('[data-qty]').forEach((b) =>

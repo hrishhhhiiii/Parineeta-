@@ -1,8 +1,9 @@
-import { PRODUCTS, SETS, STORY, CATEGORIES, byId, productHref } from '../data/products.js';
+import { PRODUCTS, SETS, STORY, CATEGORIES, byId, productHref, parentOf, topCategories } from '../data/products.js';
 import { REELS, REVIEWS, SERVICES, TRUST, LOOKBOOK, FILMS, ytThumb, ytEmbed, photoSrc, photoSrcset, reelPreview, reelPosterSmall, reelStill } from '../data/site.js';
 import { openLightbox, describeMedia } from './lightbox.js';
 import { h, icon, inr, $ } from './dom.js';
 import { store } from './store.js';
+import { fromPrice } from '../data/pricing.js';
 import { openEnquiry } from './enquiry.js';
 import { thumbImg } from './drawers.js';
 import { toast } from './toast.js';
@@ -69,9 +70,10 @@ export function renderLookbook() {
 
 export function renderChips(onChange) {
   const box = $('#chips');
-  const present = new Set(PRODUCTS.map((p) => p.category));
-  for (const c of CATEGORIES) {
-    if (c.id !== 'all' && !present.has(c.id)) continue;
+  // Chips are the main categories; a main category's chip also covers its sub-categories (in Filters).
+  const present = new Set(PRODUCTS.map((p) => parentOf(p.category) || p.category));
+  for (const c of [CATEGORIES.find((x) => x.id === 'all'), ...topCategories()]) {
+    if (!c || (c.id !== 'all' && !present.has(c.id))) continue;
     box.append(h('button', { type: 'button', class: `chip${c.id === 'all' ? ' is-active' : ''}`, 'aria-pressed': String(c.id === 'all'), dataset: { cat: c.id }, text: c.label }));
   }
   box.addEventListener('click', (e) => {
@@ -109,15 +111,25 @@ export function realPhoto(p, cls = 'card__real') {
 }
 
 export function filterGrid(filter) {
-  for (const group of $('#grid-view').children) group.hidden = filter !== 'all' && group.dataset.cat !== filter;
+  for (const group of $('#grid-view').children) {
+    const cat = group.dataset.cat;
+    group.hidden = filter !== 'all' && cat !== filter && parentOf(cat) !== filter;
+  }
+}
+
+/** A photo shown whole, as uploaded (never cropped or zoomed), on a blurred copy of itself that fills
+ *  the rest of the frame. Returns [backdrop, photo] for a positioned frame. */
+export function wholePhoto(img, smallSrc) {
+  img.classList.add('photo-whole');
+  return [h('img', { class: 'photo-whole__bg', src: smallSrc, alt: '', 'aria-hidden': 'true', loading: 'lazy', decoding: 'async' }), img];
 }
 
 /** The shop's own picture of a product: a photo, else a film still, else the 3D render. */
 function tileImage(p) {
   const photo = p.media?.find((m) => m.type === 'photo');
-  if (photo) return h('img', { class: 'tile-card__img', src: photoSrc(photo.id, 800), srcset: photoSrcset(photo.id), sizes: '(max-width: 640px) 50vw, (max-width: 1100px) 33vw, 28vw', alt: '', loading: 'lazy', width: 800, height: 1000 });
+  if (photo) return wholePhoto(h('img', { class: 'tile-card__img', src: photoSrc(photo.id, 800), srcset: photoSrcset(photo.id), sizes: '(max-width: 640px) 50vw, (max-width: 1100px) 33vw, 28vw', alt: '', loading: 'lazy', width: 800, height: 1000 }), photoSrc(photo.id, 400));
   const reel = p.media?.find((m) => m.type === 'reel');
-  if (reel) return h('img', { class: 'tile-card__img', src: reelStill(reel.id), alt: '', loading: 'lazy', width: 720, height: 1280 });
+  if (reel) return wholePhoto(h('img', { class: 'tile-card__img', src: reelStill(reel.id), alt: '', loading: 'lazy', width: 720, height: 1280 }), reelStill(reel.id));
   return thumbImg(p, p.styles[0], 'tile-card__img tile-card__img--render');
 }
 
@@ -139,7 +151,7 @@ export function renderGrid() {
   }
 }
 
-function tileCard(p) {
+export function tileCard(p) {
   return h('article', { class: 'tile-card' },
     h('a', { class: 'tile-card__link', href: productHref(p.id) },
       tileImage(p),
@@ -147,7 +159,7 @@ function tileCard(p) {
         h('span', { class: 'tile-card__names' },
           h('span', { class: 'tile-card__bn bn', lang: 'bn', translate: 'no', text: p.bn }),
           h('span', { class: 'tile-card__title', text: p.en })),
-        h('span', { class: 'tile-card__price' }, h('span', { class: 'sr-only', text: 'from ' }), inr(p.priceFrom)))),
+        h('span', { class: 'tile-card__price' }, h('span', { class: 'sr-only', text: 'from ' }), inr(fromPrice(p))))),
     wishButton(p.id, p.en));
 }
 

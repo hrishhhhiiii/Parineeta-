@@ -1,10 +1,10 @@
 // What the shop owner can edit, and how each field is shown in the admin panel.
 // Each section is saved as one document in Supabase `site_content` under its `key`.
-import { PRODUCTS, CATEGORIES, SETS, STORY, PALETTES } from '../data/products.js';
+import { PRODUCTS, CATEGORIES, SETS, STORY, PALETTES, variantsOf, DEFAULT_ALIASES } from '../data/products.js';
 import { SITE, PAYMENTS, TRUST, LOOKBOOK, SERVICES, FILMS } from '../data/site.js';
 import { WRITTEN_REVIEWS } from '../data/reviews.js';
 import { ANNOUNCEMENT } from '../data/announcement.js';
-import { HOMEPAGE, HOMEPAGE_SECTIONS, SOCIALS, PLATFORMS, STORES, VIDEOS, SEO } from '../data/homepage.js';
+import { HOMEPAGE, HOMEPAGE_SECTIONS, SOCIALS, PLATFORMS, STORES, VIDEOS, SEO, BANNERS } from '../data/homepage.js';
 import { MODELS, customKind } from '../data/shapes.js';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -36,7 +36,17 @@ const shapeOptions = (ctx) => [
   ...SHAPES,
   ...(ctx?.data?.models?.custom || []).filter((m) => m.id && m.file).map((m) => [customKind(m.id), `${m.name || m.id} (your upload)`]),
 ];
-const categoryOptions = (ctx) => (ctx.data.categories || []).map((c) => [c.id, c.label || c.id]);
+// Sub-categories are listed under their parent: "Crowns › Bride's crowns".
+const categoryOptions = (ctx) => {
+  const cats = ctx.data.categories || [];
+  const name = (c) => {
+    const par = c.parent && cats.find((x) => x.id === c.parent);
+    return par ? `${par.label || par.id} › ${c.label || c.id}` : c.label || c.id;
+  };
+  return cats.map((c) => [c.id, name(c)]);
+};
+// A sub-category can only sit inside a top-level category (one level).
+const parentOptions = (ctx) => [['', 'None (a main category)'], ...(ctx.data.categories || []).filter((c) => c.id && !c.parent).map((c) => [c.id, c.label || c.id])];
 
 const mediaFields = [
   { key: 'type', label: 'Kind', type: 'select', options: [['photo', 'Photo'], ['reel', 'Film (from the shop\'s film library)']], default: 'photo' },
@@ -75,11 +85,30 @@ export const SECTIONS = [
     defaults: () => clone(PRODUCTS),
     blank: () => ({
       id: '', en: '', bn: '', category: 'ritual', line: '', story: '', priceFrom: 0,
-      styles: ['sindoor'], combos: [{ id: 'single', label: 'Single piece', add: 0 }],
+      styles: ['sindoor'], variants: [], prices: [], stock: 'made', count: null, aliases: '', addedAt: new Date().toISOString().slice(0, 10),
       // New products start with photos and films only; a 3D model is optional.
       customizable: true, leadDays: 7, model: { kind: 'none' }, media: [],
     }),
-    normalize: (p) => ({ ...p, model: p.model?.image ? p.model : { kind: p.model?.kind || 'none' } }),
+    // Older products keep their options in `combos`; the admin edits them as choice groups (variantsOf)
+    // and saves only `variants` from then on.
+    prepare: (p) => {
+      const { combos, ...rest } = p;
+      return { ...rest, variants: variantsOf(p), prices: Array.isArray(p.prices) ? p.prices : [], stock: p.stock || 'made', aliases: p.aliases ?? DEFAULT_ALIASES[p.id] ?? '' };
+    },
+    normalize: (p) => {
+      const { combos, ...rest } = p;
+      const variants = variantsOf(p);
+      const valid = (r) => r && r.pick && Number.isFinite(Number(r.price))
+        && Object.entries(r.pick).some(([g, o]) => o && variants.some((x) => x.id === g && x.options.some((y) => y.id === o)));
+      return {
+        ...rest,
+        variants,
+        prices: (p.prices || []).filter(valid).map((r) => ({ pick: Object.fromEntries(Object.entries(r.pick).filter(([, o]) => o)), price: Number(r.price) })),
+        stock: p.stock || 'made',
+        count: p.count === '' || p.count == null ? null : Number(p.count),
+        model: p.model?.image ? p.model : { kind: p.model?.kind || 'none' },
+      };
+    },
     fields: [
       { key: 'en', label: 'Name (English)', type: 'text', required: true },
       { key: 'bn', label: 'Name (Bengali)', type: 'text', lang: 'bn' },
@@ -87,19 +116,33 @@ export const SECTIONS = [
       { key: 'category', label: 'Category', type: 'select', options: categoryOptions, required: true },
       { key: 'priceFrom', label: 'Price from (₹)', type: 'number', min: 0, required: true },
       { key: 'line', label: 'One-line summary', type: 'text', help: 'Shown under the name in the collection.' },
+      { key: 'aliases', label: 'Other names customers use (optional)', type: 'text', help: 'Comma separated, in English or Bengali, e.g. "topar, টোপর, groom crown". The search finds the product by these too.' },
       { key: 'story', label: 'Full description', type: 'textarea' },
       { key: 'media', label: 'Photos and films', type: 'list', of: mediaFields, itemTitle: (m) => m.title || m.id || 'New photo', help: 'The first photo is the one shown in the collection grid.' },
       { key: 'model.kind', label: '3D model (optional)', type: 'select', options: shapeOptions, required: true, noStar: true, default: 'none', help: 'Leave as “None” to show only your photos and films. To let customers turn the piece around in 3D, pick the closest shape, or one of your own models from “3D models” in the menu.' },
+      { key: 'noPavilion', label: 'Show in the 3D pavilion', type: 'bool', invert: true, help: 'The "3D pavilion" view of the collection on the homepage. Only pieces with a 3D model can appear there. Switched off, the piece still shows in Photos, search and its own page.' },
       { key: 'styles', label: 'Colourways offered', type: 'multi', options: palettes, required: true, help: 'The first one is shown by default.' },
-      { key: 'combos', label: 'Options and add-ons', type: 'list', of: [
-        { key: 'label', label: 'Option name', type: 'text', required: true },
-        { key: 'add', label: 'Extra price (₹)', type: 'number', min: 0 },
-        { advanced: true, key: 'id', label: 'Option code', type: 'slug', from: 'label' },
-      ], itemTitle: (c) => `${c.label || 'New option'}${c.add ? ` (+₹${c.add})` : ''}` },
+      { key: 'variants', label: 'Choices', type: 'list', help: 'Groups of choices customers pick from, e.g. Size (Small, Large) or Type (Single, Pair). Each choice can add to the price, show its own photo and have its own stock. Leave empty if there is nothing to choose.', of: [
+        { key: 'name', label: 'Choice name (e.g. Size)', type: 'text', required: true },
+        { key: 'options', label: 'Options', type: 'list', of: [
+          { key: 'label', label: 'Option name', type: 'text', required: true },
+          { key: 'add', label: 'Extra price (₹)', type: 'number', min: 0, help: 'Added to "Price from". Leave 0 if it costs the same.' },
+          { key: 'photo', label: 'Photo when chosen (optional)', type: 'media', photoOnly: true },
+          { key: 'stock', label: 'Stock', type: 'select', options: [['', 'Same as the product'], ['made', 'Made to order'], ['ready', 'Ready now'], ['out', 'Sold out']] },
+          { key: 'count', label: 'How many ready (optional)', type: 'number', min: 0, help: 'Customers see "Only a few left" at 3 or fewer. The number itself is never shown.' },
+          { advanced: true, key: 'id', label: 'Option code', type: 'slug', from: 'label' },
+        ], itemTitle: (o) => `${o.label || 'New option'}${o.add ? ` (+₹${o.add})` : ''}${o.stock === 'out' ? ' · sold out' : ''}` },
+        { advanced: true, key: 'id', label: 'Choice code', type: 'slug', from: 'name' },
+      ], itemTitle: (g) => `${g.name || 'New choice'}${g.options?.length ? `: ${g.options.map((o) => o.label).filter(Boolean).join(', ')}` : ''}` },
+      { key: 'prices', label: 'Exact prices (optional)', type: 'exact-prices', help: 'Only when a combination costs something other than the sum, e.g. Large + Gold = ₹2,200. The most specific match wins.' },
+      { key: 'stock', label: 'Stock', type: 'select', options: [['made', 'Made to order'], ['ready', 'Ready now'], ['out', 'Sold out']], default: 'made', help: 'Choices can override this. Stock goes live with "Put changes live" and is confirmed on WhatsApp.' },
+      { key: 'count', label: 'How many ready (optional)', type: 'number', min: 0 },
+      { advanced: true, key: 'addedAt', label: 'Date added', type: 'date', help: 'Used by "Newest first" in the collection.' },
       { key: 'leadDays', label: 'Days to make', type: 'number', min: 0 },
       { key: 'customizable', label: 'Can be personalised (names, portraits, colours)', type: 'bool' },
       { advanced: true, key: 'customHelp', label: 'Personalisation hint for customers', type: 'text' },
       { advanced: true, key: 'model.image', label: 'Painting on the panel (arched panel shape only)', type: 'media', photoOnly: true },
+      { key: 'featured', label: 'Bestseller (shown in the "Bestsellers" row)', type: 'bool' },
       { key: 'hidden', label: 'Hide from the site', type: 'bool' },
     ],
   },
@@ -110,14 +153,28 @@ export const SECTIONS = [
     kind: 'list',
     intro: 'The groups the collection is organised into. Their order here is the order on the site.',
     itemTitle: (c) => c.label || 'New category',
-    itemSub: (c) => c.bn || '',
+    itemSub: (c) => [c.parent ? 'sub-category' : '', c.bn || ''].filter(Boolean).join(' · '),
     defaults: () => clone(CATEGORIES.filter((c) => c.id !== 'all')),
-    blank: () => ({ id: '', label: '', bn: '', line: '' }),
+    blank: () => ({ id: '', label: '', bn: '', line: '', parent: '' }),
+    // One level only, and no sub-category may be left pointing at a deleted (or nested) parent.
+    check: (cats) => {
+      const problems = [];
+      for (const c of cats) {
+        if (!c.parent) continue;
+        const par = cats.find((x) => x.id === c.parent);
+        if (c.parent === c.id) problems.push(`"${c.label || c.id}" can't sit inside itself.`);
+        else if (!par) problems.push(`"${c.label || c.id}" sits inside a category that no longer exists. Choose another "Inside category", or None. (To delete a category, move its sub-categories first.)`);
+        else if (par.parent) problems.push(`"${c.label || c.id}" sits inside "${par.label || par.id}", which is itself a sub-category. Only one level is allowed.`);
+      }
+      return problems;
+    },
     fields: [
       { key: 'label', label: 'Name (English)', type: 'text', required: true },
       { key: 'bn', label: 'Name (Bengali)', type: 'text', lang: 'bn' },
       { advanced: true, key: 'id', label: 'Category code', type: 'slug', from: 'label', required: true, help: 'Products point at this code. Avoid changing it.' },
       { key: 'line', label: 'Short description', type: 'text' },
+      { key: 'parent', label: 'Inside category (optional)', type: 'select', options: parentOptions, help: 'Make this a sub-category, e.g. "Bridal crowns" inside "Crowns". Customers pick sub-categories in Filters.' },
+      { key: 'image', label: 'Tile picture (optional)', type: 'media', photoOnly: true, help: 'Shown on the category tiles under the homepage photo. Without one, the first product photo in the category is used.' },
     ],
   },
   {
@@ -176,6 +233,7 @@ export const SECTIONS = [
       { key: 'site.whatsapp', label: 'WhatsApp number', type: 'text', help: 'With country code, digits only, e.g. 919064188260.', pattern: '^\\d{10,15}$' },
       { key: 'site.email', label: 'Shop email', type: 'text' },
       { advanced: true, key: 'site.web3formsKey', label: 'Web3Forms access key', type: 'text', help: 'Turns on the "Send by Email" buttons. Free from web3forms.com.' },
+      { key: 'site.deliveryBufferDays', label: 'Days to allow for delivery', type: 'number', min: 0, help: 'Product pages say "Order by …" = wedding date − days to make − these days.' },
       { heading: 'Payments' },
       { key: 'payments.advancePercent', label: 'Advance to confirm an order (%)', type: 'number', min: 0, max: 100 },
       { key: 'payments.upi.id', label: 'UPI ID', type: 'text', help: 'e.g. parineeta365@okaxis' },
@@ -339,6 +397,41 @@ export const SECTIONS = [
       { key: 'platform', label: 'Platform', type: 'select', options: Object.entries(PLATFORMS).map(([k, v]) => [k, v.label]), required: true },
       { key: 'url', label: 'Link', type: 'text', required: true, pattern: '^https://', help: 'The full https:// address of your page. Links to other websites are ignored.' },
       { key: 'handle', label: 'Name shown under it', type: 'text', help: 'e.g. @parineeta_365' },
+      { key: 'hidden', label: 'Hide from the site', type: 'bool' },
+    ],
+  },
+  {
+    key: 'banners',
+    title: 'Promo banners',
+    icon: '🎉',
+    kind: 'list',
+    intro: 'Big pictures under the homepage photo, like a shop app: a new piece, a festive offer, a category. Customers swipe through them; each opens what you choose. Use start and end dates to show one for a while.',
+    itemTitle: (b) => b.title || 'New banner',
+    itemSub: (b) => [b.start || b.end ? `${b.start || '…'} to ${b.end || '…'}` : '', b.hidden ? 'hidden' : ''].filter(Boolean).join(' · '),
+    thumbKey: 'photo',
+    defaults: () => clone(BANNERS),
+    blank: () => ({ photo: '', title: '', line: '', linkType: 'product', linkProduct: '', linkCategory: '', linkSearch: '', linkUrl: '', start: '', end: '', hidden: false }),
+    // Each banner must open something real, and web links must be https (never javascript: or http:).
+    check: (list) => list.flatMap((b, i) => {
+      const where = `"${b.title || `Banner ${i + 1}`}"`;
+      if (b.linkType === 'product' && !b.linkProduct) return [`${where}: choose the product it opens.`];
+      if (b.linkType === 'category' && !b.linkCategory) return [`${where}: choose the category it opens.`];
+      if (b.linkType === 'search' && !String(b.linkSearch || '').trim()) return [`${where}: type the search words it opens.`];
+      if (b.linkType === 'url' && !/^https:\/\/[^\s]+$/i.test(String(b.linkUrl || '').trim())) return [`${where}: the web address must start with https://`];
+      if (b.start && b.end && b.end < b.start) return [`${where}: the end date is before the start date.`];
+      return [];
+    }),
+    fields: [
+      { key: 'photo', label: 'Picture', type: 'media', photoOnly: true, required: true, help: 'A wide photo works best (about 2:1).' },
+      { key: 'title', label: 'Headline', type: 'text', required: true, help: 'Short, e.g. "Puja collection is here".' },
+      { key: 'line', label: 'Small line (optional)', type: 'text' },
+      { key: 'linkType', label: 'Opens', type: 'select', default: 'product', options: [['product', 'A product'], ['category', 'A category'], ['search', 'A search'], ['url', 'A web address']] },
+      { key: 'linkProduct', label: 'Product (if it opens a product)', type: 'select', options: productOptions },
+      { key: 'linkCategory', label: 'Category (if it opens a category)', type: 'select', options: categoryOptions },
+      { key: 'linkSearch', label: 'Search words (if it opens a search)', type: 'text' },
+      { key: 'linkUrl', label: 'Web address (if it opens one)', type: 'text', help: 'Must start with https://' },
+      { key: 'start', label: 'Show from (optional)', type: 'date' },
+      { key: 'end', label: 'Show until (optional)', type: 'date' },
       { key: 'hidden', label: 'Hide from the site', type: 'bool' },
     ],
   },

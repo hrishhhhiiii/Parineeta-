@@ -23,6 +23,8 @@ export function createViewer(canvas) {
   scene.add(holder);
 
   camera.position.set(0, 2.1, 6.8);
+  // A plain mouse wheel scrolls the page or panel; Ctrl + wheel (and a trackpad pinch) zooms the model.
+  canvas.addEventListener('wheel', (e) => { if (!e.ctrlKey && !e.metaKey) e.stopImmediatePropagation(); }, { capture: true });
   const controls = new OrbitControls(camera, canvas);
   controls.target.set(0, 1.35, 0);
   controls.enableDamping = true;

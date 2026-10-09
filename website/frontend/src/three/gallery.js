@@ -4,6 +4,7 @@ import { createStage, dragRotate, reducedMotion, motion } from './stage.js';
 import { createPedestal, PEDESTAL_TOP } from './pedestal.js';
 import { buildModel } from './models.js';
 import { floorTexture } from './textures.js';
+import { inCategory } from '../data/products.js';
 
 const TAU = Math.PI * 2;
 const mod = (a, n) => ((a % n) + n) % n;
@@ -176,7 +177,7 @@ export function initGallery({ canvas, stageEl, products, onFocus, onOpen }) {
     },
     setFilter(cat) {
       for (const it of items) {
-        const show = cat === 'all' || it.p.category === cat;
+        const show = inCategory(it.p, cat); // a main category includes its sub-categories
         if (show === it.shown) continue;
         it.shown = show;
         gsap.killTweensOf(it.holder.scale);

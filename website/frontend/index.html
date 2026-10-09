@@ -91,7 +91,10 @@
         <a href="#visit">Visit</a>
       </nav>
       <div class="nav__actions">
-        <button class="icon-btn" type="button" data-open="wishlist" aria-label="Open wishlist">
+        <button class="icon-btn nav__search" type="button" data-open-search aria-label="Search the collection">
+          <i class="ph-light ph-magnifying-glass" aria-hidden="true"></i>
+        </button>
+        <button class="icon-btn nav__wish" type="button" data-open="wishlist" aria-label="Open wishlist">
           <i class="ph-light ph-heart" aria-hidden="true"></i>
           <span class="badge" data-count="wish" hidden>0</span>
         </button>
@@ -99,11 +102,8 @@
           <i class="ph-light ph-shopping-bag-open" aria-hidden="true"></i>
           <span class="badge" data-count="cart" hidden>0</span>
         </button>
-        <a class="icon-btn nav__account" href="/login.html" aria-label="Sign in" title="Sign in">
+        <a class="icon-btn nav__account" href="/login.html?signin" aria-label="Sign in" title="Sign in">
           <i class="ph-light ph-user-circle" aria-hidden="true"></i>
-        </a>
-        <a class="btn btn--gold btn--sm nav__cta" data-wa href="#" target="_blank" rel="noopener">
-          <i class="ph-fill ph-whatsapp-logo" aria-hidden="true"></i>WhatsApp us
         </a>
         <button class="icon-btn nav__menu-btn" type="button" data-open="menu" aria-label="Open menu">
           <i class="ph-light ph-list" aria-hidden="true"></i>
@@ -130,6 +130,14 @@
         </div>
       </div>
       <p class="hero__meta"><span class="bn" lang="bn" translate="no">শোলার মুকুট</span><span>Shola mukut, cut from reed pith · from ₹950</span></p>
+    </section>
+
+    <!-- PROMO: banners and category tiles (ui/home.js) -->
+    <section class="promo" id="promo" aria-label="Highlights and categories" hidden>
+      <div class="container">
+        <div id="banners" hidden></div>
+        <nav class="cat-tiles" id="cat-tiles" aria-label="Shop by category" hidden></nav>
+      </div>
     </section>
 
     <!-- MARQUEE -->
@@ -203,6 +211,15 @@
       </div>
       <div class="container">
         <div class="chips" id="chips" role="group" aria-label="Filter by category"></div>
+        <div class="catalogue-bar" id="catalogue-bar">
+          <button class="catalogue-search" type="button" data-open-search>
+            <i class="ph-light ph-magnifying-glass" aria-hidden="true"></i><span id="catalogue-q">Search</span>
+          </button>
+          <button class="btn btn--ghost btn--sm catalogue-filters" type="button" id="filters-open">
+            <i class="ph-light ph-sliders-horizontal" aria-hidden="true"></i>Filters<span class="catalogue-count" id="filters-count" hidden></span>
+          </button>
+        </div>
+        <div class="catalogue-active" id="catalogue-active" aria-live="polite"></div>
       </div>
 
       <div class="pavilion" id="pavilion" hidden>
@@ -232,7 +249,9 @@
       </div>
 
       <div class="container">
+        <div class="rails" id="rails"></div>
         <div class="grid-view" id="grid-view"></div>
+        <div class="grid-results" id="grid-results" hidden></div>
       </div>
     </section>
 
@@ -467,7 +486,7 @@
         <a href="#invitations">Invitation studio</a>
         <a href="#services">Custom work</a>
         <a href="#visit">Visit</a>
-        <a href="/login.html">Sign in</a>
+        <a href="/login.html?signin">Sign in</a>
       </nav>
       <div class="footer__social">
         <a class="icon-btn icon-btn--ring" href="https://www.instagram.com/parineeta_365/" target="_blank" rel="noopener" aria-label="Instagram"><i class="ph-light ph-instagram-logo" aria-hidden="true"></i></a>
@@ -477,7 +496,6 @@
     </div>
     <div class="container footer__base">
       <p>&copy; <span id="year"></span> Parineeta365, Patuli. Prices shown are indicative; every order is confirmed on enquiry.</p>
-      <a class="footer__admin" href="/admin.html" rel="nofollow"><i class="ph-light ph-lock-simple" aria-hidden="true"></i>Admin</a>
     </div>
   </footer>
 
@@ -502,10 +520,7 @@
             <legend class="field__label">Colourway</legend>
             <div class="swatches swatches--lg" id="pp-styles"></div>
           </fieldset>
-          <fieldset class="field">
-            <legend class="field__label">Option</legend>
-            <div class="options" id="pp-combos"></div>
-          </fieldset>
+          <div id="pp-choices"></div>
           <div class="field" id="pp-custom-wrap">
             <label class="field__label" for="pp-custom">Personalise it <span class="field__opt">(optional)</span></label>
             <input class="input" id="pp-custom" name="custom" type="text" maxlength="80" autocomplete="off" />
@@ -527,6 +542,7 @@
             <button type="button" class="icon-btn icon-btn--ring icon-btn--lg" id="pp-wish" aria-pressed="false" aria-label="Save to wishlist"><i class="ph-light ph-heart" aria-hidden="true"></i></button>
           </div>
           <button type="button" class="btn btn--ghost btn--wide" id="pp-enquire"><i class="ph-light ph-chat-circle-text" aria-hidden="true"></i>Enquire</button>
+          <div id="pp-notify"></div>
           <p class="fineprint">Pay a booking advance or the full estimate by UPI or bank transfer, or pay when you collect. We confirm the final price with you on WhatsApp.</p>
         </form>
       </div>
@@ -622,15 +638,49 @@
       <nav class="menu__links" aria-label="Mobile">
         <a href="#story" data-close-nav>The rituals</a>
         <a href="#collection" data-close-nav>Collection</a>
+        <button type="button" class="menu__btn" data-open-search>Search</button>
+        <button type="button" class="menu__btn" data-open="wishlist">Wishlist</button>
         <a href="#sets" data-close-nav hidden>Bridal sets</a>
         <a href="#lookbook" data-close-nav>Lookbook</a>
         <a href="#studio" data-close-nav>Alpana studio</a>
         <a href="#invitations" data-close-nav>Invitation studio</a>
         <a href="#services" data-close-nav>Custom work</a>
         <a href="#visit" data-close-nav>Visit</a>
-        <a href="/login.html">Sign in</a>
+        <a href="/login.html?signin">Sign in</a>
       </nav>
       <a class="btn btn--gold btn--wide" data-wa href="#" target="_blank" rel="noopener"><i class="ph-fill ph-whatsapp-logo" aria-hidden="true"></i>WhatsApp us</a>
+    </div>
+  </dialog>
+
+  <!-- SEARCH (ui/catalogue.js) -->
+  <dialog class="sheet sheet--drawer sheet--search" id="search-dialog" aria-label="Search the collection" data-lenis-prevent>
+    <div class="drawer">
+      <div class="drawer__head search__head">
+        <form class="search__form" id="search-form" role="search">
+          <i class="ph-light ph-magnifying-glass" aria-hidden="true"></i>
+          <input class="search__input" id="search-input" type="search" name="q" placeholder="Search: topor, mukut, kouto…" autocomplete="off" enterkeyhint="search" aria-label="Search the collection" maxlength="80" />
+        </form>
+        <button class="icon-btn" type="button" data-close aria-label="Close search"><i class="ph-light ph-x" aria-hidden="true"></i></button>
+      </div>
+      <div class="drawer__body" id="search-body" aria-live="polite"></div>
+      <div class="drawer__foot" id="search-foot" hidden>
+        <button class="btn btn--gold btn--wide" type="button" id="search-all"></button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- FILTERS (ui/catalogue.js) -->
+  <dialog class="sheet sheet--drawer" id="filters-dialog" aria-labelledby="filters-title" data-lenis-prevent>
+    <div class="drawer">
+      <div class="drawer__head">
+        <h2 class="drawer__title" id="filters-title">Filters</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close filters"><i class="ph-light ph-x" aria-hidden="true"></i></button>
+      </div>
+      <div class="drawer__body filters" id="filters-body"></div>
+      <div class="drawer__foot filters__foot">
+        <button class="btn btn--ghost" type="button" id="filters-clear">Clear all</button>
+        <button class="btn btn--gold" type="button" id="filters-apply"></button>
+      </div>
     </div>
   </dialog>
 

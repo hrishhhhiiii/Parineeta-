@@ -3,6 +3,8 @@ export const SITE = {
   // Free key from https://web3forms.com (sign up with debrajnandi2004@gmail.com). Leave empty to disable email sending.
   web3formsKey: '',
   email: 'debrajnandi2004@gmail.com',
+  // Days allowed for packing and delivery before a wedding, used for "Order by …" on product pages.
+  deliveryBufferDays: 2,
 };
 
 /**

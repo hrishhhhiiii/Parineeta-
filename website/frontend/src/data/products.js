@@ -30,6 +30,7 @@ export const PRODUCTS = [
     id: 'gach-kouto',
     en: 'Gach Kouto',
     bn: 'গাছকৌটো',
+    aliases: 'gachkouto, gach kauto, kouto, kauto, sindoor box, sindur kouto, কৌটো',
     category: 'ritual',
     line: 'The tiered vermilion box a bride keeps for life.',
     story: 'A tall, tiered wooden box that holds the bride\'s sindoor (vermilion). She carries it into her new home and many families keep it for generations. Ours are turned in wood and painted by hand in Patuli, and can carry the couple\'s portrait.',
@@ -45,6 +46,7 @@ export const PRODUCTS = [
     id: 'kunke',
     en: 'Kunke',
     bn: 'কুনকে',
+    aliases: 'kunki, kunko, kunkey, measuring pot, rice pot, কুনকি',
     category: 'ritual',
     line: 'A rice-measuring pot, a wish for a full home.',
     story: 'A small pot for measuring rice, used in the wedding rites and in the bride\'s farewell. Filled with rice it stands for a household that never runs short. Painted to match your kouto set.',
@@ -60,6 +62,7 @@ export const PRODUCTS = [
     id: 'darpan',
     en: 'Darpan',
     bn: 'দর্পণ',
+    aliases: 'dorpon, darpon, mirror, hand mirror, আয়না',
     category: 'ritual',
     line: 'The painted hand mirror of the ceremony.',
     story: 'A hand mirror that travels with the couple through the rituals. We paint the rim and handle so it matches the rest of the set, and it becomes a keepsake afterwards.',
@@ -75,6 +78,7 @@ export const PRODUCTS = [
     id: 'biyer-piri',
     en: 'Biyer Piri',
     bn: 'বিয়ের পিঁড়ি',
+    aliases: 'piri, pidi, pinri, biye piri, wedding seat, পিঁড়ি',
     category: 'ritual',
     line: 'The low seat the bride is carried in on.',
     story: 'The bride sits on this low wooden seat while her brothers lift her and walk seven circles around the groom, a ritual called saat paak. We paint the top with alpana in your colours.',
@@ -90,6 +94,7 @@ export const PRODUCTS = [
     id: 'paan-pata',
     en: 'Paan Pata',
     bn: 'পানপাতা',
+    aliases: 'paan, pan pata, betel leaf, paner pata, পান',
     category: 'ritual',
     line: 'The leaves she hides behind until the first look.',
     story: 'The bride covers her face with two betel leaves while she is carried around the groom. When she lowers them the couple share shubho drishti, their first auspicious look. Ours are painted with chandan dots.',
@@ -105,6 +110,7 @@ export const PRODUCTS = [
     id: 'shola-mukut',
     en: 'Shola Mukut',
     bn: 'শোলার মুকুট',
+    aliases: 'mukut, mukat, mukoot, shola, sola, sholar mukut, bride crown, crown, মুকুট',
     category: 'crown',
     line: 'The bride\'s crown, cut from reed pith.',
     story: 'The bride\'s crown is carved from sholapith, the soft white core of a marsh reed, and cut into filigree as fine as lace. Worn with a red and white sari, it marks her as Lakshmi for the day.',
@@ -120,6 +126,7 @@ export const PRODUCTS = [
     id: 'topor',
     en: 'Topor',
     bn: 'টোপর',
+    aliases: 'topar, topur, tópor, groom crown, crown, টোপোর',
     category: 'crown',
     line: 'The groom\'s tall crown, light as paper.',
     story: 'The groom arrives in a tall conical crown made of sholapith. It weighs almost nothing and is carved like lace, and most families keep it long after the wedding.',
@@ -135,6 +142,7 @@ export const PRODUCTS = [
     id: 'thala-set',
     en: 'Matir Thala Set',
     bn: 'মাটির থালার সেট',
+    aliases: 'thala, thali, plate, plate set, aiburobhat, bowls, থালা',
     category: 'clay',
     line: 'Hand-painted thala and bowls for the bride\'s last meal at home.',
     story: 'The day before the wedding the family serves the bride aiburobhat, her last meal as an unmarried daughter, on a hand-painted thala set: one large thala and a small bowl for every dish.',
@@ -150,6 +158,7 @@ export const PRODUCTS = [
     id: 'punjabi',
     en: 'Hand-painted Punjabi',
     bn: 'হাতে আঁকা পাঞ্জাবি',
+    aliases: 'panjabi, kurta, groom kurta, painted kurta, পাঞ্জাবি',
     category: 'apparel',
     line: 'A cotton kurta painted with alpana motifs.',
     story: 'A cotton punjabi (kurta) painted by hand with alpana borders and small flower buttis. We paint to your size and match the colours to the wedding. Tell us the size in the personalisation box.',
@@ -166,6 +175,7 @@ export const PRODUCTS = [
     id: 'har-parvati',
     en: 'Har Parvati Panel',
     bn: 'হর পার্বতী',
+    aliases: 'hara parvati, shiva parvati, shiv parvati, shiva, panel, হর পার্বতী',
     category: 'art',
     line: 'The divine couple, painted as a blessing.',
     story: 'Shiva and Parvati, the ideal married couple in Hindu tradition, painted on an arched panel. Families hang it in the new home as a blessing for the newlyweds.',
@@ -181,6 +191,7 @@ export const PRODUCTS = [
     id: 'aradhana',
     en: 'Aradhana Panel',
     bn: 'আরাধনা',
+    aliases: 'puja, devotional, panel, আরাধনা',
     category: 'art',
     line: 'Maa Shyamsundari, painted for worship.',
     story: 'From our devotional series: Maa Shyamsundari painted on an arched panel for the home shrine or the wedding altar. Each face is painted freehand, so no two are alike.',
@@ -196,6 +207,7 @@ export const PRODUCTS = [
     id: 'sabeki-backdrop',
     en: 'Khoi Daan Kulo',
     bn: 'খই দানের কুলো',
+    aliases: 'kulo, khoi, khoi daan, kula, winnowing tray, কুলো',
     category: 'ritual',
     line: 'The velvet kulo the bride offers khoi from.',
     story: 'In the wedding\'s fire ritual the bride offers khoi (puffed rice) into the fire from a kulo, the winnowing tray, with the groom standing behind her. Ours is covered in velvet, painted by hand with white feathers and a kalka, and held in a cane frame.',
@@ -211,6 +223,7 @@ export const PRODUCTS = [
     id: 'flower-dala',
     en: 'Engagement Platter',
     bn: 'এনগেজমেন্ট প্ল্যাটার',
+    aliases: 'dala, platter, engagement, ashirbad, tattva, ডালা',
     category: 'decor',
     line: 'A silk platter crowned with roses, for the engagement rings.',
     story: 'The engagement rings are brought out on this platter. A round tray wrapped in silk and edged with lace, with a hoop of roses at the back and strings of pearls falling to the centre. We make it in your colours.',
@@ -320,5 +333,64 @@ export const has3d = (p) => {
 };
 /** A product's own web address: a prebuilt page that search engines can read. */
 export const productHref = (id) => `/p/${id}/`;
+/* ---------- choices (variants) ----------
+   A product's choices are groups of options: [{ id, name, options: [{ id, label, add, photo, stock, count }] }].
+   Products saved before choices existed have one list of options (`combos`); they become a single group with the
+   id "option", which keeps their cart lines and message text exactly as before. Used by the site, the build and
+   the admin, so all three always agree. */
+const slugOf = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-');
+const uniqueId = (wanted, used, fallback) => {
+  let id = slugOf(wanted) || fallback;
+  for (let n = 2; used.has(id); n++) id = `${slugOf(wanted) || fallback}-${n}`;
+  used.add(id);
+  return id;
+};
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+export function variantsOf(p) {
+  const groups = Array.isArray(p?.variants) && p.variants.length
+    ? p.variants
+    : Array.isArray(p?.combos) && p.combos.length ? [{ id: 'option', name: 'Option', options: p.combos }] : [];
+  const usedGroups = new Set();
+  return groups
+    .filter((g) => g && Array.isArray(g.options) && g.options.length)
+    .map((g, gi) => {
+      const usedOptions = new Set();
+      return {
+        id: g.id && !usedGroups.has(g.id) ? (usedGroups.add(g.id), g.id) : uniqueId(g.name, usedGroups, `choice-${gi + 1}`),
+        name: String(g.name || 'Option'),
+        options: g.options.filter(Boolean).map((o, oi) => ({
+          id: o.id && !usedOptions.has(o.id) ? (usedOptions.add(o.id), o.id) : uniqueId(o.label, usedOptions, `option-${oi + 1}`),
+          label: String(o.label || ''),
+          add: num(o.add),
+          photo: o.photo || null,
+          stock: ['made', 'ready', 'out'].includes(o.stock) ? o.stock : null,
+          count: o.count == null || o.count === '' ? null : num(o.count),
+        })),
+      };
+    });
+}
+
 export const byId = (id) => PRODUCTS.find((p) => p.id === id) || SETS.find((s) => s.id === id);
 export const isSet = (id) => SETS.some((s) => s.id === id);
+
+/** Search words written for the built-in products, kept before published content replaces PRODUCTS.
+ *  Products the admin hasn't given "Other names" use these. */
+export const DEFAULT_ALIASES = Object.fromEntries(PRODUCTS.map((p) => [p.id, p.aliases || '']));
+
+/* ---------- categories and sub-categories (one level) ----------
+   A category may sit inside another (`parent`). Only one level: a parent that itself has a parent is ignored. */
+export const categoryOf = (id) => CATEGORIES.find((c) => c.id === id);
+/** The parent of a sub-category; null for a top-level or unknown category. */
+export const parentOf = (id) => {
+  const par = categoryOf(categoryOf(id)?.parent);
+  return par && par.id !== 'all' && !par.parent ? par.id : null;
+};
+export const topCategories = () => CATEGORIES.filter((c) => c.id !== 'all' && !parentOf(c.id));
+export const childrenOf = (id) => CATEGORIES.filter((c) => c.id !== 'all' && parentOf(c.id) === id);
+/** A category's web address, made from its English name (/c/thala-sets/), not its internal code. */
+export const categorySlug = (c) => slugOf(c.label) || c.id;
+export const categoryPath = (c) => `/c/${categorySlug(c)}/`;
+export const categoryBySlug = (slug) => CATEGORIES.find((c) => c.id !== 'all' && categorySlug(c) === slug);
+/** Products of a parent category include those of its sub-categories. */
+export const inCategory = (p, cat) => !cat || cat === 'all' || p.category === cat || parentOf(p.category) === cat;

@@ -95,6 +95,27 @@
   object-fit: cover;
   object-position: 50% 30%;
 }
+/* Desktop: the whole photo, centred in its frame, so the crown is never clipped by the nav or the edge.
+   The frame starts where the text column ends (both measured from the page's 1360px column), so the
+   headline never runs over the crown at any screen width. */
+@media (min-width: 901px) {
+  .hero--photo {
+    --hero-col: max(var(--gutter), calc((100vw - 1360px) / 2 + var(--gutter)));
+    --hero-copy: min(640px, 46vw);
+  }
+  .hero__photo {
+    left: calc(var(--hero-col) + var(--hero-copy) + 24px);
+    width: auto;
+  }
+  .hero__photo img {
+    height: 100%;
+    object-fit: contain;
+    object-position: 50% 50%;
+  }
+  .hero--photo {
+    --hero-title: clamp(2.7rem, 5vw, 5.6rem);
+  }
+}
 .hero__photo::after {
   content: '';
   position: absolute;
@@ -107,10 +128,10 @@
   display: block;
 }
 .hero--photo .hero__copy {
-  max-width: 760px;
+  max-width: var(--hero-copy, 760px);
 }
 .hero--photo .hero__title {
-  font-size: clamp(2.7rem, 6.4vw, 6.4rem);
+  font-size: var(--hero-title, clamp(2.7rem, 6.4vw, 6.4rem));
   line-height: 0.98;
   margin-bottom: 28px;
 }
@@ -453,7 +474,8 @@
   opacity: 1;
 }
 @media (hover: hover) {
-  .tile-card__link:hover .tile-card__img {
+  /* Only the 3D renders lift on hover; the shop's photos stay exactly as uploaded. */
+  .tile-card__link:hover .tile-card__img--render {
     transform: scale(1.04);
   }
 }
@@ -950,5 +972,644 @@ img.thumb--photo {
   .story__photo,
   .story__stage canvas {
     transition: none;
+  }
+}
+
+/* ---------- Collection search and filters (ui/catalogue.js) ---------- */
+.catalogue-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+.catalogue-search {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-3);
+  font: inherit;
+  text-align: left;
+  cursor: text;
+  min-width: 0;
+}
+.catalogue-search span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalogue-search .ico,
+.catalogue-filters .ico {
+  font-size: 1.15rem;
+  color: var(--gold);
+}
+.catalogue-filters {
+  flex: none;
+  min-height: 46px;
+}
+.catalogue-count {
+  min-width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 20px;
+}
+.catalogue-active {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+.catalogue-active:empty {
+  display: none;
+}
+.chip.chip--on,
+.chip.chip--on:hover {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  color: var(--ink);
+}
+.chip--on .ico {
+  font-size: 0.9rem;
+}
+.catalogue-clear {
+  min-height: 36px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.results-count {
+  margin: 18px 0 12px;
+  color: var(--ink-3);
+}
+.grid-results {
+  padding-bottom: var(--section-y);
+}
+.results-empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 28px 0;
+}
+.results-empty__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+}
+.results-empty__body {
+  margin: 0;
+  color: var(--ink-2);
+}
+.results-empty__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Search panel */
+.search__head {
+  gap: 10px;
+}
+.search__form {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.search__form .ico {
+  color: var(--gold);
+  font-size: 1.2rem;
+}
+.search__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+.search__form:focus-within {
+  border-color: var(--gold);
+}
+.search__hint {
+  margin: 4px 0 18px;
+  color: var(--ink-3);
+}
+.search-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.search-hit {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: var(--r-input);
+  text-decoration: none;
+  color: var(--ink);
+}
+.search-hit:hover,
+.search-hit:focus-visible {
+  background: var(--surface);
+}
+.search-hit__img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--r-input);
+  background: var(--surface);
+}
+.search-hit__names {
+  display: grid;
+  min-width: 0;
+}
+.search-hit__title {
+  font-weight: 600;
+}
+.search-hit__bn {
+  color: var(--gold);
+  font-size: 0.9rem;
+}
+.search-hit__price {
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* Filter sheet */
+.filters {
+  display: grid;
+  gap: 18px;
+}
+.filters .field {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.filters__range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.filters__foot {
+  display: flex;
+  gap: 10px;
+}
+.filters__foot .btn--gold {
+  flex: 1;
+}
+
+/* Menu: Search and Wishlist sit with the links. */
+.menu__btn {
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Very narrow phones: the wishlist steps into the menu so search stays in the header. */
+@media (max-width: 379px) {
+  .nav__wish {
+    display: none;
+  }
+}
+
+/* ---------- Homepage shopping parts (ui/home.js) ---------- */
+.promo {
+  padding: clamp(28px, 4vw, 48px) 0 clamp(20px, 3vw, 36px);
+}
+.banners {
+  position: relative;
+}
+.banners__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border-radius: var(--r-card);
+}
+.banners__track::-webkit-scrollbar {
+  display: none;
+}
+.banner {
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 1;
+  scroll-snap-align: start;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--surface);
+}
+.banner__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(14, 3, 5, 0.82), rgba(14, 3, 5, 0.25) 60%, transparent);
+}
+.banner__text {
+  position: absolute;
+  left: clamp(18px, 4vw, 48px);
+  bottom: clamp(18px, 4vw, 44px);
+  right: 30%;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.banner__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+.banner__line {
+  color: var(--ink-2);
+  max-width: 40ch;
+}
+.banner__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.banner:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -4px;
+}
+.banners__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.banners__dots {
+  display: flex;
+  gap: 2px;
+}
+.banners__dot {
+  width: 28px;
+  height: 44px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  position: relative;
+}
+.banners__dot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--line-strong);
+  transition: width 0.25s var(--ease), background-color 0.25s;
+}
+.banners__dot[aria-current='true']::after {
+  width: 20px;
+  border-radius: 999px;
+  background: var(--gold);
+}
+.cat-tiles {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(118px, 1fr);
+  gap: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-top: 22px;
+  padding-bottom: 4px;
+}
+.cat-tiles::-webkit-scrollbar {
+  display: none;
+}
+.cat-tile {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  text-decoration: none;
+  color: var(--ink);
+}
+.cat-tile__media {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition: border-color 0.2s, transform 0.3s var(--ease);
+}
+.cat-tile:hover .cat-tile__media,
+.cat-tile:focus-visible .cat-tile__media {
+  border-color: var(--gold);
+  transform: translateY(-2px);
+}
+.cat-tile__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cat-tile__img--none {
+  opacity: 0.4;
+}
+.cat-tile__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.cat-tile__bn {
+  color: var(--gold);
+  font-size: 0.85rem;
+}
+.rails {
+  display: grid;
+  gap: 28px;
+  padding-top: 28px;
+}
+.rail__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.5rem;
+}
+@media (max-width: 640px) {
+  .banner {
+    aspect-ratio: 4 / 3;
+  }
+  .banner__text {
+    right: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-tile__media,
+  .banners__dot::after {
+    transition: none;
+  }
+}
+
+/* Category pages before the script starts: the written-in list (removed by main.js). */
+.cat-static {
+  padding-top: 28px;
+}
+.cat-static h1 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+.cat-static ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+}
+.cat-static a {
+  color: var(--ink);
+}
+
+/* ---------- "Notify me when it's back" (sold-out pieces) ---------- */
+.notify {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.notify__form {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+.notify__form[hidden] {
+  display: none;
+}
+.notify__row {
+  display: flex;
+  gap: 8px;
+}
+.notify__row .input {
+  flex: 1;
+  min-width: 0;
+}
+.notify__trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.notify__msg {
+  margin: 0;
+  color: var(--ink-2);
+}
+.notify__msg.is-ok {
+  color: #8fd19e;
+}
+.notify__msg.is-err {
+  color: var(--heart);
+}
+.notify__msg a {
+  color: var(--gold);
+}
+
+/* ---------- Order-by line with the wedding date ---------- */
+.pp__stock,
+#pp-lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.pp__stock[data-stock='tight'],
+#pp-lead[data-stock='tight'] {
+  color: #f0b45a;
+}
+.wedding-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+}
+.wedding-date__input {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-input);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  color-scheme: dark;
+}
+
+/* ---------- nav: right-hand tools, spaced and grouped ---------- */
+/* Search, wishlist and bag sit together; a hairline sets the account apart. */
+.nav__actions {
+  gap: 6px;
+}
+.nav__actions .icon-btn {
+  width: 40px;
+  height: 40px;
+  font-size: 1.25rem;
+}
+.nav__actions .badge {
+  top: -3px;
+  right: -3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  font-size: 0.65rem;
+  line-height: 17px;
+  box-shadow: 0 0 0 2px var(--bg, #150507);
+}
+.nav__actions .nav__account,
+.nav__actions .nav__account-wrap {
+  margin-left: 14px;
+}
+.nav__actions .nav__account::before,
+.nav__actions .nav__account-wrap::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  top: 50%;
+  height: 22px;
+  border-left: 1px solid var(--line-strong, rgba(255, 236, 200, 0.22));
+  transform: translateY(-50%);
+}
+/* The ADMIN tag sits centred under the avatar instead of crowding the bag icon. */
+.nav__account-wrap .avatar__role {
+  right: auto;
+  left: 50%;
+  bottom: -9px;
+  transform: translateX(-50%);
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+}
+@media (max-width: 1100px) {
+  .nav__actions .nav__menu-btn {
+    margin-left: 6px;
+  }
+}
+/* Phones: five 44px touch buttons do not fit beside the logo, which pushed the menu button off screen
+   (390-430px). The wishlist steps into the menu (it is listed there), and the gaps tighten. */
+@media (max-width: 640px) {
+  .nav__inner {
+    gap: 12px;
+  }
+  .nav__actions {
+    gap: 2px;
+  }
+  .nav__wish {
+    display: none;
+  }
+  .nav__actions .nav__account,
+  .nav__actions .nav__account-wrap {
+    margin-left: 8px;
+  }
+  .nav__actions .nav__account::before,
+  .nav__actions .nav__account-wrap::before {
+    left: -5px;
+  }
+  .nav__actions .nav__menu-btn {
+    margin-left: 0;
+  }
+}
+
+/* Floating WhatsApp button: tucked away while the hero or Visit section (each with its own button) is on screen. */
+.fab {
+  transition: transform 0.3s var(--ease), opacity 0.25s var(--ease), background-color 0.25s var(--ease);
+}
+.fab.is-tucked {
+  opacity: 0;
+  visibility: hidden; /* out of the tab order too */
+  transform: translateY(16px) scale(0.9);
+  pointer-events: none;
+  transition: transform 0.3s var(--ease), opacity 0.25s var(--ease), visibility 0s linear 0.3s;
+}
+
+/* Phone menu: link size follows the screen height, so all ten links fit on a 375x812 phone
+   without scrolling (they were 80px rows, about 950px in total). */
+.menu__links a,
+.menu__btn {
+  padding-block: clamp(8px, 1.4vh, 14px);
+  font-size: clamp(1.5rem, 4.2vh, 2rem);
+  line-height: 1.25;
+}
+
+/* Touch screens: breadcrumb links and the wedding-date field reach the 44px tap size.
+   The crumbs' margins shrink by the same amount so the page rhythm stays the same. */
+@media (pointer: coarse) {
+  .crumbs {
+    margin: 0 0 12px;
+    row-gap: 0;
+  }
+  .crumbs a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .wedding-date__input {
+    min-height: 44px;
+    font-size: 16px; /* under 16px, iPhones zoom the page on focus */
   }
 }
