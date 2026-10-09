@@ -15,9 +15,9 @@
   --danger: #ff8a8a;
   --ok: #9fe0b0;
 
-  --font-display: 'Cormorant Garamond', 'Cormorant Fallback', serif;
-  --font-body: 'Plus Jakarta Sans', 'Jakarta Fallback', system-ui, sans-serif;
-  --font-bn: 'Noto Serif Bengali', 'Cormorant Garamond', serif;
+  --font-display: 'Parineeta Numerals', 'Cormorant Garamond', 'Cormorant Fallback', serif;
+  --font-body: 'Parineeta Numerals', 'Plus Jakarta Sans', 'Jakarta Fallback', system-ui, sans-serif;
+  --font-bn: 'Parineeta Numerals', 'Noto Serif Bengali', 'Cormorant Garamond', serif;
 
   --r-card: 20px;
   --r-input: 12px;

@@ -1,0 +1,22 @@
+/* Numbers in Arial (Calibri where Arial is missing), words in the brand fonts.
+   'Parineeta Numerals' covers only the digits 0-9, the rupee sign and %, and sits first in every font stack,
+   so each number on the site renders in Arial while the letters around it fall through to the next font.
+   Nothing is downloaded: local() uses the font already on the device. Phones without Arial (most Android)
+   get its metric twin (Liberation Sans / Arimo) or the system sans. Bengali digits are untouched. */
+@font-face {
+  font-family: 'Parineeta Numerals';
+  src: local('Arial'), local('ArialMT'), local('Calibri'), local('Liberation Sans'), local('Arimo'), local('Helvetica'), local('Roboto');
+  font-weight: 100 599;
+  unicode-range: U+0030-0039, U+0025, U+20B9;
+}
+@font-face {
+  font-family: 'Parineeta Numerals';
+  src: local('Arial Bold'), local('Arial-BoldMT'), local('Calibri Bold'), local('Liberation Sans Bold'), local('Arimo Bold'), local('Helvetica Bold'), local('Roboto Bold');
+  font-weight: 600 900;
+  unicode-range: U+0030-0039, U+0025, U+20B9;
+}
+
+:root {
+  /* Whole-element number font: prices and counts, so the commas in ₹1,450 match the digits. */
+  --font-num: Arial, Calibri, 'Liberation Sans', Arimo, Helvetica, sans-serif;
+}

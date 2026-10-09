@@ -1,3 +1,4 @@
+import '../styles/numerals.css';
 import './admin.css';
 import { configured, getClerk, getSupabase, userOf } from '../auth/client.js';
 import { SECTIONS, FILM_OPTIONS } from './schemas.js';
@@ -280,7 +281,7 @@ function paintPublishBar() {
     : ctx.notLive.size ? 'Some published changes are not live yet'
     : 'Your website is up to date ✓';
   bar.replaceChildren(...[
-    h('span', { class: `pub__state${j?.status === 'failed' ? ' is-err' : ''}`, role: 'status', text: state }),
+    h('span', { class: `pub__state${j?.status === 'failed' ? ' is-err' : ''}`, role: 'status', title: state, text: state }),
     j?.run_url && (j.status === 'failed' || busy) ? h('a', { href: j.run_url, target: '_blank', rel: 'noopener', class: 'linkbtn', text: 'Run log' }) : null,
     h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Preview', onclick: openPreview }),
     ctx.role === 'owner' && !busy && (j?.status === 'failed' || (!n && ctx.notLive.size)) ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Retry update', onclick: retryDeploy }) : null,
@@ -694,6 +695,7 @@ async function openHistory(section) {
 }
 
 /* ---------- layout ---------- */
+const topSize = new ResizeObserver(([e]) => document.documentElement.style.setProperty('--top-h', `${Math.round(e.target.offsetHeight)}px`));
 // Owner only: orders from the website's checkout. /admin#orders opens it directly.
 const ORDERS = 'orders';
 const DEMAND = 'demand';
@@ -816,6 +818,9 @@ function render() {
       edited: () => { writeBackup('models'); writeBackup('products'); paintPublishBar(); } })
     : ctx.section === 'reviews' ? reviewsView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), onCount: setReviewCount })
     : sectionView(section))));
+  // The sidebar and the product list stick just under the top bar, whatever its height (it wraps on phones).
+  topSize.disconnect();
+  topSize.observe(top);
   if (clerk) {
     if (ctx.userBtn) clerk.unmountUserButton(ctx.userBtn);
     clerk.mountUserButton((ctx.userBtn = userBtn), { showName: true });

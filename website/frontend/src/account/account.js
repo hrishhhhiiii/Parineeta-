@@ -1,5 +1,6 @@
 // /account: a signed-in customer's orders and their stage, plus profile settings (sign-in is on /login).
 // Orders are matched by the account's email: checkout fills it in for signed-in customers.
+import '../styles/numerals.css';
 import '../login/login.css';
 import { tooManyHops } from '../auth/hops.js';
 

@@ -2,6 +2,7 @@
 // and customers go to their orders (/account). An account is optional: customers can always buy
 // as guests. Tabs switch between Sign in and Create account, and "Forgot your password?" resets it
 // with a code sent by email. Password, email code and Google are switched on in the Clerk dashboard.
+import '../styles/numerals.css';
 import './login.css';
 import { configured, getClerk, getSupabase } from '../auth/client.js';
 import { tooManyHops } from '../auth/hops.js';

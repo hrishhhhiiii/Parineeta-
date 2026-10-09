@@ -1621,3 +1621,26 @@ img.thumb--photo {
     font-size: 16px; /* under 16px, iPhones zoom the page on focus */
   }
 }
+
+/* ---------- numbers: prices and counts in Arial (see numerals.css) ---------- */
+/* Every digit on the site is already Arial. These elements are prices or bare numbers, so they take Arial
+   whole: the commas in ₹1,450 and the "from" before a price match the digits, and figures line up. */
+.price,
+.tile-card__price,
+.mini-card__price,
+.bcard__price,
+.search-hit__price,
+.line__price,
+#cart-total,
+.enq__total strong,
+.co-pay__amount strong,
+.qty__val,
+.badge,
+.catalogue-count,
+.dist__count,
+.lightbox__count,
+.reviews-summary__avg:not(.reviews-summary__avg--none) {
+  font-family: var(--font-num);
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0;
+}
