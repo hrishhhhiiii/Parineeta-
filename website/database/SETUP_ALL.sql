@@ -56,7 +56,7 @@ create policy "admins change media" on storage.objects for update using (bucket_
 drop policy if exists "admins delete media" on storage.objects;
 create policy "admins delete media" on storage.objects for delete using (bucket_id = 'media' and public.is_admin());
 
--- ▼ Put the shop owner's login email here.
+-- ▼ Put the shop owner's login email here (kept out of the repo, which is public).
 insert into public.admins (email) values ('owner-login@example.com') on conflict do nothing;
 
 

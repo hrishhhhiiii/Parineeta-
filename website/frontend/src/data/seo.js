@@ -15,12 +15,15 @@ export function clip(text, max = 158) {
   return `${(end > max * 0.6 ? cut.slice(0, end) : cut).replace(/[\s,;:.–-]+$/, '')}…`;
 }
 
+/** "Darpan (দর্পণ)", or just "Darpan" when the Bengali name is blank. */
+export const bothNames = (p) => `${String(p.en || '').replace(/\s+/g, ' ').trim()}${p.bn ? ` (${p.bn})` : ''}`;
+
 export const categoryLabel = (p) => CATEGORIES.find((c) => c.id === p.category)?.label || '';
 
 /** "Darpan (দর্পণ), Wedding rituals | Parineeta, Patuli" */
 export function productTitle(p) {
   const cat = categoryLabel(p);
-  return `${p.en} (${p.bn})${cat ? `, ${cat}` : ''} | Parineeta, Patuli`;
+  return `${bothNames(p)}${cat ? `, ${cat}` : ''} | Parineeta, Patuli`;
 }
 
 /** The product's one-liner and story, ending with where it is made when there is room. */
@@ -50,7 +53,7 @@ export function productSchema(p, { origin = '', images = [] } = {}) {
     '@type': 'Product',
     ...(origin ? { '@id': `${url}#product`, url } : {}),
     name: p.en,
-    alternateName: p.bn,
+    ...(p.bn ? { alternateName: p.bn } : {}),
     sku: p.id,
     description: p.story || p.line,
     ...(categoryLabel(p) ? { category: categoryLabel(p) } : {}),

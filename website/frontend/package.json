@@ -17,8 +17,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@clerk/clerk-js": "^6.34.1",
-    "@clerk/ui": "^1.36.0",
+    "@clerk/clerk-js": "^6.39.0",
+    "@clerk/ui": "^1.40.0",
     "@phosphor-icons/core": "^2.1.1",
     "@supabase/supabase-js": "^2.117.2",
     "gsap": "^3.15.0",
@@ -27,6 +27,7 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "vite": "^8.3.1",
     "vitest": "^5.0.3"
   }

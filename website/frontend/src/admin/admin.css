@@ -113,7 +113,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .form-heading.is-flash { animation: heading-flash 1.6s ease-out; }
 @keyframes heading-flash { 0%, 40% { background: rgba(212, 175, 55, 0.22); box-shadow: 0 0 0 8px rgba(212, 175, 55, 0.22); border-radius: 6px; } 100% { background: transparent; box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .form-heading.is-flash { animation: none; } }
-.sec-head__link { margin-top: 10px; }
+.sec-head__link { margin-top: 10px; max-width: 100%; white-space: normal; text-align: left; }
 .field { display: grid; gap: 6px; }
 .field__label { font-weight: 600; font-size: 0.9rem; color: var(--ink-2); }
 .req { color: var(--gold); }

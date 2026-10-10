@@ -7,6 +7,7 @@ import { mergeEdits } from './merge.js';
 import { variantsOf } from '../data/products.js';
 import { avatar, profileOf } from '../auth/profile.js';
 import { ordersView } from './orders.js';
+import { couponsView } from './coupons.js';
 import { reviewsView, newReviewCount } from './reviews.js';
 import { modelsView } from './modelsView.js';
 
@@ -59,6 +60,7 @@ function demoClient() {
   const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
     total: 1450, paid_now: 725, plan: '50% advance', utr: '426512345678', event_date: '2026-12-02', address: 'Patuli, Kolkata', status: 'placed', suspect: false,
     items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null }];
+  const demoCoupons = [{ code: 'WEDDING10', kind: 'percent', value: 10, min_total: 1000, max_off: 500, starts_on: null, ends_on: null, max_uses: 50, used: 3, active: true, note: 'Demo code', created_at: new Date().toISOString() }];
   const demoReviews = [
     { id: 'rv-1', review_date: '2026-10-03', product: 'gach-kouto', rating: 5, name: 'Moumita Ghosh', place: 'Katwa', phone: '9800012345', source: 'website',
       title: 'Beautiful work', text: 'The kouto was painted exactly as we asked, with our names on the lid. Everyone at the wedding asked where it came from.', shown: false, checked: false },
@@ -97,7 +99,19 @@ function demoClient() {
     },
     set_order_status: ({ p_ref, p_status, p_amount }) => Object.assign(demoOrders.find((o) => o.ref === p_ref), { status: p_status, suspect: false, ...(p_amount ? { paid_amount: p_amount, paid_at: new Date().toISOString(), paid_by: user.email } : {}) }),
     delete_order: ({ p_ref }) => demoOrders.splice(demoOrders.findIndex((o) => o.ref === p_ref), 1),
+    // 019_coupons.sql
+    admin_coupons: () => demoCoupons,
+    save_coupon: ({ p }) => {
+      const row = { code: p.code, kind: p.kind, value: Number(p.value), min_total: Number(p.minTotal) || 0, max_off: Number(p.maxOff) || null, starts_on: p.startsOn || null, ends_on: p.endsOn || null, max_uses: Number(p.maxUses) || null, active: p.active !== false, note: p.note || null };
+      const old = demoCoupons.find((c) => c.code === p.code);
+      if (old) Object.assign(old, row);
+      else demoCoupons.unshift({ ...row, used: 0, created_at: new Date().toISOString() });
+    },
+    delete_coupon: ({ p_code }) => demoCoupons.splice(demoCoupons.findIndex((c) => c.code === p_code), 1),
+    list_order_coupons: () => ({}),
     list_refunds: () => Object.fromEntries(demoOrders.filter((o) => o.refund).map((o) => [o.ref, o.refund])),
+    // 018_order_totals.sql: the first demo order shows the "check the price" note.
+    list_total_checks: () => (demoOrders[0] ? { [demoOrders[0].ref]: { check: 'changed', clientTotal: Math.max(1, Math.round(demoOrders[0].total / 2)) } } : {}),
     set_order_refund: ({ p_ref, p_stage, p_amount, p_refund_ref, p_note }) => {
       const o = demoOrders.find((x) => x.ref === p_ref);
       if (p_amount > Math.max(o.paid_amount || 0, o.total)) throw { message: 'BAD_AMOUNT', hint: 'The refund is more than the customer paid.' };
@@ -690,16 +704,18 @@ async function openHistory(section) {
 const topSize = new ResizeObserver(([e]) => document.documentElement.style.setProperty('--top-h', `${Math.round(e.target.offsetHeight)}px`));
 // Owner only: orders from the website's checkout. /admin#orders opens it directly.
 const ORDERS = 'orders';
+const COUPONS = 'coupons';
 const HOME = 'home';
 // Screens that aren't saved sections: their menu icon, title and who may open them.
 const SCREENS = {
   [ORDERS]: { icon: '🧾', title: 'Orders', ownerOnly: true },
+  [COUPONS]: { icon: '🏷️', title: 'Coupons', ownerOnly: true },
 };
 const canOpen = (k) => (SCREENS[k] ? !SCREENS[k].ownerOnly || ctx.role === 'owner' : SECTIONS.some((s) => s.key === k));
 
 // The menu, grouped by how often each part is used. Anything not listed falls under "More".
 const GROUPS = [
-  { title: 'Every day', keys: [ORDERS, 'products'] },
+  { title: 'Every day', keys: [ORDERS, 'products', COUPONS] },
   { title: 'Your website', keys: ['banners', 'story', 'sets', 'reviews', 'models', 'lookbook', 'announcement', 'homepage'] },
   { title: 'Shop details', keys: ['settings', 'stores', 'socials'] },
 ];
@@ -708,6 +724,7 @@ GROUPS.push({ title: 'More', keys: SECTIONS.map((s) => s.key).filter((k) => !GRO
 // What each tile on the Home screen says, in plain words.
 const TILE_TEXT = {
   [ORDERS]: 'See new orders and mark them paid, made or delivered.',
+  [COUPONS]: 'Make a code customers type at checkout for money off, or switch one off.',
   products: 'Add a product, change a price or a photo, or hide one.',
   sets: 'Bundles sold together at one price.',
   reviews: 'Every review, kept. Choose which ones show on the website.',
@@ -797,6 +814,7 @@ function render() {
       clerk ? null : h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Sign out', onclick: async () => { if (!anyDirty() || confirm('You have unsaved changes. Sign out anyway?')) toLogin('?signout'); } })));
 
   root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === HOME ? homeView() : ctx.section === ORDERS ? ordersView(sb, { h, toast, explain })
+    : ctx.section === COUPONS ? couponsView(sb, { h, toast, explain })
     : ctx.section === 'models' ? modelsView({ h, toast, sb, ctx, slugify, changed, saveAll: saveModels, undoAll: undoModels,
       edited: () => { writeBackup('models'); writeBackup('products'); paintPublishBar(); } })
     : ctx.section === 'reviews' ? reviewsView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), onCount: setReviewCount })

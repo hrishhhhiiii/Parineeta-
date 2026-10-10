@@ -16,11 +16,14 @@ export const onDropped = (fn) => droppedSubs.add(fn);
  *  open) `combo` for products that only have the original option list. Unreadable lines return null. */
 function readLine(l) {
   if (!l || typeof l !== 'object' || !byId(l.id) || !Number.isFinite(l.qty)) return null;
-  if (isSet(l.id)) return { ...l, key: l.key || [l.id, '', '', ''].join('|') };
+  // Saved carts can be edited in the browser: whole pieces only, 1 to MAX_QTY, so a total can't go negative.
+  const qty = Math.min(MAX_QTY, Math.floor(l.qty));
+  if (qty < 1) return null;
+  if (isSet(l.id)) return { ...l, qty, key: l.key || [l.id, '', '', ''].join('|') };
   const p = byId(l.id);
-  const pick = pickOf(p, l);
+  const pick = pickOf(p, { ...l, qty });
   const legacy = isLegacyChoices(variantsOf(p));
-  return { ...l, pick, combo: legacy ? pick.option : null, key: lineKey(p, { ...l, pick }) };
+  return { ...l, qty, pick, combo: legacy ? pick.option : null, key: lineKey(p, { ...l, pick }) };
 }
 const readLines = (lines) => {
   const out = [];

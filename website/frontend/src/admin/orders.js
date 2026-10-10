@@ -119,12 +119,15 @@ export function ordersView(sb, { h, toast, explain }) {
     return h('article', { class: 'card inbox__item' },
       h('div', { class: 'inbox__head' }, h('strong', { text: `${o.ref} · ${o.name}` }), h('span', { class: 'muted', text: when(o.created_at) })),
       o.suspect ? h('p', { class: 'form-msg', text: 'Many orders came from the same connection within an hour. Check this one is real before making it.' }) : null,
+      o.totalCheck?.check === 'changed' ? h('p', { class: 'form-msg', text: `Check the price before taking money: the customer's page showed ${rupees(o.totalCheck.clientTotal)}, but the published prices add up to ${rupees(o.total)} (shown below). Either prices changed while they were ordering, or the page was edited.` }) : null,
+      o.totalCheck?.check === 'unverified' ? h('p', { class: 'form-msg', text: 'The website could not check this total against the published prices (an older page, or a piece not in the published catalogue). Check the items and prices before taking money.' }) : null,
       h('p', {}, ...[
         o.phone ? h('a', { href: `tel:${o.phone}`, text: o.phone }) : null,
         digits.length >= 10 ? h('a', { href: `https://wa.me/${digits.length === 10 ? `91${digits}` : digits}`, target: '_blank', rel: 'noopener', text: 'WhatsApp' }) : null,
         o.email ? h('a', { href: `mailto:${o.email}`, text: o.email }) : null,
       ].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
-      h('ul', {}, ...(o.items || []).map((i) => h('li', { text: `${i.qty} × ${i.title}${i.detail ? ` (${i.detail})` : ''}: ${rupees(i.amount)}` }))),
+      h('ul', {}, ...(o.items || []).map((i) => h('li', { text: `${i.qty} × ${i.title}${i.detail ? ` (${i.detail})` : ''}: ${rupees(i.amount)}${i.clientAmount != null ? ` (their page said ${rupees(i.clientAmount)})` : ''}` }))),
+      o.coupon ? h('p', { text: `Coupon ${o.coupon.code}: ${rupees(o.coupon.off)} off (already taken off the total below).` }) : null,
       h('p', { text: `Estimated total ${rupees(o.total)}. ${paidLine}.` }),
       o.event_date || o.address ? h('p', { class: 'muted', text: [o.event_date && `Event: ${o.event_date}`, o.address && `Deliver to: ${o.address}`].filter(Boolean).join(' · ') }) : null,
       o.paid_amount ? h('p', { class: 'muted', text: `Received ${rupees(o.paid_amount)}${o.paid_at ? ` on ${when(o.paid_at)}` : ''}${o.paid_by ? ` (${o.paid_by})` : ''}` }) : null,
@@ -134,11 +137,14 @@ export function ordersView(sb, { h, toast, explain }) {
       h('p', {}, remove));
   };
 
-  // Refund details come from their own function, so the Orders list still loads before 016 is run.
-  Promise.all([sb.rpc('list_orders'), Promise.resolve(sb.rpc('list_refunds')).catch(() => ({ data: {} }))]).then(([{ data, error }, refunds]) => {
+  // Refund details, price checks and coupons come from their own functions, so the Orders list still loads before 016/018/019 are run.
+  const optional = (fn) => Promise.resolve(sb.rpc(fn)).catch(() => ({ data: {} }));
+  Promise.all([sb.rpc('list_orders'), optional('list_refunds'), optional('list_total_checks'), optional('list_order_coupons')]).then(([{ data, error }, refunds, checks, coupons]) => {
     if (error) return body.replaceChildren(h('p', { class: 'form-msg', text: `Could not load orders: ${explain(error)}` }));
     const byRef = (!refunds?.error && refunds?.data) || {};
-    rows = (data || []).map((o) => (byRef[o.ref] ? { ...o, refund: byRef[o.ref] } : o));
+    const checkByRef = (!checks?.error && checks?.data) || {};
+    const couponByRef = (!coupons?.error && coupons?.data) || {};
+    rows = (data || []).map((o) => ({ ...o, ...(byRef[o.ref] ? { refund: byRef[o.ref] } : {}), ...(checkByRef[o.ref] ? { totalCheck: checkByRef[o.ref] } : {}), ...(couponByRef[o.ref] ? { coupon: couponByRef[o.ref] } : {}) }));
     paint();
   });
   return h('div', {}, h('div', { class: 'sec-head' }, h('div', {}, h('h1', { text: 'Orders' }),

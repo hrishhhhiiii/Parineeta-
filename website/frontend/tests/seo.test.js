@@ -57,3 +57,20 @@ describe('schema.org data', () => {
     expect(b.itemListElement.map((i) => i.position)).toEqual(names.map((_, i) => i + 1));
   });
 });
+
+describe('blank Bengali names and saved categories', () => {
+  it('no empty brackets when the Bengali name is blank, and spaces are tidied', async () => {
+    const { bothNames } = await import('../src/data/seo.js');
+    expect(bothNames({ en: 'gach   kouto 2', bn: '' })).toBe('gach kouto 2');
+    expect(productTitle({ ...p, bn: '' })).not.toContain('()');
+    expect(productSchema({ ...p, bn: '' }).alternateName).toBeUndefined();
+  });
+  it('a category saved before "About" existed gets the built-in paragraph; a written one is kept', async () => {
+    const { DEFAULT_CATEGORY_ABOUT } = await import('../src/data/products.js');
+    const { applyAll } = await import('../src/cms/apply.js');
+    const id = Object.keys(DEFAULT_CATEGORY_ABOUT)[0];
+    applyAll({ categories: [{ id, label: 'Renamed' }, { id: 'x-new', label: 'New', about: 'Ours.' }] });
+    expect(CATEGORIES.find((c) => c.id === id).about).toBe(DEFAULT_CATEGORY_ABOUT[id]);
+    expect(CATEGORIES.find((c) => c.id === 'x-new').about).toBe('Ours.');
+  });
+});

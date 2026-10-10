@@ -626,6 +626,25 @@
   font-size: 1.35rem;
   font-weight: 600;
 }
+/* Coupon code at checkout (migrations/019_coupons.sql): shown only while the shop has a usable code. */
+.co-coupon {
+  margin-top: 14px;
+}
+.co-coupon__row {
+  display: flex;
+  gap: 8px;
+}
+.co-coupon__row .input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+}
+.co-coupon__row .btn {
+  flex: none;
+}
+.co-discount span:last-child {
+  white-space: nowrap;
+}
 .co-amounts {
   display: grid;
   gap: 8px;
@@ -1032,11 +1051,14 @@ a.review__source { text-decoration: underline; text-underline-offset: 3px; }
   font-size: 0.75rem;
   font-weight: 600;
   opacity: 0;
+  /* Hidden, not just see-through: otherwise screen readers say "Selected" on every card. */
+  visibility: hidden;
   transform: translateY(-4px);
-  transition: opacity 0.2s, transform 0.25s var(--ease);
+  transition: opacity 0.2s, transform 0.25s var(--ease), visibility 0.2s;
 }
 .bcard.is-active .bcard__tag {
   opacity: 1;
+  visibility: visible;
   transform: none;
 }
 .bcard__text {

@@ -1,6 +1,6 @@
 // Applies published admin content over the bundled defaults in src/data. Runs at build time
 // (product pages), on page load (published.json baked into the bundle) and in admin preview.
-import { PRODUCTS, CATEGORIES, SETS, STORY, PALETTES, variantsOf, DEFAULT_ALIASES } from '../data/products.js';
+import { PRODUCTS, CATEGORIES, SETS, STORY, PALETTES, variantsOf, DEFAULT_ALIASES, DEFAULT_CATEGORY_ABOUT } from '../data/products.js';
 import { SITE, PAYMENTS, TRUST, LOOKBOOK, SERVICES } from '../data/site.js';
 import { WRITTEN_REVIEWS } from '../data/reviews.js';
 import { ANNOUNCEMENT } from '../data/announcement.js';
@@ -41,7 +41,8 @@ export const CONTENT_APPLY = {
     replace(MODELS.custom, (d?.custom || []).filter((m) => m && m.id && m.file));
   },
   products: (d) => replace(PRODUCTS, cleanProducts(d)),
-  categories: (d) => replace(CATEGORIES, [{ id: 'all', label: 'Everything' }, ...d.filter((c) => c.id && c.id !== 'all')]),
+  categories: (d) => replace(CATEGORIES, [{ id: 'all', label: 'Everything' }, ...d.filter((c) => c.id && c.id !== 'all')
+    .map((c) => (c.about == null && DEFAULT_CATEGORY_ABOUT[c.id] ? { ...c, about: DEFAULT_CATEGORY_ABOUT[c.id] } : c))]),
   sets: (d) => replace(SETS, d.filter((s) => s.id && !s.hidden)
     .map((s) => ({ ...s, price: Number(s.price) || 0, items: (s.items || []).filter(hasProduct) }))
     .filter((s) => s.items.length)),

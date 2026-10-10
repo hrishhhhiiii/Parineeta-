@@ -23,11 +23,12 @@ function dialog() {
       h('div', { class: 'drawer__head' },
         h('h2', { class: 'drawer__title', id: 'gate-title', text: 'Sign in to continue' }),
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: () => closeDialog(dlg) }, icon('x'))),
-      line,
-      h('p', { class: 'field__help', text: 'Browsing stays open to everyone. An account keeps your cart and wishlist with you on every device.' }),
-      h('div', { class: 'gate__actions' },
-        h('button', { type: 'button', class: 'btn btn--gold btn--wide', onclick: goToSignIn }, 'Sign in or create an account'),
-        h('button', { type: 'button', class: 'btn btn--ghost btn--wide', onclick: () => closeDialog(dlg) }, 'Not now'))));
+      h('div', { class: 'drawer__body' },
+        line,
+        h('p', { class: 'field__help', text: 'Browsing stays open to everyone. An account keeps your cart and wishlist with you on every device.' }),
+        h('div', { class: 'gate__actions' },
+          h('button', { type: 'button', class: 'btn btn--gold btn--wide', onclick: goToSignIn }, 'Sign in or create an account'),
+          h('button', { type: 'button', class: 'btn btn--ghost btn--wide', onclick: () => closeDialog(dlg) }, 'Not now')))));
   document.body.append(dlg);
   return dlg;
 }

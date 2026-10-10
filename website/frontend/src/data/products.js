@@ -29,6 +29,10 @@ export const CATEGORIES = [
     about: "Decor to dress the venue and the home for the engagement and the wedding. The engagement platter carries the rings: a round tray wrapped in silk and lace, with a hoop of roses and strings of pearls. We also paint wall and floor alpana to order. Everything is made in your colours in Patuli, West Bengal." },
 ];
 
+// The built-in "About" paragraphs by category code, kept before published content replaces CATEGORIES:
+// categories saved before the About field existed get these instead of nothing.
+export const DEFAULT_CATEGORY_ABOUT = Object.fromEntries(CATEGORIES.filter((c) => c.about).map((c) => [c.id, c.about]));
+
 const single = { id: 'single', label: 'Single piece', add: 0 };
 
 export const PRODUCTS = [

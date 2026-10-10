@@ -1,6 +1,6 @@
 // What the shop owner can edit, and how each field is shown in the admin panel.
 // Each section is saved as one document in Supabase `site_content` under its `key`.
-import { PRODUCTS, CATEGORIES, SETS, STORY, PALETTES, variantsOf, DEFAULT_ALIASES } from '../data/products.js';
+import { PRODUCTS, CATEGORIES, SETS, STORY, PALETTES, variantsOf, DEFAULT_ALIASES, DEFAULT_CATEGORY_ABOUT } from '../data/products.js';
 import { SITE, PAYMENTS, TRUST, LOOKBOOK, SERVICES, FILMS } from '../data/site.js';
 import { WRITTEN_REVIEWS } from '../data/reviews.js';
 import { ANNOUNCEMENT } from '../data/announcement.js';
@@ -156,6 +156,8 @@ export const SECTIONS = [
     itemSub: (c) => [c.parent ? 'sub-category' : '', c.bn || ''].filter(Boolean).join(' · '),
     defaults: () => clone(CATEGORIES.filter((c) => c.id !== 'all')),
     blank: () => ({ id: '', label: '', bn: '', line: '', about: '', parent: '' }),
+    // Categories saved before "About this category" existed show the built-in paragraph, as the website does.
+    prepare: (c) => (c.about == null && DEFAULT_CATEGORY_ABOUT[c.id] ? { ...c, about: DEFAULT_CATEGORY_ABOUT[c.id] } : c),
     // One level only, and no sub-category may be left pointing at a deleted (or nested) parent.
     check: (cats) => {
       const problems = [];

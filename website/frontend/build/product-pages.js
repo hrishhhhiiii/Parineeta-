@@ -12,7 +12,7 @@ import { photoSrc } from '../src/data/site.js';
 import { applyAll } from '../src/cms/apply.js';
 import { SEO, SOCIALS, STORES, socialUrlOk, phoneList } from '../src/data/homepage.js';
 import { SITE } from '../src/data/site.js';
-import { productTitle, productDescription, categoryDescription, productSchema, breadcrumbSchema } from '../src/data/seo.js';
+import { productTitle, productDescription, categoryDescription, productSchema, breadcrumbSchema, bothNames } from '../src/data/seo.js';
 
 // Same published content the browser bundle bakes in, so /p/ pages never go stale.
 const PUBLISHED_FILE = new URL('../src/data/published.json', import.meta.url);
@@ -86,7 +86,7 @@ function setUrls(html, site, path, image) {
 function productBody(p, image, cat) {
   const c = CATEGORIES.find((x) => x.id === p.category);
   const crumbs = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${c ? categoryPath(c) : '/#collection'}">${esc(c?.label || 'Collection')}</a> / <span aria-current="page">${esc(p.en)}</span></nav>`;
-  const img = `<div class="ppage__viewer"><img src="${esc(image)}" alt="${esc(`${p.en} (${p.bn}), hand-painted by Parineeta`)}" fetchpriority="high" /></div>`;
+  const img = `<div class="ppage__viewer"><img src="${esc(image)}" alt="${esc(`${bothNames(p)}, hand-painted by Parineeta`)}" fetchpriority="high" /></div>`;
   const from = fromPrice(p);
   const price = from ? `<p class="ppage__line">From ₹${from.toLocaleString('en-IN')}${cat ? ` · ${esc(cat)}` : ''}</p>` : '';
   const info = `<div class="ppage__info"><p class="pp__bn bn" lang="bn" translate="no">${esc(p.bn)}</p><h1 class="ppage__title" id="pg-en" tabindex="-1">${esc(p.en)}</h1><p class="ppage__line">${esc(p.line)}</p><p class="pp__story">${esc(p.story)}</p>${price}</div>`;
@@ -107,7 +107,7 @@ function productHtml(base, p, site) {
   html = setMeta(html, 'property', 'og:type', 'product');
   html = setMeta(html, 'property', 'og:title', `${p.en} | Parineeta`);
   html = setMeta(html, 'property', 'og:description', p.line);
-  html = setMeta(html, 'property', 'og:image:alt', `${p.en} (${p.bn}), hand-painted by Parineeta`);
+  html = setMeta(html, 'property', 'og:image:alt', `${bothNames(p)}, hand-painted by Parineeta`);
   html = html.replace(/\s*<meta property="og:image:(width|height)" content="[^"]*" \/>/g, '');
   html = setUrls(html, site, path, image);
   html = demoteHero(html);

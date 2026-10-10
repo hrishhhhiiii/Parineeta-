@@ -20,7 +20,7 @@ const loadImage = (src) => new Promise((res) => {
 
 /**
  * r: { ref, date, name, phone, email, eventDate, address, items: [{ title, detail, qty, amount }],
- *      total, paidNow, plan, method: { id, label }, payTo, utr, status?: 'placed' | 'paid', paidAmount?, paidAt? }
+ *      subtotal?, coupon?: { code, off }, total, paidNow, plan, method: { id, label }, payTo, utr, status?: 'placed' | 'paid', paidAmount?, paidAt? }
  */
 export async function receiptBlob(r) {
   const paid = r.status === 'paid';
@@ -126,6 +126,10 @@ export async function receiptBlob(r) {
   }
   rule(30);
   y -= 30;
+  if (r.coupon?.off) {
+    pair('Items', inr(r.subtotal ?? r.total + r.coupon.off));
+    pair(`Coupon ${r.coupon.code}`, `− ${inr(r.coupon.off)}`);
+  }
   pair('Estimated total', inr(r.total), { bold: true, size: 32 });
   const settled = paid ? r.paidAmount : r.method.id === 'later' ? 0 : r.paidNow;
   if (paid) pair('Paid', inr(settled), { bold: true });

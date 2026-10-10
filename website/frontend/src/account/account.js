@@ -101,7 +101,7 @@ async function showAccount() {
     ...(error ? [h('p', { class: 'msg is-err', text: 'Could not load your orders. Please try again later.' })]
       : orders?.length ? orders.map(orderCard)
       : [h('div', { class: 'card' }, h('p', { text: 'No orders yet.' }),
-          h('p', { class: 'muted', text: `Orders placed with this email (${me.user.email}) appear here, with their stage as we make them.` }))]),
+          h('p', { class: 'muted', text: 'Orders you place while signed in appear here, with their stage as we make them.' }))]),
     settings ? h('h2', { class: 'acc-h2', text: 'Profile and password' }) : '',
     settings || '',
     back(), h('p', {}, del));

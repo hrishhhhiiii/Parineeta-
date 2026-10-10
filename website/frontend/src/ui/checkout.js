@@ -10,7 +10,7 @@ import { downloadReceipt, shareReceipt, canShareFiles } from './receipt.js';
 import { requireSignIn } from './signInGate.js';
 
 const dialog = () => $('#checkout-dialog');
-let ctx = { lines: [], fromCart: false, ref: '', requestId: '', receipt: null };
+let ctx = { lines: [], fromCart: false, ref: '', requestId: '', receipt: null, coupon: null };
 
 // Every order is also saved for the shop's admin panel (Orders). The WhatsApp message stays the
 // customer's confirmation, so a failed save never blocks them. database/migrations/009_simple_orders.sql
@@ -36,7 +36,8 @@ async function saveOrder(receipt) {
       method: 'POST',
       keepalive: true, // finishes even if the phone switches to WhatsApp
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token || SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p: { ...receipt, requestId: ctx.requestId } }),
+      // `lines` lets the server price the order itself from the published catalogue (migrations/018_order_totals.sql).
+      body: JSON.stringify({ p: { ...receipt, requestId: ctx.requestId, lines: ctx.lines.map((l) => ({ id: l.id, pick: lineInfo(l).pick || null, qty: l.qty })) } }),
     }).catch(() => {});
   } catch {
     /* the WhatsApp message still reaches the shop */
@@ -61,7 +62,76 @@ function newRef() {
   return `PRN-${ymd}-${[...crypto.getRandomValues(new Uint8Array(4))].map((b) => abc[b % 32]).join('')}`;
 }
 
-const total = () => cartTotal(ctx.lines);
+// A coupon (database/migrations/019_coupons.sql) takes a fixed number of rupees off the items' total. The
+// database works that number out, here to show it and again when the order is saved.
+const subtotal = () => cartTotal(ctx.lines);
+const total = () => Math.max(0, subtotal() - (ctx.coupon?.off || 0));
+
+async function couponRpc(fn, args = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.message || fn);
+  return body;
+}
+
+// The coupon box appears only while the shop has a usable code. Asked once per visit.
+let couponsOn = null;
+const couponsAvailable = () => (couponsOn ||= SUPABASE_URL && SUPABASE_KEY ? couponRpc('coupons_available').then((x) => x === true).catch(() => false) : Promise.resolve(false));
+
+async function applyCoupon() {
+  const input = $('#co-coupon-code');
+  const btn = $('#co-coupon-apply');
+  const msg = $('#co-coupon-msg');
+  if (ctx.coupon) {
+    ctx.coupon = null;
+    msg.textContent = '';
+    paintTotals();
+    input.focus();
+    return;
+  }
+  const code = input.value.replace(/\s/g, '').toUpperCase();
+  if (!code) return;
+  btn.disabled = true;
+  msg.className = 'field__help';
+  msg.textContent = 'Checking…';
+  try {
+    const r = await couponRpc('check_coupon', { p_code: code, p_total: subtotal() });
+    if (r?.ok) {
+      ctx.coupon = { code: r.code, off: Math.min(Number(r.off) || 0, subtotal()), label: r.label };
+      msg.textContent = `${r.code} applied: ${r.label}, you save ${inr(ctx.coupon.off)}.`;
+    } else {
+      msg.className = 'field__error';
+      msg.textContent = r?.reason || 'That code is not valid.';
+    }
+  } catch (err) {
+    msg.className = 'field__error';
+    msg.textContent = /RATE_LIMITED/.test(err.message) ? 'Too many tries. Please try again in an hour, or ask us on WhatsApp.' : 'We could not check that code just now. Please try again.';
+  } finally {
+    btn.disabled = false;
+    paintTotals();
+  }
+}
+
+// Everything on the page that depends on the total: the discount line, the total, the amount choices and the payment details.
+function paintTotals() {
+  const c = ctx.coupon;
+  const input = $('#co-coupon-code');
+  if (!input) return;
+  $('#co-discount').hidden = !c;
+  $('#co-discount-label').textContent = c ? `Coupon ${c.code}` : '';
+  $('#co-discount-amount').textContent = c ? `− ${inr(c.off)}` : '';
+  $('#co-total').textContent = inr(total());
+  $('#co-advance-label').textContent = `${PAYMENTS.advancePercent}% booking advance, ${inr(advance())}`;
+  $('#co-full-label').textContent = `Full estimate, ${inr(total())}`;
+  input.disabled = !!c;
+  if (c) input.value = c.code;
+  $('#co-coupon-apply').textContent = c ? 'Remove' : 'Apply';
+  renderMethodDetail();
+}
 const advance = () => Math.ceil((total() * PAYMENTS.advancePercent) / 100);
 
 // "Pay at the shop or on delivery" means nothing is paid now.
@@ -136,8 +206,8 @@ function render() {
     return h('li', {}, h('span', { class: 'enq__item' }, `${l.qty} × ${p.en}`, h('small', { text: [styleLabel, choiceLabel].filter(Boolean).join(', ') })), h('span', { class: 'enq__price', text: inr(t) }));
   }));
   const amountChoice = h('div', { class: 'options co-amounts' },
-    h('label', { class: 'opt', for: 'co-amount-advance' }, h('input', { type: 'radio', name: 'co-amount', value: 'advance', id: 'co-amount-advance', checked: true }), h('span', { class: 'opt__label', text: `${PAYMENTS.advancePercent}% booking advance, ${inr(advance())}` })),
-    h('label', { class: 'opt', for: 'co-amount-full' }, h('input', { type: 'radio', name: 'co-amount', value: 'full', id: 'co-amount-full' }), h('span', { class: 'opt__label', text: `Full estimate, ${inr(total())}` })));
+    h('label', { class: 'opt', for: 'co-amount-advance' }, h('input', { type: 'radio', name: 'co-amount', value: 'advance', id: 'co-amount-advance', checked: true }), h('span', { class: 'opt__label', id: 'co-advance-label', text: `${PAYMENTS.advancePercent}% booking advance, ${inr(advance())}` })),
+    h('label', { class: 'opt', for: 'co-amount-full' }, h('input', { type: 'radio', name: 'co-amount', value: 'full', id: 'co-amount-full' }), h('span', { class: 'opt__label', id: 'co-full-label', text: `Full estimate, ${inr(total())}` })));
   const ms = methods();
   const online = ms.some((m) => m.id !== 'later');
   const methodChoice = h('div', { class: 'co-methods' }, ...ms.map((m, i) => h('label', { class: 'co-method', for: `co-method-${m.id}` },
@@ -150,7 +220,15 @@ function render() {
 
   body.append(
     h('section', { class: 'co-step' }, h('h3', { class: 'co-step__title', text: 'Your order' }), list,
-      h('p', { class: 'enq__total' }, h('span', { text: 'Estimated total' }), h('strong', { text: inr(total()) })),
+      h('p', { class: 'enq__total co-discount', id: 'co-discount', hidden: true }, h('span', { id: 'co-discount-label' }), h('span', { id: 'co-discount-amount' })),
+      h('p', { class: 'enq__total' }, h('span', { text: 'Estimated total' }), h('strong', { id: 'co-total', text: inr(total()) })),
+      h('div', { class: 'co-coupon', id: 'co-coupon', hidden: true },
+        h('label', { class: 'field__label', for: 'co-coupon-code', text: 'Coupon code' }),
+        h('div', { class: 'co-coupon__row' },
+          h('input', { class: 'input', id: 'co-coupon-code', maxlength: 24, autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-describedby': 'co-coupon-msg',
+            onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); applyCoupon(); } } }),
+          h('button', { type: 'button', class: 'btn btn--ghost btn--sm', id: 'co-coupon-apply', onclick: applyCoupon }, 'Apply')),
+        h('p', { class: 'field__help', id: 'co-coupon-msg', role: 'status', 'aria-live': 'polite' })),
       h('p', { class: 'field__help', text: 'Prices are estimates until we confirm your order. Any difference is settled on delivery.' })),
     h('section', { class: 'co-step', id: 'co-amount-step' }, h('h3', { class: 'co-step__title', text: 'How much would you like to pay now?' }), amountChoice),
     h('section', { class: 'co-step' }, h('h3', { class: 'co-step__title', text: 'Your details' }),
@@ -167,7 +245,8 @@ function render() {
     date.value ||= weddingDate(todayIso());
     date.addEventListener('change', () => setWeddingDate(date.value));
   }
-  renderMethodDetail();
+  paintTotals();
+  couponsAvailable().then((on) => { const box = $('#co-coupon'); if (box) box.hidden = !on; });
   $('#co-status').textContent = '';
   $('#co-mail').hidden = !SITE.web3formsKey; // shown once an email service is set up in the admin
   $('#co-actions').hidden = false;
@@ -203,7 +282,9 @@ function orderMessage(v) {
   const out = ['Namaskar Parineeta! I would like to place an order.', '', `Order: ${ctx.ref}`];
   ctx.lines.forEach((l, i) => out.push(orderLine(l, i)));
   const paying = payLater() ? 'Paying: at the shop or on delivery' : `Paying now: ${full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`}, ${inr(amountNow())}`;
-  out.push('', `Estimated total: ${inr(total())}`, paying, `Method: ${method?.label || ''}`);
+  out.push('');
+  if (ctx.coupon) out.push(`Items: ${inr(subtotal())}`, `Coupon ${ctx.coupon.code}: − ${inr(ctx.coupon.off)}`);
+  out.push(`Estimated total: ${inr(total())}`, paying, `Method: ${method?.label || ''}`);
   if (v.utr) out.push(`Payment reference: ${v.utr}`);
   out.push('', `Name: ${v.name}`, `Phone: ${v.phone}`);
   if (v.email) out.push(`Email: ${v.email}`);
@@ -223,6 +304,7 @@ function receiptData(v) {
       const { p, total: t } = lineInfo(l);
       return { title: p.en, qty: l.qty, amount: t, detail: orderDetail(l) };
     }),
+    ...(ctx.coupon ? { subtotal: subtotal(), coupon: { code: ctx.coupon.code, off: ctx.coupon.off } } : {}),
     total: total(), paidNow: amountNow(), plan: id === 'later' ? 'pay at the shop' : full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`,
     method: { id, label: methods().find((m) => m.id === id)?.label || '' }, payTo, utr: v.utr,
   };
@@ -256,15 +338,15 @@ export function openCheckout({ lines, fromCart = false }) {
     toast(`${names} ${sold.length > 1 ? 'are' : 'is'} sold out, so ${sold.length > 1 ? 'they were' : 'it was'} left out of this order. Ask us on WhatsApp about ${sold.length > 1 ? 'them' : 'it'}.`, { iconName: 'whatsapp-logo' });
   }
   if (!ok.length) return;
-  ctx = { lines: ok.map((l) => ({ ...l })), fromCart, ref: newRef(), requestId: crypto.randomUUID(), receipt: null };
+  ctx = { lines: ok.map((l) => ({ ...l })), fromCart, ref: newRef(), requestId: crypto.randomUUID(), receipt: null, coupon: null };
   $('#co-title-ref').textContent = ctx.ref;
   render();
   openDialog(dialog());
   fillFromAccount();
 }
 
-// Signed-in customers: fill in their name and account email. The email links the order to
-// their account (/account lists orders by email). Guests never load Clerk.
+// Signed-in customers: fill in their name and account email. The order is linked to their account
+// by the Clerk token sent with it (saveOrder), not by this email. Guests never load Clerk.
 async function fillFromAccount() {
   if (!/(?:^|;\s*)__client_uat(?:_[\w-]+)?=[1-9]/.test(document.cookie)) return;
   try {
