@@ -7,14 +7,16 @@
 // compares it with the website for every combination of every product: the built-in catalogue, the
 // last published catalogue, and edge cases. If a pricing rule changes on one side only, this fails.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { PRODUCTS, SETS, variantsOf } from '../src/data/products.js';
 import { priceOf, pickOf } from '../src/data/pricing.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const migration = read('../../database/migrations/018_order_totals.sql');
-const published = JSON.parse(read('../src/data/published.json')).docs || {};
+// The last published catalogue is fetched at build time and is not in the repository, so it may be missing (e.g. on GitHub).
+const publishedFile = new URL('../src/data/published.json', import.meta.url);
+const published = existsSync(publishedFile) ? JSON.parse(readFileSync(publishedFile, 'utf8')).docs || {} : {};
 
 // Only the two pricing functions: everything from _num up to submit_order.
 const start = migration.indexOf('create or replace function public._num');
