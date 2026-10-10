@@ -76,6 +76,32 @@
 .crumbs .ico {
   font-size: 0.8rem;
 }
+/* Phones: the trail stays on one line; a long category or product name ends in "…" instead of wrapping. */
+@media (max-width: 640px) {
+  .crumbs {
+    flex-wrap: nowrap;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .crumbs > * {
+    flex: none;
+  }
+  /* "Home" is the logo's job on a phone; without it the trail usually fits whole. */
+  .crumbs > a:first-child,
+  .crumbs > a:first-child + .ico {
+    display: none;
+  }
+  .crumbs > span:not(.ico) {
+    flex: 0 3 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* If something must be shortened, the category gives way before the product's own name. */
+  .crumbs > span[aria-current] {
+    flex-shrink: 1;
+  }
+}
 .ppage__top {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
@@ -867,8 +893,8 @@
   height: 40px;
   font-size: 1.1rem;
   background: rgba(21, 5, 7, 0.55);
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 .icon-btn--glass:hover {
   background: var(--surface-2);
@@ -1214,6 +1240,12 @@ a.review__source { text-decoration: underline; text-underline-offset: 3px; }
   .builder__stage {
     height: min(44dvh, 380px);
     min-height: 260px;
+  }
+  /* On the shorter phone stage the hint sat on the model's base: it moves to the empty top corner. */
+  .builder__stage .stage-hint {
+    top: 12px;
+    bottom: auto;
+    left: 12px;
   }
 }
 @media (max-width: 480px) {

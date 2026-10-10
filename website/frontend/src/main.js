@@ -6,7 +6,6 @@ import './styles/redesign.css';
 
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import Lenis from 'lenis';
 
 import { PRODUCTS, STORY, byId, has3d, categoryOf, parentOf, categoryBySlug } from './data/products.js';
 import { waLink, photoSrc, reelStill } from './data/site.js';
@@ -19,6 +18,7 @@ import { fromPrice } from './data/pricing.js';
 import { initCatalogue, setCatalogue, catalogueState, syncUrl, isRefined, renderResults, showCollection, emptyState } from './ui/catalogue.js';
 import { initHome, renderRails, rememberViewed } from './ui/home.js';
 import { setupDialogs, setLenis, scrollToHash, whenScrollIdle } from './ui/dialogs.js';
+import { tuckFabNear } from './ui/fab.js';
 import { setupEnquiry } from './ui/enquiry.js';
 import { setupProductPanel, openProduct } from './ui/productPanel.js';
 import { setupDrawers } from './ui/drawers.js';
@@ -57,8 +57,43 @@ if (!IS_PREVIEW && /(?:^|;\s*)__client_uat(?:_[\w-]+)?=[1-9]/.test(document.cook
 gsap.registerPlugin(ScrollTrigger);
 const reduce = reduceMotion();
 
-/* ---------- static content ---------- */
+/* ---------- preloader + hero ---------- */
+// Set up before the rest of the page, so the loading screen can lift at the first pause below instead of
+// waiting for every section to be built.
+const preloader = $('#preloader');
+let preloaderGone = false;
+function hidePreloader() {
+  if (preloaderGone) return;
+  preloaderGone = true;
+  preloader.classList.add('is-done');
+  setTimeout(() => preloader.remove(), 900);
+  if (!reduce) {
+    gsap.from('[data-hero-in]', { y: 28, opacity: 0, duration: 1.1, stagger: 0.12, ease: 'power3.out', delay: 0.15 });
+    gsap.from('.hero__strip', { opacity: 0, duration: 1, delay: 0.1 });
+  }
+}
+// Reveal the page as soon as fonts are in, so the headline is not held back by WebGL. On a slow connection
+// the later font weights can take seconds: after 0.6 s the page shows anyway and the fonts swap in.
+Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 600))]).then(hidePreloader);
+
+// The page starts up in a few steps with a pause between them. Each pause lets the browser draw what it
+// has (the page as written into the HTML, pictures that have just arrived) and answer a tap. As one
+// unbroken run, start-up kept a slow phone busy for over a second and the page's main picture counted as
+// arriving only when it ended. A hidden tab draws no frames, so a pause also ends after 100 ms.
+const breathe = () => new Promise((resolve) => {
+  const t = setTimeout(resolve, 100);
+  requestAnimationFrame(() => setTimeout(() => {
+    clearTimeout(t);
+    resolve();
+  }, 0));
+});
+// Start-up may now finish after the browser's "load" event, so nothing below listens for it directly.
+const afterLoad = (fn) => (document.readyState === 'complete' ? fn() : addEventListener('load', fn, { once: true }));
+// The icons go in before the first pause, so the first screen the visitor sees already has them.
 hydrateIcons();
+await breathe();
+
+/* ---------- static content ---------- */
 $('#year').textContent = String(new Date().getFullYear());
 const hello = 'Namaskar Parineeta! I found you on your website and would like to know more.';
 $$('[data-wa]').forEach((a) => {
@@ -98,15 +133,20 @@ setupCheckout();
 setupVisitMap();
 initAlpana();
 initInvite();
+await breathe();
 
 /* ---------- smooth scroll ---------- */
-let lenis = null;
-if (!reduce) {
-  lenis = new Lenis({ lerp: 0.11, wheelMultiplier: 0.95 });
-  lenis.on('scroll', ScrollTrigger.update);
-  gsap.ticker.add((t) => lenis.raf(t * 1000));
-  gsap.ticker.lagSmoothing(0);
-  setLenis(lenis);
+// Eased wheel scrolling is for a mouse or trackpad. A touch screen already scrolls smoothly by itself, so
+// phones and tablets skip this code (it was running on every frame there and doing nothing). Until it has
+// loaded, and wherever it is skipped, the page scrolls natively and ui/dialogs.js falls back to window.scrollTo.
+if (!reduce && !window.matchMedia('(pointer: coarse)').matches) {
+  import('lenis').then(({ default: Lenis }) => {
+    const lenis = new Lenis({ lerp: 0.11, wheelMultiplier: 0.95 });
+    lenis.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add((t) => lenis.raf(t * 1000));
+    gsap.ticker.lagSmoothing(0);
+    setLenis(lenis);
+  }).catch(() => { /* native scrolling stays */ });
 }
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[href^="#"]');
@@ -134,32 +174,8 @@ document.body.prepend(sentinel);
 new IntersectionObserver(([entry]) => nav.classList.toggle('is-scrolled', !entry.isIntersecting)).observe(sentinel);
 
 // The floating WhatsApp button steps aside while a section with its own WhatsApp button is on screen,
-// so on phones it never covers the hero's or the Visit section's button.
-const fab = $('.fab');
-if (fab) {
-  const showing = new Set();
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((e) => (e.isIntersecting ? showing.add(e.target) : showing.delete(e.target)));
-    fab.classList.toggle('is-tucked', showing.size > 0);
-  }, { threshold: 0.15 });
-  $$('#top, #visit').forEach((s) => io.observe(s));
-}
-
-/* ---------- preloader + hero ---------- */
-const preloader = $('#preloader');
-let preloaderGone = false;
-function hidePreloader() {
-  if (preloaderGone) return;
-  preloaderGone = true;
-  preloader.classList.add('is-done');
-  setTimeout(() => preloader.remove(), 900);
-  if (!reduce) {
-    gsap.from('[data-hero-in]', { y: 28, opacity: 0, duration: 1.1, stagger: 0.12, ease: 'power3.out', delay: 0.15 });
-    gsap.from('.hero__strip', { opacity: 0, duration: 1, delay: 0.1 });
-  }
-}
-// Reveal the page as soon as fonts are in, so the headline is not held back by WebGL.
-Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1200))]).then(hidePreloader);
+// so on phones it never covers the hero's or the Visit section's button (ui/fab.js).
+tuckFabNear(...$$('#top, #visit'));
 
 /* ---------- deferred images ---------- */
 // Chrome's preload scanner fetched the services backdrop despite loading="lazy", so it carries data-src until it nears the viewport.
@@ -236,7 +252,6 @@ chapters.forEach((li, i) => {
 // The 3D model (about 160 KB of three.js) starts loading only when the story is close, after the page
 // has finished loading and the browser is idle, and not at all when the visitor asked to save data.
 const idle = (fn) => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(fn, 200));
-const afterLoad = (fn) => (document.readyState === 'complete' ? fn() : addEventListener('load', fn, { once: true }));
 if (!navigator.connection?.saveData) {
   whenNear($('#story-chapters'), () => afterLoad(() => idle(() => {
     import('./three/story.js').then(({ initStory }) => {
@@ -257,6 +272,7 @@ ScrollTrigger.create({
 });
 
 /* ---------- collection ---------- */
+await breathe();
 let gallery = null;
 let view = 'grid';
 const focusEls = { bn: $('#focus-bn'), en: $('#focus-en'), line: $('#focus-line'), price: $('#focus-price'), wish: $('#focus-wish'), page: $('#focus-page') };
@@ -353,7 +369,7 @@ if (catPage) {
   const q = new URLSearchParams(location.search);
   if (c) q.set(parentOf(c.id) ? 'sub' : 'cat', c.id);
   history.replaceState(history.state, '', `/${q.toString() ? `?${q}` : ''}#collection`);
-  addEventListener('load', () => setTimeout(() => scrollToHash('#collection'), 300), { once: true });
+  afterLoad(() => setTimeout(() => scrollToHash('#collection'), 300));
 }
 renderChips((cat) => setCatalogue({ cat, sub: '' }));
 // Banners and category tiles under the hero, rows at the top of the collection (ui/home.js).
@@ -384,16 +400,36 @@ else {
 }
 
 /* ---------- reveals ---------- */
+// Headings, paragraphs and cards ease in as they come up the screen. A piece is dimmed only while it is
+// just below the screen, a moment before it arrives. So whatever is on screen when the page opens, or
+// after a jump to #collection, is at full brightness straight away, and nothing can be left faded
+// (the old way dimmed the whole page at the start and waited for a scroll position to light each piece).
 if (!reduce) {
-  gsap.set('[data-reveal]', { y: 14, opacity: 0.2 });
-  ScrollTrigger.batch('[data-reveal]', {
-    start: 'top 94%',
-    once: true,
-    onEnter: (els) => gsap.to(els, { y: 0, opacity: 1, duration: 0.6, stagger: 0.06, ease: 'expo.out' }),
-  });
-  gsap.utils.toArray('.tile, .set, .video--reel, .trust__shot, .look-item').forEach((el) => {
-    gsap.from(el, { y: 20, opacity: 0.2, duration: 0.7, ease: 'expo.out', scrollTrigger: { trigger: el, start: 'top 96%', once: true } });
-  });
+  const isCard = (el) => !el.hasAttribute('data-reveal');
+  const enter = new IntersectionObserver((entries) => {
+    const arrived = entries.filter((e) => e.isIntersecting).map((e) => e.target);
+    arrived.forEach((el) => enter.unobserve(el));
+    const dimmed = arrived.filter((el) => el.dataset.dimmed);
+    const done = (els) => els.forEach((el) => delete el.dataset.dimmed);
+    const text = dimmed.filter((el) => !isCard(el));
+    const cards = dimmed.filter(isCard);
+    if (text.length) gsap.to(text, { y: 0, opacity: 1, duration: 0.6, stagger: 0.06, ease: 'expo.out', clearProps: 'opacity,transform', onComplete: () => done(text) });
+    if (cards.length) gsap.to(cards, { y: 0, opacity: 1, duration: 0.7, ease: 'expo.out', clearProps: 'opacity,transform', onComplete: () => done(cards) });
+  }, { rootMargin: '0px 0px -5% 0px' });
+  const near = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      const el = e.target;
+      near.unobserve(el);
+      // Still below the screen: dim it now so it can ease in. Already on screen (or passed): leave it alone.
+      if (e.boundingClientRect.top > window.innerHeight * 0.95) {
+        gsap.set(el, { y: isCard(el) ? 20 : 14, opacity: 0.2 });
+        el.dataset.dimmed = '1';
+      }
+      enter.observe(el);
+    }
+  }, { rootMargin: '0px 0px 15% 0px' });
+  $$('[data-reveal], .tile, .set, .video--reel, .trust__shot, .look-item').forEach((el) => near.observe(el));
   gsap.to('.hero__photo img', { yPercent: 8, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
 }
 
@@ -430,6 +466,7 @@ if (droppedLines()) requestAnimationFrame(() => tellDropped(droppedLines()));
 onDropped(tellDropped);
 
 /* ---------- product pages (/p/<id>/) ---------- */
+await breathe();
 store.subscribe(refreshWish);
 initRouter({
   render: (root, p) => {
@@ -452,4 +489,4 @@ initRouter({
   },
 });
 
-window.addEventListener('load', () => whenScrollIdle(() => ScrollTrigger.refresh()));
+afterLoad(() => whenScrollIdle(() => ScrollTrigger.refresh()));

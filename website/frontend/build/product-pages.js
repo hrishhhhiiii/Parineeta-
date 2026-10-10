@@ -6,11 +6,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PRODUCTS, CATEGORIES, isSet, parentOf, inCategory, categoryPath } from '../src/data/products.js';
+import { PRODUCTS, CATEGORIES, isSet, parentOf, inCategory, categoryPath, categoryAliasSlug, has3d } from '../src/data/products.js';
 import { fromPrice } from '../src/data/pricing.js';
-import { photoSrc } from '../src/data/site.js';
+import { photoSrc, photoSrcset, STAGE_SIZES } from '../src/data/site.js';
 import { applyAll } from '../src/cms/apply.js';
-import { SEO, SOCIALS, STORES, socialUrlOk, phoneList } from '../src/data/homepage.js';
+import { SEO, SOCIALS, STORES, HOMEPAGE, socialUrlOk, phoneList } from '../src/data/homepage.js';
 import { SITE } from '../src/data/site.js';
 import { productTitle, productDescription, categoryDescription, productSchema, breadcrumbSchema, bothNames } from '../src/data/seo.js';
 
@@ -82,18 +82,28 @@ function setUrls(html, site, path, image) {
 }
 
 /** The product's name, words and photo, written into the page so search engines and no-script visitors
- *  see it straight away. The browser then draws the full product page over it with the same classes. */
+ *  see it straight away. The browser then draws the full product page over it.
+ *  The picture sits in the same boxes, and asks for the same files, as the script's own first view
+ *  (ui/productPage.js builder + ui/mediaStage.js). So it is on screen before the script runs, the script
+ *  finds those files already downloaded, and nothing large appears late. */
 function productBody(p, image, cat) {
   const c = CATEGORIES.find((x) => x.id === p.category);
-  const crumbs = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${c ? categoryPath(c) : '/#collection'}">${esc(c?.label || 'Collection')}</a> / <span aria-current="page">${esc(p.en)}</span></nav>`;
-  const img = `<div class="ppage__viewer"><img src="${esc(image)}" alt="${esc(`${bothNames(p)}, hand-painted by Parineeta`)}" fetchpriority="high" /></div>`;
+  const sep = '<span class="ico" aria-hidden="true">/</span>';
+  const crumbs = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a>${sep}<a href="${c ? categoryPath(c) : '/#collection'}">${esc(c?.label || 'Collection')}</a>${sep}<span aria-current="page">${esc(p.en)}</span></nav>`;
+  const alt = esc(`${bothNames(p)}, hand-painted by Parineeta`);
+  const photo = p.media?.find((m) => m.type === 'photo');
+  // A product with no 3D model opens on its photo over a blurred copy of it; one with 3D swaps the photo for the model.
+  const backdrop = photo && !has3d(p) ? `<img class="ppage__backdrop" src="${esc(photoSrc(photo.id, 400))}" alt="" aria-hidden="true" />` : '';
+  const picture = photo
+    ? `${backdrop}<span class="ppage__photo"><img src="${esc(photoSrc(photo.id, 1600))}" srcset="${esc(photoSrcset(photo.id))}" sizes="${STAGE_SIZES}" alt="${alt}" fetchpriority="high" /></span>`
+    : `<span class="ppage__photo"><img src="${esc(image)}" alt="${alt}" fetchpriority="high" /></span>`;
   const from = fromPrice(p);
   const price = from ? `<p class="ppage__line">From ₹${from.toLocaleString('en-IN')}${cat ? ` · ${esc(cat)}` : ''}</p>` : '';
-  const info = `<div class="ppage__info"><p class="pp__bn bn" lang="bn" translate="no">${esc(p.bn)}</p><h1 class="ppage__title" id="pg-en" tabindex="-1">${esc(p.en)}</h1><p class="ppage__line">${esc(p.line)}</p><p class="pp__story">${esc(p.story)}</p>${price}</div>`;
-  return `<main class="ppage" id="product-page"><div class="container">${crumbs}<div class="ppage__top"><div class="ppage__media">${img}</div>${info}</div></div></main>`;
+  const info = `<div class="builder__info"><p class="pp__bn bn" lang="bn" translate="no">${esc(p.bn)}</p><h1 class="ppage__title" id="pg-en" tabindex="-1">${esc(p.en)}</h1><p class="ppage__line">${esc(p.line)}</p><p class="pp__story">${esc(p.story)}</p>${price}</div>`;
+  return `<main class="ppage" id="product-page"><div class="container">${crumbs}<div class="builder"><div class="builder__main"></div><aside class="builder__panel"><div class="ppage__viewer builder__stage">${picture}</div>${info}</aside></div></div></main>`;
 }
 
-function productHtml(base, p, site) {
+function productHtml(base, p, site, connect) {
   const path = `/p/${p.id}/`;
   const title = productTitle(p);
   const desc = productDescription(p);
@@ -110,7 +120,12 @@ function productHtml(base, p, site) {
   html = setMeta(html, 'property', 'og:image:alt', `${bothNames(p)}, hand-painted by Parineeta`);
   html = html.replace(/\s*<meta property="og:image:(width|height)" content="[^"]*" \/>/g, '');
   html = setUrls(html, site, path, image);
+  // Reviews come from the database as soon as the product page starts: open that connection early.
+  if (connect) html = html.replace('</head>', `  <link rel="preconnect" href="${esc(connect)}" crossorigin />\n</head>`);
   html = demoteHero(html);
+  // The landing page is hidden while a product shows, so its large hero photo waits until the visitor goes
+  // there instead of being fetched first, ahead of the product's own picture.
+  html = html.replace(/(<figure class="hero__photo">\s*<img [^>]*?)\s+fetchpriority="high"/, '$1 loading="lazy"');
   // The product shows first; the landing page stays in the HTML for when the visitor goes back.
   html = html.replace('<main id="main">', '<main id="main" hidden>').replace('<main class="ppage" id="product-page" hidden></main>', productBody(p, image, cat));
   const ld = productSchema(p, { origin: site, images: productImages(p) });
@@ -167,8 +182,9 @@ function categoryHtml(base, c, site) {
   return html.replace('</head>', `${ldTag(ld)}${ldTag(breadcrumbSchema(site, { category: c.id }))}</head>`);
 }
 
-export function productPages({ site = '' } = {}) {
+export function productPages({ site = '', connect = '' } = {}) {
   site = site.replace(/\/+$/, '');
+  connect = /^https:\/\/[a-z0-9.-]+\/?$/i.test(connect) ? connect.replace(/\/+$/, '') : '';
   let outDir = 'dist';
   return {
     name: 'parineeta-product-pages',
@@ -181,6 +197,13 @@ export function productPages({ site = '' } = {}) {
       handler(html, ctx) {
         if (!ctx.path.endsWith('/index.html')) return html;
         html = applySeo(html);
+        // The hero photo chosen in the admin is written into the page, so the browser fetches it straight
+        // away instead of fetching the built-in one first and swapping when the script runs.
+        const hero = HOMEPAGE.hero || {};
+        if (hero.photo) {
+          html = html.replace(/(<figure class="hero__photo">\s*<img )src="[^"]*" srcset="[^"]*"( sizes="[^"]*") alt="[^"]*"/,
+            (m, a, b) => `${a}src="${esc(photoSrc(hero.photo, 1600))}" srcset="${esc(photoSrcset(hero.photo))}"${b} alt="${esc(hero.photoAlt || '')}"`);
+        }
         const ogImage = SEO.ogImage ? photoSrc(SEO.ogImage, 1600) : DEFAULT_IMAGE;
         html = setUrls(html, site, '/', ogImage).replace('"image": "/brand/og-logo.jpg"', `"image": "${abs(site, DEFAULT_IMAGE)}"`);
         // With the site address known, the shop gets a stable id and absolute links.
@@ -197,13 +220,22 @@ export function productPages({ site = '' } = {}) {
       for (const p of list) {
         const dir = join(outDir, 'p', p.id);
         await mkdir(dir, { recursive: true });
-        await writeFile(join(dir, 'index.html'), productHtml(bare, p, site));
+        await writeFile(join(dir, 'index.html'), productHtml(bare, p, site, connect));
       }
       const cats = routableCategories();
       for (const c of cats) {
         const dir = join(outDir, ...categoryPath(c).split('/').filter(Boolean));
         await mkdir(dir, { recursive: true });
-        await writeFile(join(dir, 'index.html'), categoryHtml(bare, c, site));
+        const page = categoryHtml(bare, c, site);
+        await writeFile(join(dir, 'index.html'), page);
+        // A renamed category also answers at the address made from its current name (pages built before
+        // addresses were fixed used it). Same page; its canonical link names the real address, and it is
+        // left out of the sitemap.
+        const alias = categoryAliasSlug(c);
+        if (alias) {
+          await mkdir(join(outDir, 'c', alias), { recursive: true });
+          await writeFile(join(outDir, 'c', alias, 'index.html'), page);
+        }
       }
       let robots = 'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nDisallow: /login\n';
       if (site) {

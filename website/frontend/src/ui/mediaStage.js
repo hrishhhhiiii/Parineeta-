@@ -1,7 +1,7 @@
 // The product media stage used by the product page and the quick-view panel:
 // the shop's real photos and films first, the 3D model as the last option
 // (and the only one for products with no real media yet).
-import { photoSrc, photoSrcset, reelSrc, reelPoster } from '../data/site.js';
+import { photoSrc, photoSrcset, reelSrc, reelPoster, STAGE_SIZES } from '../data/site.js';
 import { has3d } from '../data/products.js';
 import { h, icon } from './dom.js';
 import { openLightbox, describeMedia } from './lightbox.js';
@@ -57,7 +57,7 @@ export function mediaStage(p, o) {
       stage.replaceChildren(
         h('img', { class: 'ppage__backdrop', src: photoSrc(it.id, 400), alt: '', 'aria-hidden': 'true' }),
         h('button', { type: 'button', class: 'ppage__photo', 'aria-label': `Enlarge photo: ${m.title || p.en}`, onclick: () => (real.includes(it) ? openLightbox(real, real.indexOf(it), { subject: p.en }) : openLightbox([it], 0, { subject: p.en })) },
-          h('img', { src: photoSrc(it.id, 1600), srcset: photoSrcset(it.id), sizes: '(max-width: 900px) 100vw, 58vw', alt: m.title || p.en, decoding: 'async' })),
+          h('img', { src: photoSrc(it.id, 1600), srcset: photoSrcset(it.id), sizes: STAGE_SIZES, alt: m.title || p.en, decoding: 'async' })),
         h('p', { class: 'stage-hint' }, icon('magnifying-glass-plus'), h('span', { text: 'Tap to enlarge' })));
     }
     for (const [j, b] of [...thumbs.children].entries()) b.setAttribute('aria-pressed', String(j === i));

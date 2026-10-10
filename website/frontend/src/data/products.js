@@ -398,9 +398,20 @@ export const parentOf = (id) => {
 };
 export const topCategories = () => CATEGORIES.filter((c) => c.id !== 'all' && !parentOf(c.id));
 export const childrenOf = (id) => CATEGORIES.filter((c) => c.id !== 'all' && parentOf(c.id) === id);
-/** A category's web address, made from its English name (/c/thala-sets/), not its internal code. */
-export const categorySlug = (c) => slugOf(c.label) || c.id;
+/* A category's web address never changes when the category is renamed, so links and Google results keep
+   working. The original categories keep the address made from their first English name (/c/thala-sets/,
+   read here before published content replaces CATEGORIES); a category added in the admin uses its code,
+   which is made from its name once, when it is created. */
+const ORIGINAL_SLUGS = Object.fromEntries(CATEGORIES.filter((c) => c.id !== 'all').map((c) => [c.id, slugOf(c.label)]));
+export const categorySlug = (c) => ORIGINAL_SLUGS[c.id] || slugOf(c.id) || c.id;
 export const categoryPath = (c) => `/c/${categorySlug(c)}/`;
-export const categoryBySlug = (slug) => CATEGORIES.find((c) => c.id !== 'all' && categorySlug(c) === slug);
+/** The address a category would have had from its current name, when that differs from its real one and no
+ *  other category owns it. Pages built before addresses were fixed used it, so it still opens the category. */
+export const categoryAliasSlug = (c) => {
+  const s = slugOf(c.label);
+  return s && s !== categorySlug(c) && !CATEGORIES.some((x) => x.id !== 'all' && categorySlug(x) === s) ? s : null;
+};
+export const categoryBySlug = (slug) => CATEGORIES.find((c) => c.id !== 'all' && categorySlug(c) === slug)
+  || CATEGORIES.find((c) => c.id !== 'all' && categoryAliasSlug(c) === slug);
 /** Products of a parent category include those of its sub-categories. */
 export const inCategory = (p, cat) => !cat || cat === 'all' || p.category === cat || parentOf(p.category) === cat;

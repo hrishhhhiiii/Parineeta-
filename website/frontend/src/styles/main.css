@@ -440,8 +440,8 @@ body {
 }
 .nav.is-scrolled {
   background: rgba(21, 5, 7, 0.78);
-  backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
   border-color: var(--line);
 }
 .nav__inner {
@@ -898,8 +898,8 @@ body {
   border-radius: 999px;
   border: 1px solid var(--line-strong);
   background: rgba(21, 5, 7, 0.6);
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   color: var(--ink);
   font-size: 1.3rem;
   transition: background-color 0.25s, border-color 0.25s, transform 0.25s var(--ease);
@@ -1494,8 +1494,8 @@ body {
   border-radius: 999px;
   background: rgba(21, 5, 7, 0.55);
   border: 1px solid rgba(243, 205, 116, 0.6);
-  backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   color: var(--gold-2);
   font-size: 1.3rem;
   z-index: 1;
@@ -1726,8 +1726,8 @@ dialog.sheet {
 }
 dialog.sheet::backdrop {
   background: rgba(8, 2, 3, 0.62);
-  backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 dialog.sheet[open]::backdrop {
   animation: fade-in 0.3s var(--ease);
@@ -2333,8 +2333,8 @@ input[type='date'].input {
   border-radius: var(--r-card);
   border: 1px solid var(--line-strong);
   background: rgba(36, 10, 15, 0.95);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.8);
   font-size: 0.9rem;
   pointer-events: auto;
@@ -2824,8 +2824,8 @@ input[type='date'].input {
 }
 dialog.sheet--lightbox::backdrop {
   background: rgba(8, 2, 3, 0.94);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 .sheet--lightbox[open] > * {
   animation: fade-in 0.35s var(--ease);
@@ -3032,8 +3032,8 @@ dialog.sheet--lightbox::backdrop {
   border-radius: 999px;
   border: 1px solid rgba(243, 205, 116, 0.6);
   background: rgba(21, 5, 7, 0.6);
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   color: var(--ink);
   font-size: 0.86rem;
   font-weight: 600;

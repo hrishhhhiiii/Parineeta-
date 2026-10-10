@@ -1,6 +1,10 @@
 export function h(tag, props = {}, ...kids) {
   const el = document.createElement(tag);
   if (props && props.lang === 'bn' && props.translate == null) el.setAttribute('translate', 'no');
+  // "Load this picture only when it is near the screen" has to be on the element before its address is.
+  // Given the address first, the browser may start the download at once (it did for every picture made
+  // after the page's load event), and a later loading="lazy" does not call it back.
+  if (props && props.loading != null) el.setAttribute('loading', String(props.loading));
   for (const [k, v] of Object.entries(props || {})) {
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;

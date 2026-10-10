@@ -37,8 +37,13 @@ function applyHero() {
   if (cta && h.ctaText) cta.lastChild.textContent = h.ctaText;
   const img = $('.hero__photo img');
   if (img && h.photo) {
-    img.src = photoSrc(h.photo, 1600);
-    img.srcset = photoSrcset(h.photo);
+    // Only when it differs from what the page was built with. Setting the same address again makes the
+    // browser load and draw the picture a second time, so the page's main image "arrived" only after the
+    // script had run (the build writes the published photo into the page: build/product-pages.js).
+    const src = photoSrc(h.photo, 1600);
+    const srcset = photoSrcset(h.photo);
+    if (img.getAttribute('srcset') !== srcset) img.srcset = srcset;
+    if (img.getAttribute('src') !== src) img.src = src;
     img.alt = h.photoAlt || '';
   }
   const meta = $('.hero__meta');

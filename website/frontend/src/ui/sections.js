@@ -51,9 +51,11 @@ export function renderTrust() {
   const box = $('#trust-collage');
   const refs = TRUST.map((t) => ({ type: 'photo', id: t.id, title: t.guest ? `${t.guest}, ${t.caption.charAt(0).toLowerCase()}${t.caption.slice(1)}` : t.caption }));
   TRUST.forEach((t, i) => {
+    // On phones the two full-width photos claim 60vw, so a phone fetches the 800px file (about 100 KB)
+    // instead of the 1600px one (200 to 250 KB each); it still looks sharp at that size.
     box.append(h('figure', { class: `trust__shot trust__shot--${i}` },
       h('button', { type: 'button', class: 'trust__btn', 'aria-label': `View photo: ${refs[i].title}`, onclick: () => openLightbox(refs, i, { enquire: false }) },
-        h('img', { src: photoSrc(t.id, 800), srcset: photoSrcset(t.id), sizes: ['(max-width: 900px) 100vw, 21vw', '(max-width: 900px) 100vw, 31vw', '(max-width: 900px) 50vw, 15vw', '(max-width: 900px) 50vw, 15vw'][i], alt: refs[i].title, loading: 'lazy', width: 800, height: 800 })),
+        h('img', { src: photoSrc(t.id, 800), srcset: photoSrcset(t.id), sizes: ['(max-width: 900px) 60vw, 21vw', '(max-width: 900px) 60vw, 31vw', '(max-width: 900px) 50vw, 15vw', '(max-width: 900px) 50vw, 15vw'][i], alt: refs[i].title, loading: 'lazy', width: 800, height: 800 })),
       h('figcaption', { text: t.guest || refs[i].title })));
   });
 }

@@ -79,12 +79,13 @@
 
   <header class="nav" id="nav">
     <div class="nav__inner container">
-      <a class="nav__brand" href="#top" aria-label="Parineeta, back to top">
+      <a class="nav__brand" href="#top">
         <span class="brand-mask nav__mono" aria-hidden="true"></span>
         <span class="nav__word" translate="no">
           <span class="nav__en">Parineeta</span>
           <span class="nav__bn bn" lang="bn" translate="no">পরিণীতা</span>
         </span>
+        <span class="sr-only">, back to top</span>
       </a>
       <nav class="nav__links" aria-label="Primary">
         <a href="#story">The rituals</a>
@@ -196,7 +197,7 @@
         </div>
         <div class="filmband__frame">
           <video id="filmband-video" muted loop playsinline preload="none" poster="/media/reels/kouto-river.webp" aria-label="A hand-painted gach kouto held up against the sunset over the river"></video>
-          <button type="button" class="filmband__sound" id="filmband-open" aria-label="Watch this film with sound"><i class="ph-fill ph-play" aria-hidden="true"></i><span>Watch with sound</span></button>
+          <button type="button" class="filmband__sound" id="filmband-open"><i class="ph-fill ph-play" aria-hidden="true"></i><span>Watch with sound</span></button>
         </div>
       </div>
     </section>
@@ -228,7 +229,7 @@
 
       <div class="pavilion" id="pavilion" hidden>
         <div class="pavilion__stage" id="pavilion-stage" tabindex="0" aria-roledescription="3D carousel" aria-label="Collection pavilion. Use left and right arrow keys to browse, Enter to open.">
-          <canvas id="gallery-canvas"></canvas>
+          <canvas id="gallery-canvas" aria-hidden="true"></canvas>
           <button class="pav-arrow pav-arrow--prev" type="button" id="pav-prev" aria-label="Previous piece"><i class="ph-light ph-caret-left" aria-hidden="true"></i></button>
           <button class="pav-arrow pav-arrow--next" type="button" id="pav-next" aria-label="Next piece"><i class="ph-light ph-caret-right" aria-hidden="true"></i></button>
           <p class="stage-hint stage-hint--center"><i class="ph-light ph-arrows-left-right" aria-hidden="true"></i><span>Drag to spin. Tap a piece to open it.</span></p>

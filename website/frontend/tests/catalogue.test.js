@@ -122,4 +122,31 @@ describe('category pages', () => {
     expect(categoryBySlug('thala-sets').id).toBe('clay');
     expect(cats.filter((c) => c.id !== 'all').map(categoryPath).join(' ')).not.toMatch(/clay/i);
   });
+
+  it('keep their address when the shop renames a category, and the newer name still opens it', async () => {
+    const { CATEGORIES: cats, categoryPath, categoryBySlug, categoryAliasSlug } = await import('../src/data/products.js');
+    const ritual = cats.find((c) => c.id === 'ritual');
+    const was = ritual.label;
+    ritual.label = 'Gach kouto';
+    expect(categoryPath(ritual)).toBe('/c/wedding-rituals/');
+    expect(categoryBySlug('wedding-rituals').id).toBe('ritual');
+    expect(categoryAliasSlug(ritual)).toBe('gach-kouto');
+    expect(categoryBySlug('gach-kouto').id).toBe('ritual');
+    ritual.label = was;
+    expect(categoryAliasSlug(ritual)).toBe(null);
+  });
+
+  it('a category added in the admin gets its address from its code, not its name', async () => {
+    const { CATEGORIES: cats, categoryPath, categoryBySlug, categoryAliasSlug } = await import('../src/data/products.js');
+    const added = { id: 'darpan', label: 'Mirrors and trays' };
+    cats.push(added);
+    expect(categoryPath(added)).toBe('/c/darpan/');
+    expect(categoryBySlug('darpan')).toBe(added);
+    expect(categoryBySlug('mirrors-and-trays')).toBe(added);
+    // A name that would collide with another category's address is not used as a second address.
+    added.label = 'Crowns';
+    expect(categoryAliasSlug(added)).toBe(null);
+    expect(categoryBySlug('crowns').id).toBe('crown');
+    cats.pop();
+  });
 });

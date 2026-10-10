@@ -88,15 +88,17 @@ function bannerCarousel(list) {
   const track = h('div', { class: 'banners__track' });
   const slides = list.map((b, i) => {
     const t = bannerTarget(b);
+    // A plain link named by its own words (a role here would stop it being announced as a link).
     const a = h('a', {
-      class: 'banner', href: t.href, role: 'group', 'aria-roledescription': 'slide', 'aria-label': `${i + 1} of ${total}: ${b.title}`,
+      class: 'banner', href: t.href,
       ...(t.kind === 'url' ? { target: '_blank', rel: 'noopener' } : {}),
     },
     h('img', { class: 'banner__img', src: photoSrc(b.photo, 1600), srcset: photoSrcset(b.photo), sizes: '(max-width: 1100px) 100vw, 1100px', alt: '', loading: i ? 'lazy' : 'eager', decoding: 'async', width: 1600, height: 800 }),
     h('span', { class: 'banner__text' },
       h('span', { class: 'banner__title', text: b.title }),
       b.line ? h('span', { class: 'banner__line', text: b.line }) : null,
-      h('span', { class: 'banner__cta' }, t.kind === 'url' ? 'Open' : 'Shop now', icon('arrow-right'))));
+      h('span', { class: 'banner__cta' }, t.kind === 'url' ? 'Open' : 'Shop now', icon('arrow-right'))),
+    total > 1 ? h('span', { class: 'sr-only', text: `, banner ${i + 1} of ${total}` }) : null);
     // Categories and searches open the collection on this page, without a reload.
     if (t.kind === 'category' || t.kind === 'search') {
       a.addEventListener('click', (e) => {

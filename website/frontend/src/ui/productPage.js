@@ -15,6 +15,7 @@ import { toast } from './toast.js';
 import { mediaStage } from './mediaStage.js';
 import { productSchema, breadcrumbSchema } from '../data/seo.js';
 import { requireSignIn } from './signInGate.js';
+import { tuckFabNear } from './fab.js';
 
 const canvas = h('canvas', { class: 'ppage__canvas', role: 'img', 'aria-label': 'Interactive 3D view. Drag to rotate, scroll or pinch to zoom.' });
 let viewer = null;
@@ -135,6 +136,14 @@ function configurator(p) {
     }
   } }, icon('share-network'));
 
+  const buy = h('div', { class: 'pp__buy' },
+    h('div', { class: 'qty', 'aria-label': 'Quantity' }, refs.minus, refs.qty, refs.plus),
+    h('div', { class: 'pp__total' }, refs.total, refs.stock));
+  const buttons = h('div', { class: 'builder__buy' }, refs.add, refs.book);
+  const more = h('div', { class: 'builder__more' }, refs.ask, refs.wish, share);
+  // The floating WhatsApp button sat on top of the price on phones; Enquire is right here anyway.
+  tuckFabNear(buy, buttons, more);
+
   const form = h('form', { class: 'pp__form', onsubmit: (e) => {
     e.preventDefault();
     if (!requireSignIn('add pieces to your cart')) return;
@@ -147,11 +156,9 @@ function configurator(p) {
     h('label', { class: 'field__label', for: 'pg-custom' }, 'Personalise it ', h('span', { class: 'field__opt', text: '(optional)' })),
     refs.custom,
     h('p', { class: 'field__help', text: p.customHelp || 'Names, a date, or a line you want painted on it.' })) : null,
-  h('div', { class: 'pp__buy' },
-    h('div', { class: 'qty', 'aria-label': 'Quantity' }, refs.minus, refs.qty, refs.plus),
-    h('div', { class: 'pp__total' }, refs.total, refs.stock)),
-  h('div', { class: 'builder__buy' }, refs.add, refs.book),
-  h('div', { class: 'builder__more' }, refs.ask, refs.wish, share),
+  buy,
+  buttons,
+  more,
   h('p', { class: 'fineprint', text: 'Pay a booking advance or the full estimate by UPI or bank transfer, or pay when you collect. We confirm the final price with you on WhatsApp.' }));
   return form;
 }
@@ -486,12 +493,12 @@ function builderCard(x) {
   const actions = out
     ? [h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => openEnquiry({ lines: [line()] }) }, icon('chat-circle-text'), 'Ask on WhatsApp')]
     : [
-      h('button', { type: 'button', class: 'btn btn--gold btn--sm', 'aria-label': `Add ${x.en} to cart`, onclick: () => {
+      h('button', { type: 'button', class: 'btn btn--gold btn--sm', 'aria-label': `Add to cart: ${x.en}`, onclick: () => {
         if (!requireSignIn('add pieces to your cart')) return;
         store.add(line());
         toast(`${x.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() });
       } }, icon('shopping-bag-open'), 'Add to cart'),
-      h('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': `Buy ${x.en} now`, onclick: () => openCheckout({ lines: [line()] }) }, 'Buy now'),
+      h('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': `Buy now: ${x.en}`, onclick: () => openCheckout({ lines: [line()] }) }, 'Buy now'),
     ];
   return h('li', { class: 'bcard', 'data-id': x.id }, select, h('div', { class: 'bcard__actions' }, ...actions));
 }
@@ -501,7 +508,7 @@ function paintGrid(p) {
   build.ids = new Set(items.map((x) => x.id));
   const cards = items.map(builderCard);
   const more = items.length > family
-    ? [h('li', { class: 'bgrid__divider', role: 'presentation' }, h('span', { text: 'More from the collection' })), ...cards.slice(family)]
+    ? [h('li', { class: 'bgrid__divider' }, h('span', { text: 'More from the collection' })), ...cards.slice(family)]
     : [];
   build.grid.replaceChildren(...cards.slice(0, family), ...more);
   const parent = parentOf(p.category);

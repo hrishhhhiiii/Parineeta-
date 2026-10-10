@@ -31,6 +31,10 @@ export const waLink = (text = '') =>
 // Photos uploaded in the admin panel are stored as full URLs; the shop's original photos are ids.
 const isUrl = (id) => /^https?:\/\//.test(id);
 export const photoSrc = (id, size = 1600) => (isUrl(id) ? id : `/media/photos/${id}-${size}.webp`);
+// How wide the product page's main picture is drawn, as a share of the screen. Claimed a little under the real
+// width on phones so they fetch the 800px file (95 KB) instead of the 1600px one (220 KB); it still looks sharp.
+// Shared by the prebuilt /p/ pages and ui/mediaStage.js so both ask for the same file.
+export const STAGE_SIZES = '(max-width: 899px) 60vw, 34vw';
 export const photoSrcset = (id) => (isUrl(id) ? `${id} 1600w` : [400, 800, 1600].map((s) => `${photoSrc(id, s)} ${s}w`).join(', '));
 export const reelSrc = (id) => `/media/reels/${id}.mp4`;
 export const reelPoster = (id) => `/media/reels/${id}.webp`;

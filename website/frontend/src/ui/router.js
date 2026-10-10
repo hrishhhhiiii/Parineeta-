@@ -19,6 +19,8 @@ let inPage = false;
 let shownId = null;
 let landingY = 0;
 let hooks = null;
+// False until the first route has been handled: a page opened straight on a product has not navigated yet.
+let started = false;
 
 export const isProductRoute = () => inPage;
 
@@ -40,7 +42,9 @@ function enter(p) {
   if (metaDesc) metaDesc.content = productDescription(p);
   if (switched) return;
   jumpTo(0);
-  requestAnimationFrame(() => $('#pg-en')?.focus({ preventScroll: true }));
+  // After moving to a product from elsewhere on the site, keyboard and screen-reader users continue from its
+  // name. Not on a fresh page load: nothing moved, and the browser would draw a focus box round the title.
+  if (started) requestAnimationFrame(() => $('#pg-en')?.focus({ preventScroll: true }));
 }
 
 function leave(hash) {
@@ -124,4 +128,5 @@ export function initRouter(h) {
   window.addEventListener('popstate', route);
   document.addEventListener('click', onClick);
   route();
+  started = true;
 }
