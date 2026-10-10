@@ -25,6 +25,7 @@ export function couponsView(sb, { h, toast, explain }) {
     c.kind === 'percent' ? `${c.value}% off${c.max_off ? `, at most ${rupees(c.max_off)}` : ''}` : `${rupees(c.value)} off`,
     c.min_total ? `orders of ${rupees(c.min_total)} or more` : 'any order',
     c.starts_on || c.ends_on ? [c.starts_on && `from ${day(c.starts_on)}`, c.ends_on && `until ${day(c.ends_on)}`].filter(Boolean).join(' ') : 'no end date',
+    c.once_per_customer === false ? 'a customer can use it again and again' : 'once per customer',
     `used ${c.used}${c.max_uses ? ` of ${c.max_uses}` : ''} time${c.used === 1 && !c.max_uses ? '' : 's'}`,
   ].join(' · ');
 
@@ -36,7 +37,7 @@ export function couponsView(sb, { h, toast, explain }) {
   };
   const payload = (c, extra = {}) => ({
     code: c.code, kind: c.kind, value: c.value, minTotal: c.min_total || '', maxOff: c.max_off || '', startsOn: c.starts_on || '', endsOn: c.ends_on || '',
-    maxUses: c.max_uses || '', active: c.active, note: c.note || '', ...extra,
+    maxUses: c.max_uses || '', active: c.active, note: c.note || '', oncePerCustomer: c.once_per_customer !== false, ...extra,
   });
 
   const card = (c) => {
@@ -93,6 +94,7 @@ export function couponsView(sb, { h, toast, explain }) {
         field('Last day (optional)', input('endsOn', c.ends_on, { type: 'date' }))),
       field('How many orders can use it (optional)', number('maxUses', c.max_uses, { min: 1 }), isNew ? 'Leave empty for no limit.' : `Used ${c.used || 0} time${c.used === 1 ? '' : 's'} so far.`),
       field('Note for yourself (optional)', input('note', c.note, { maxlength: 200, placeholder: 'e.g. Given to wedding planners in November' })),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'oncePerCustomer', checked: c.once_per_customer !== false }), h('span', { text: 'Each customer can use it once' })),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'active', checked: isNew ? true : Boolean(c.active) }), h('span', { text: 'On: customers can use it now' })),
       h('div', { class: 'row' },
         h('button', { type: 'submit', class: 'btn btn--gold', text: isNew ? 'Make the code' : 'Save changes' }),
@@ -104,7 +106,7 @@ export function couponsView(sb, { h, toast, explain }) {
       const p = {
         code: isNew ? el.code.value.replace(/\s/g, '').toUpperCase() : c.code, kind: el.kind.value, value: el.value.value,
         maxOff: el.kind.value === 'percent' ? el.maxOff.value : '', minTotal: el.minTotal.value, startsOn: el.startsOn.value, endsOn: el.endsOn.value,
-        maxUses: el.maxUses.value, note: el.note.value.trim(), active: el.active.checked,
+        maxUses: el.maxUses.value, note: el.note.value.trim(), active: el.active.checked, oncePerCustomer: el.oncePerCustomer.checked,
       };
       if (!/^[A-Z0-9]{3,20}$/.test(p.code)) return toast('The code needs 3 to 20 letters or numbers, with no spaces.', 'err');
       if (isNew && rows.some((x) => x.code === p.code)) return toast(`${p.code} already exists. Change that one instead.`, 'err');

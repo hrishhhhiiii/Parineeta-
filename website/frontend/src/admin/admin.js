@@ -60,7 +60,7 @@ function demoClient() {
   const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
     total: 1450, paid_now: 725, plan: '50% advance', utr: '426512345678', event_date: '2026-12-02', address: 'Patuli, Kolkata', status: 'placed', suspect: false,
     items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null }];
-  const demoCoupons = [{ code: 'WEDDING10', kind: 'percent', value: 10, min_total: 1000, max_off: 500, starts_on: null, ends_on: null, max_uses: 50, used: 3, active: true, note: 'Demo code', created_at: new Date().toISOString() }];
+  const demoCoupons = [{ code: 'WEDDING10', kind: 'percent', value: 10, min_total: 1000, max_off: 500, starts_on: null, ends_on: null, max_uses: 50, used: 3, active: true, once_per_customer: true, note: 'Demo code', created_at: new Date().toISOString() }];
   const demoReviews = [
     { id: 'rv-1', review_date: '2026-10-03', product: 'gach-kouto', rating: 5, name: 'Moumita Ghosh', place: 'Katwa', phone: '9800012345', source: 'website',
       title: 'Beautiful work', text: 'The kouto was painted exactly as we asked, with our names on the lid. Everyone at the wedding asked where it came from.', shown: false, checked: false },
@@ -102,7 +102,7 @@ function demoClient() {
     // 019_coupons.sql
     admin_coupons: () => demoCoupons,
     save_coupon: ({ p }) => {
-      const row = { code: p.code, kind: p.kind, value: Number(p.value), min_total: Number(p.minTotal) || 0, max_off: Number(p.maxOff) || null, starts_on: p.startsOn || null, ends_on: p.endsOn || null, max_uses: Number(p.maxUses) || null, active: p.active !== false, note: p.note || null };
+      const row = { code: p.code, kind: p.kind, value: Number(p.value), min_total: Number(p.minTotal) || 0, max_off: Number(p.maxOff) || null, starts_on: p.startsOn || null, ends_on: p.endsOn || null, max_uses: Number(p.maxUses) || null, active: p.active !== false, once_per_customer: p.oncePerCustomer !== false, note: p.note || null };
       const old = demoCoupons.find((c) => c.code === p.code);
       if (old) Object.assign(old, row);
       else demoCoupons.unshift({ ...row, used: 0, created_at: new Date().toISOString() });

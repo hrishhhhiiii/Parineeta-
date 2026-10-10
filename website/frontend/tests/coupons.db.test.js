@@ -1,6 +1,6 @@
 // Coupon codes and order totals, run against the real database functions.
 //
-// Loads migrations 018 (order totals) and 019 (coupons) into an in-memory Postgres, with small stand-ins for
+// Loads migrations 018 (order totals), 019 (coupons) and 020 (hardening) into an in-memory Postgres, with small stand-ins for
 // the parts of Supabase they lean on (sign-in, the rate limit, the activity log), then places orders the way
 // the checkout does. The discount rule lives only in the database, so this is where it is tested.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -22,7 +22,9 @@ const STAND_INS = `
     request_id uuid unique, customer_id text, suspect boolean not null default false, anonymized_at timestamptz);
   create function public._rate(p_kind text, p_ip_hash text) returns boolean language sql as 'select false';
   create function public._new_ref() returns text language sql as $$ select 'PRN-000000-' || upper(substr(md5(random()::text), 1, 4)) $$;
-  create function public.clerk_user_id() returns text language sql as 'select null::text';
+  create table public.admins (email text primary key);
+  -- Who is signed in, and which headers the request carried: set by the tests below.
+  create function public.clerk_user_id() returns text language sql stable as $$ select nullif(current_setting('test.user', true), '') $$;
   create function public._require(role_needed text) returns text language sql as $$ select 'owner@test'::text $$;
   create function public._log(actor text, action text, key text default null, ref text default null, detail text default null, extra jsonb default null)
     returns void language sql as 'select';
@@ -37,7 +39,9 @@ const CATALOGUE = [
 let db;
 let seq = 0;
 const one = async (sql, params = []) => (await db.query(sql, params)).rows[0];
-const off = async (code, total) => (await one('select public._coupon_off($1, $2) as r', [code, total])).r;
+const signIn = (user) => db.query("select set_config('test.user', $1, false)", [user || '']);
+const headers = (h) => db.query("select set_config('request.headers', $1, false)", [JSON.stringify(h)]);
+const off = async (code, total, customer = 'user_a') => (await one('select public._coupon_off($1, $2, $3) as r', [code, total, customer])).r;
 const saveCoupon = (c) => one('select public.save_coupon($1::jsonb) as code', [JSON.stringify(c)]);
 
 /** Places an order as the checkout does. `page` is what the customer's page showed. */
@@ -58,11 +62,14 @@ beforeAll(async () => {
   await db.exec(STAND_INS);
   await db.exec(migration('018_order_totals.sql'));
   await db.exec(migration('019_coupons.sql'));
+  await db.exec(migration('021_hardening.sql'));
   await db.query('insert into public.published_content values ($1, $2::jsonb)', ['products', JSON.stringify(CATALOGUE)]);
 });
 afterAll(() => db?.close());
 beforeEach(async () => {
   await db.exec('delete from public.orders; delete from public.coupons;');
+  await signIn('user_a');
+  await headers({ 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '1.2.3.4, 203.0.113.7' });
 });
 
 describe('the discount rule', () => {
@@ -171,8 +178,50 @@ describe('orders with a coupon', () => {
     expect(o.receipt.subtotal).toBeUndefined();
   });
 
+  it('one use per customer: the second order by the same customer gets no discount, another customer still can', async () => {
+    const first = await order({ page: { total: 900 }, coupon: { code: 'WEDDING10', off: 100 } });
+    const again = await order({ page: { total: 900 }, coupon: { code: 'WEDDING10', off: 100 } });
+    await signIn('user_b');
+    const other = await order({ page: { total: 900 }, coupon: { code: 'WEDDING10', off: 100 } });
+    expect(first).toMatchObject({ total: 900, total_check: 'ok', discount: 100 });
+    expect(again).toMatchObject({ total: 1000, total_check: 'changed', discount: null });
+    expect(other).toMatchObject({ total: 900, total_check: 'ok', discount: 100 });
+    expect(await off('WEDDING10', 1000, 'user_a')).toEqual({ ok: false, reason: 'You have already used this code.' });
+  });
+
+  it('a code the shop allows again and again works twice for one customer', async () => {
+    await saveCoupon({ code: 'ALWAYS5', kind: 'percent', value: 5, oncePerCustomer: false });
+    await order({ page: { total: 950 }, coupon: { code: 'ALWAYS5', off: 50 } });
+    const again = await order({ page: { total: 950 }, coupon: { code: 'ALWAYS5', off: 50 } });
+    expect(again).toMatchObject({ total: 950, total_check: 'ok', discount: 50 });
+  });
+
+  it('an order sent without a signed-in account gets no discount and is flagged', async () => {
+    await signIn(null);
+    const o = await order({ page: { total: 900 }, coupon: { code: 'WEDDING10', off: 100 } });
+    expect(o).toMatchObject({ total: 1000, total_check: 'changed', coupon_code: null, discount: null });
+    expect((await one('select public.check_coupon($1, $2) as r', ['WEDDING10', 1000])).r).toEqual({ ok: false, reason: 'Please sign in to use a coupon code.' });
+    expect((await one('select used from public.coupons')).used).toBe(0);
+  });
+
   it('an order the database cannot price keeps the page figures and says so', async () => {
     const o = await order({ withLines: false, page: { total: 900 }, coupon: { code: 'WEDDING10', off: 100 } });
     expect(o).toMatchObject({ total: 900, total_check: 'unverified', coupon_code: 'WEDDING10', discount: 100 });
+  });
+});
+
+describe('whose connection is it', () => {
+  const ip = async () => (await one('select public._client_ip() as ip')).ip;
+
+  it('uses the address Cloudflare reports, not the one the sender typed first', async () => {
+    await headers({ 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '1.2.3.4, 203.0.113.7' });
+    expect(await ip()).toBe('203.0.113.7');
+  });
+
+  it('without Cloudflare, uses the last address (added by the gateway), never the first', async () => {
+    await headers({ 'x-forwarded-for': '1.2.3.4, 198.51.100.9' });
+    expect(await ip()).toBe('198.51.100.9');
+    await headers({});
+    expect(await ip()).toBe('unknown');
   });
 });

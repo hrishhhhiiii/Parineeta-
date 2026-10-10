@@ -67,10 +67,10 @@ function newRef() {
 const subtotal = () => cartTotal(ctx.lines);
 const total = () => Math.max(0, subtotal() - (ctx.coupon?.off || 0));
 
-async function couponRpc(fn, args = {}) {
+async function couponRpc(fn, args = {}, token = null) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: 'POST',
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token || SUPABASE_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(args),
   });
   const body = await res.json().catch(() => null);
@@ -99,7 +99,10 @@ async function applyCoupon() {
   msg.className = 'field__help';
   msg.textContent = 'Checking…';
   try {
-    const r = await couponRpc('check_coupon', { p_code: code, p_total: subtotal() });
+    // Coupons are for signed-in customers: the code is checked against their account (021_hardening.sql).
+    const token = authToken ? await authToken : null;
+    if (!token) throw new Error('NOT_SIGNED_IN');
+    const r = await couponRpc('check_coupon', { p_code: code, p_total: subtotal() }, token);
     if (r?.ok) {
       ctx.coupon = { code: r.code, off: Math.min(Number(r.off) || 0, subtotal()), label: r.label };
       msg.textContent = `${r.code} applied: ${r.label}, you save ${inr(ctx.coupon.off)}.`;
@@ -109,7 +112,9 @@ async function applyCoupon() {
     }
   } catch (err) {
     msg.className = 'field__error';
-    msg.textContent = /RATE_LIMITED/.test(err.message) ? 'Too many tries. Please try again in an hour, or ask us on WhatsApp.' : 'We could not check that code just now. Please try again.';
+    msg.textContent = /RATE_LIMITED/.test(err.message) ? 'Too many tries. Please try again in an hour, or ask us on WhatsApp.'
+      : /NOT_SIGNED_IN|JWT|401|permission/i.test(err.message) ? 'Please sign in again to use a coupon code.'
+      : 'We could not check that code just now. Please try again.';
   } finally {
     btn.disabled = false;
     paintTotals();

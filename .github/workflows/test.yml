@@ -1,0 +1,30 @@
+# Runs the website's automatic tests on every push: prices on the website and in the database must
+# agree, coupons and order totals behave, the catalogue and SEO pages build correctly.
+# A red cross here means something is wrong; it does not stop the host from publishing, so check it after a push.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: website/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=high

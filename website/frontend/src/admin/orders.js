@@ -13,6 +13,8 @@ export const ORDER_STATUS = [
   ['refunded', 'Refund completed'],
 ];
 const REFUND = ['refund_started', 'refunded'];
+// The website has asked customers to sign in before ordering since this day; older orders could be placed as a guest.
+const SIGN_IN_SINCE = '2026-10-10';
 const CLOSED = ['delivered', 'cancelled', 'refunded'];
 const waTo = (phone, text) => {
   const d = String(phone || '').replace(/[^\d]/g, '');
@@ -119,6 +121,7 @@ export function ordersView(sb, { h, toast, explain }) {
     return h('article', { class: 'card inbox__item' },
       h('div', { class: 'inbox__head' }, h('strong', { text: `${o.ref} · ${o.name}` }), h('span', { class: 'muted', text: when(o.created_at) })),
       o.suspect ? h('p', { class: 'form-msg', text: 'Many orders came from the same connection within an hour. Check this one is real before making it.' }) : null,
+      o.signed_in === false && o.created_at >= SIGN_IN_SINCE ? h('p', { class: 'form-msg', text: 'This order was sent without a signed-in account. The website always asks customers to sign in first, so check on WhatsApp that it is real before making it.' }) : null,
       o.totalCheck?.check === 'changed' ? h('p', { class: 'form-msg', text: `Check the price before taking money: the customer's page showed ${rupees(o.totalCheck.clientTotal)}, but the published prices add up to ${rupees(o.total)} (shown below). Either prices changed while they were ordering, or the page was edited.` }) : null,
       o.totalCheck?.check === 'unverified' ? h('p', { class: 'form-msg', text: 'The website could not check this total against the published prices (an older page, or a piece not in the published catalogue). Check the items and prices before taking money.' }) : null,
       h('p', {}, ...[
