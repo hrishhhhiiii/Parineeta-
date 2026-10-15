@@ -699,16 +699,18 @@
       <div class="co-foot">
         <p class="enq__status" id="co-status" role="status" aria-live="polite"></p>
         <div class="enq__actions" id="co-actions">
-          <button type="button" class="btn btn--gold" id="co-wa"><i class="ph-fill ph-whatsapp-logo" aria-hidden="true"></i>Confirm order on WhatsApp</button>
-          <button type="button" class="btn btn--ghost" id="co-mail"><i class="ph-light ph-envelope-simple" aria-hidden="true"></i>Email the order</button>
+          <!-- The only button that creates an order. Its words follow the payment choice (checkout.js). -->
+          <button type="button" class="btn btn--gold" id="co-place"><i class="ph-light ph-check-circle" aria-hidden="true"></i><span id="co-place-label">Place order</span></button>
         </div>
         <div class="co-done" id="co-done" hidden>
-          <p class="co-done__title">Thank you. Order <strong id="co-done-ref"></strong> is on its way to us.</p>
-          <p class="field__help">We will confirm the final price, timing and delivery with you on WhatsApp. Keep your order number handy.</p>
+          <p class="co-done__title">Thank you. Order <strong id="co-done-ref"></strong> is placed.</p>
+          <p class="field__help" id="co-done-next"></p>
+          <div id="co-done-pay"></div>
           <p class="field__help" id="co-receipt-note" role="status" aria-live="polite"></p>
           <div class="co-done__actions">
             <button type="button" class="btn btn--ghost" id="co-receipt"><i class="ph-light ph-receipt" aria-hidden="true"></i>Download receipt</button>
             <button type="button" class="btn btn--ghost" id="co-receipt-share" hidden><i class="ph-light ph-share-network" aria-hidden="true"></i>Share receipt</button>
+            <button type="button" class="btn btn--ghost" id="co-wa-copy"><i class="ph-light ph-whatsapp-logo" aria-hidden="true"></i><span id="co-wa-copy-label">Send us a copy on WhatsApp</span></button>
             <button type="button" class="btn btn--gold" id="co-close">Done</button>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import '../styles/numerals.css';
 import '../login/login.css';
 import { tooManyHops } from '../auth/hops.js';
+import { paymentProof } from '../ui/paymentProof.js';
 
 const DEMO = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
 const app = document.getElementById('app');
@@ -28,11 +29,23 @@ const date = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric
 const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 const back = () => h('p', {}, h('a', { href: '/', text: '← Back to Parineeta' }));
 
-function orderCard(o) {
+function orderCard(o, sb) {
   const at = STEPS.findIndex(([k]) => k === o.status);
+  const awaiting = o.status === 'placed' && o.method && o.method !== 'later' && o.paidNow > 0;
+  // The payment screenshot (024_payment_proofs.sql): its state, and a way to send one (again after a decline).
+  const proofLine = awaiting && o.proof?.status === 'sent'
+    ? h('p', { class: 'muted', text: `We have your payment screenshot (sent ${date(o.proof.at)}) and are checking it against our account.` })
+    : awaiting && o.proof?.status === 'declined'
+      ? h('p', { class: 'msg is-err', text: `We could not confirm your payment: ${String(o.proof.note || '').replace(/([^.!?])$/, '$1.')} Please check, then send the screenshot again below, or message us on WhatsApp.` })
+      : null;
   return h('article', { class: 'card' },
     h('p', { class: 'muted', text: `Order ${o.ref} · placed ${date(o.createdAt)}` }),
     h('p', {}, 'Stage: ', h('span', { class: 'status', text: label(o.status) })),
+    // Placed, paid after: until the shop records the money the order waits (it is not made before that).
+    awaiting && o.proof?.status !== 'sent'
+      ? h('p', { class: 'muted', text: `Awaiting payment of ${INR.format(o.paidNow)}. Pay by UPI with ${o.ref} as the note, then send us the payment screenshot below.` }) : null,
+    proofLine,
+    awaiting && o.proof?.status !== 'sent' && sb ? paymentProof({ ref: o.ref, amount: o.paidNow, h, client: async () => sb }) : null,
     !OTHER[o.status] ? h('div', { class: 'steps', 'aria-hidden': 'true' }, ...STEPS.map((_, i) => h('span', { class: i <= at ? 'on' : '' }))) : null,
     o.refund?.amount ? h('p', { class: 'refund-line', text: o.refund.doneAt
       ? `Refund of ${INR.format(o.refund.amount)} completed on ${date(o.refund.doneAt)}${o.refund.ref ? ` · reference ${o.refund.ref}` : ''}. It can take a few days to show in your bank account.`
@@ -46,9 +59,18 @@ const demoOrder = { ref: 'PRN-261001-DEMO', createdAt: new Date().toISOString(),
 const demoRefunded = { ref: 'PRN-260920-RFND', createdAt: '2026-09-20T10:00:00Z', total: 900, paidNow: 450, status: 'refunded', paidAmount: 450,
   items: [{ title: 'Kunke', qty: 1, detail: 'Haldi yellow' }] };
 const demoRefunds = { 'PRN-260920-RFND': { amount: 450, ref: '628412345678', startedAt: '2026-09-22T10:00:00Z', doneAt: '2026-09-23T10:00:00Z' } };
+const demoAwaiting = { ref: 'PRN-261014-WAIT', createdAt: new Date().toISOString(), total: 980, paidNow: 490, status: 'placed', method: 'upi',
+  items: [{ title: 'Sindoor Kouto', qty: 1, detail: 'Peacock blue' }] };
+const demoDeclined = { ...demoAwaiting, ref: 'PRN-261013-DECL', createdAt: '2026-10-13T09:00:00Z' };
+const demoProofs = { 'PRN-261013-DECL': { at: '2026-10-13T09:30:00Z', status: 'declined', note: 'We could not find a payment with this order number in our UPI app' } };
 const demoSession = () => ({
   user: { email: 'riya@example.com', name: 'Riya' },
-  sb: { rpc: async (fn) => ({ data: fn === 'my_orders' ? [demoOrder, demoRefunded] : fn === 'my_refunds' ? demoRefunds : fn === 'admin_role' ? null : true, error: null }) },
+  sb: {
+    rpc: async (fn) => ({ data: fn === 'my_orders' ? [demoAwaiting, demoDeclined, demoOrder, demoRefunded] : fn === 'my_refunds' ? demoRefunds
+      : fn === 'my_payment_proofs' ? demoProofs : fn === 'admin_role' ? null : true, error: null }),
+    // Demo: the screenshot "uploads" nowhere, so the send flow can be tried.
+    storage: { from: () => ({ upload: async () => ({ error: null }) }) },
+  },
   deleteUser: async () => {},
 });
 
@@ -74,10 +96,15 @@ async function showAccount() {
   try { me = await connect(); } catch { return stuck(); }
   if (!me) return looping ? stuck() : location.replace('/login.html?signin');
   const { sb } = me;
-  const [{ data: orders, error }, { data: role }, refunds] = await Promise.all([sb.rpc('my_orders'), sb.rpc('admin_role'),
-    Promise.resolve(sb.rpc('my_refunds')).catch(() => ({ data: {} }))]);
+  const optional = (fn) => Promise.resolve(sb.rpc(fn)).catch(() => ({ data: {} }));
+  const [{ data: orders, error }, { data: role }, refunds, proofs] = await Promise.all([sb.rpc('my_orders'), sb.rpc('admin_role'),
+    optional('my_refunds'), optional('my_payment_proofs')]);
   const byRef = (!refunds?.error && refunds?.data) || {};
-  (orders || []).forEach((o) => { if (byRef[o.ref]) o.refund = byRef[o.ref]; });
+  const proofByRef = (!proofs?.error && proofs?.data) || {};
+  (orders || []).forEach((o) => {
+    if (byRef[o.ref]) o.refund = byRef[o.ref];
+    if (proofByRef[o.ref]) o.proof = proofByRef[o.ref];
+  });
   // Clerk's UserButton (Manage account, Sign out) when signed in for real; a plain button in demo mode.
   const out = me.clerk ? h('div', { class: 'user-btn' }) : h('button', { class: 'ghost', type: 'button', text: 'Sign out', onclick: () => location.replace('/login.html?signout') });
   const settings = me.clerk ? h('div', { class: 'clerk-profile' }) : null;
@@ -99,7 +126,7 @@ async function showAccount() {
       h('button', { type: 'button', class: 'ghost', text: 'Change password', onclick: () => me.clerk.openUserProfile({ __experimental_startPath: '/security' }) })) : '',
     role ? h('p', {}, h('a', { href: '/admin.html', text: role === 'owner' ? 'Open the admin panel →' : 'Open the editor panel →' })) : '',
     ...(error ? [h('p', { class: 'msg is-err', text: 'Could not load your orders. Please try again later.' })]
-      : orders?.length ? orders.map(orderCard)
+      : orders?.length ? orders.map((o) => orderCard(o, sb))
       : [h('div', { class: 'card' }, h('p', { text: 'No orders yet.' }),
           h('p', { class: 'muted', text: 'Orders you place while signed in appear here, with their stage as we make them.' }))]),
     settings ? h('h2', { class: 'acc-h2', text: 'Profile and password' }) : '',

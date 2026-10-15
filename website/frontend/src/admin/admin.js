@@ -59,7 +59,8 @@ function demoClient() {
   const user = { email: 'demo@localhost' };
   const demoOrders = [{ ref: 'PRN-261001-DEMO', created_at: new Date().toISOString(), name: 'Riya Sen', phone: '9830012345', email: 'riya@example.com', method: 'upi',
     total: 1450, paid_now: 725, plan: '50% advance', utr: '426512345678', event_date: '2026-12-02', address: 'Patuli, Kolkata', status: 'placed', suspect: false,
-    items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null }];
+    items: [{ title: 'Gach Kouto', qty: 1, amount: 1450, detail: 'Sindoor red, Single piece' }], paid_amount: null, paid_at: null, paid_by: null,
+    proof: { path: 'PRN-261001-DEMO/demo.jpg', at: new Date().toISOString(), status: 'sent', note: null } }];
   const demoCoupons = [{ code: 'WEDDING10', kind: 'percent', value: 10, min_total: 1000, max_off: 500, starts_on: null, ends_on: null, max_uses: 50, used: 3, active: true, once_per_customer: true, note: 'Demo code', created_at: new Date().toISOString() }];
   const demoReviews = [
     { id: 'rv-1', review_date: '2026-10-03', product: 'gach-kouto', rating: 5, name: 'Moumita Ghosh', place: 'Katwa', phone: '9800012345', source: 'website',
@@ -112,9 +113,17 @@ function demoClient() {
     list_refunds: () => Object.fromEntries(demoOrders.filter((o) => o.refund).map((o) => [o.ref, o.refund])),
     // 018_order_totals.sql: the first demo order shows the "check the price" note.
     list_total_checks: () => (demoOrders[0] ? { [demoOrders[0].ref]: { check: 'changed', clientTotal: Math.max(1, Math.round(demoOrders[0].total / 2)) } } : {}),
+    // 024_payment_proofs.sql: the demo order arrives with a screenshot to accept or decline.
+    list_payment_proofs: () => Object.fromEntries(demoOrders.filter((o) => o.proof).map((o) => [o.ref, o.proof])),
+    decline_payment: ({ p_ref, p_reason }) => {
+      const o = demoOrders.find((x) => x.ref === p_ref);
+      o.proof = { ...o.proof, status: 'declined', note: (p_reason || '').trim() || 'We could not find this payment in our account.' };
+    },
     set_order_refund: ({ p_ref, p_stage, p_amount, p_refund_ref, p_note }) => {
       const o = demoOrders.find((x) => x.ref === p_ref);
-      if (p_amount > Math.max(o.paid_amount || 0, o.total)) throw { message: 'BAD_AMOUNT', hint: 'The refund is more than the customer paid.' };
+      // 023_order_safety.sql: a refund can't be more than the payment recorded.
+      if (!((o.paid_amount || 0) > 0)) throw { message: 'BAD_AMOUNT', hint: 'No payment is recorded on this order. Record the payment you received first (stage Payment received, with the amount), then the refund.' };
+      if (p_amount > o.paid_amount) throw { message: 'BAD_AMOUNT', hint: `The refund can't be more than the ₹${o.paid_amount} received for this order.` };
       const now = new Date().toISOString();
       o.status = p_stage;
       o.refund = { amount: p_amount, ref: p_refund_ref, note: p_note, startedAt: o.refund?.startedAt || now, doneAt: p_stage === 'refunded' ? now : null, by: user.email };
@@ -129,6 +138,8 @@ function demoClient() {
     storage: { from: () => ({
       upload: async (path, file) => (path.startsWith('models/') ? (demoFiles.set(path, URL.createObjectURL(file)), { error: null }) : { error: new Error('uploads are off in demo mode') }),
       getPublicUrl: (path) => ({ data: { publicUrl: demoFiles.get(path) || '' } }),
+      // Demo payment screenshot: the shop's logo stands in for it.
+      createSignedUrl: async () => ({ data: { signedUrl: '/brand/parineeta-logo.jpg' }, error: null }),
     }) },
   };
 }

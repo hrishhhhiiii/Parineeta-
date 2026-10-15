@@ -1,0 +1,55 @@
+/* "Send payment screenshot" (paymentProof.js): checkout's thank-you step and My orders. */
+.proof {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong, #5a403a);
+  border-radius: 12px;
+}
+.proof__title {
+  margin: 0 0 12px;
+}
+.proof__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+/* The picker is a label wrapping the file box, styled as a ghost button; the box stays keyboard-reachable. */
+.proof__pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid var(--line-strong, #5a403a);
+  border-radius: 999px;
+  color: var(--ink, #f6eddb);
+  font-weight: 600;
+  cursor: pointer;
+}
+.proof__pick:hover,
+.proof__pick:focus-within {
+  border-color: var(--gold, #d8a94a);
+}
+.proof__pick:focus-within {
+  outline: 2px solid var(--gold, #d8a94a);
+  outline-offset: 2px;
+}
+.proof__pick[aria-disabled='true'] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.proof__file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+.proof__status {
+  margin: 10px 0 0;
+  min-height: 1.4em;
+}
+.proof__status.is-error {
+  color: var(--err, #ffb4a8);
+}

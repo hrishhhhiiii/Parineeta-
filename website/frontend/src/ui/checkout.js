@@ -1,19 +1,20 @@
-import { PAYMENTS, SITE, waLink } from '../data/site.js';
+import { PAYMENTS, waLink } from '../data/site.js';
 import { store, lineInfo, cartTotal } from './store.js';
 import { orderLine, orderDetail, todayIso } from '../data/pricing.js';
 import { weddingDate, setWeddingDate } from './store.js';
 import { h, icon, inr, $ } from './dom.js';
 import { openDialog, closeDialog } from './dialogs.js';
-import { postForm } from './enquiry.js';
 import { toast } from './toast.js';
 import { downloadReceipt, shareReceipt, canShareFiles } from './receipt.js';
 import { requireSignIn } from './signInGate.js';
+import { paymentProof } from './paymentProof.js';
 
 const dialog = () => $('#checkout-dialog');
 let ctx = { lines: [], fromCart: false, ref: '', requestId: '', receipt: null, coupon: null };
 
-// Every order is also saved for the shop's admin panel (Orders). The WhatsApp message stays the
-// customer's confirmation, so a failed save never blocks them. database/migrations/009_simple_orders.sql
+// The order is created only by "Place order" / "I've paid, place my order", and only once the database has
+// saved it (Admin → Orders, My orders). WhatsApp is an optional copy afterwards and never creates an order.
+// database/migrations/009_simple_orders.sql … 021_hardening.sql (submit_order).
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // Signed-in customers: their Clerk token is fetched as checkout opens (so it is ready before the
@@ -28,20 +29,28 @@ function prepareToken() {
     .catch(() => null);
 }
 
-async function saveOrder(receipt) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+/** Saves the order and returns its number (the database may give it a new one on a clash). Throws with a
+ *  message for the customer when it could not be saved. The same requestId on a retry never makes a second order. */
+async function placeOrder(receipt) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Ordering on the website is not switched on yet.');
+  const token = authToken ? await authToken : null;
+  let res;
   try {
-    const token = authToken ? await authToken : null;
-    fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_order`, {
+    res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_order`, {
       method: 'POST',
-      keepalive: true, // finishes even if the phone switches to WhatsApp
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token || SUPABASE_KEY}`, 'Content-Type': 'application/json' },
       // `lines` lets the server price the order itself from the published catalogue (migrations/018_order_totals.sql).
       body: JSON.stringify({ p: { ...receipt, requestId: ctx.requestId, lines: ctx.lines.map((l) => ({ id: l.id, pick: lineInfo(l).pick || null, qty: l.qty })) } }),
-    }).catch(() => {});
+    });
   } catch {
-    /* the WhatsApp message still reaches the shop */
+    throw new Error('We could not reach the shop just now. Please check your connection and try again.');
   }
+  const body = await res.json().catch(() => null);
+  if (res.ok && typeof body === 'string' && body) return body;
+  const why = `${body?.message || ''} ${body?.hint || ''}`;
+  if (/RATE_LIMITED/.test(why)) throw new Error('Too many orders from this connection in the last hour. Please try again later, or message us on WhatsApp.');
+  if (/BAD_ORDER/.test(why)) throw new Error('Something in this order could not be saved. Please check your details and try again.');
+  throw new Error('We could not save your order just now. Please try again in a minute.');
 }
 
 const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
@@ -169,12 +178,18 @@ function renderMethodDetail() {
   // The advance or full-amount choice only applies when paying now.
   const amountStep = $('#co-amount-step');
   if (amountStep) amountStep.hidden = payLater();
-  const m = dialog().querySelector('input[name="co-method"]:checked')?.value;
   const amt = amountNow();
-  box.replaceChildren();
-  const ref = () => h('div', { class: 'field' },
-    h('label', { class: 'field__label', for: 'co-utr' }, 'Payment reference ', h('span', { class: 'field__opt', text: '(UTR or transaction ID, optional)' })),
-    h('input', { class: 'input', id: 'co-utr', maxlength: 40, autocomplete: 'off', spellcheck: 'false' }));
+  // The order is placed first and paid after: the payment details (with the final order number) come on the next step.
+  const label = $('#co-place-label');
+  if (label) label.textContent = payLater() ? 'Place order' : `Place order, then pay ${inr(amt)}`;
+  box.replaceChildren(h('p', { class: 'field__help', text: payLater()
+    ? 'No payment needed now. Press Place order; we confirm the final price on WhatsApp, and you pay when you collect or on delivery.'
+    : `Press Place order and you will get the details to pay ${inr(amt)}. We start making your order once we receive the payment.` }));
+}
+
+/** How to pay, shown once the order is placed, with its final order number. m: the payment method; amt: rupees. */
+function payBox(m, amt) {
+  const box = h('div', { class: 'co-method-detail' });
   if (m === 'upi') {
     const qr = h('canvas', { class: 'co-qr', width: 220, height: 220, role: 'img', 'aria-label': `UPI QR code to pay ${inr(amt)}` });
     import('qrcode').then(({ default: QR }) => QR.toCanvas(qr, upiUrl(amt), { width: 220, margin: 1, color: { dark: '#1c0508', light: '#fbf4e4' } })).catch(() => qr.remove());
@@ -184,23 +199,19 @@ function renderMethodDetail() {
         h('p', { class: 'co-pay__amount' }, 'Pay ', h('strong', { text: inr(amt) })),
         isTouch() ? h('a', { class: 'btn btn--gold', href: upiUrl(amt) }, 'Open my UPI app') : null,
         h('p', { class: 'co-pay__line' }, h('span', { text: `UPI ID: ${PAYMENTS.upi.id}` }), copyButton(PAYMENTS.upi.id, 'UPI ID')),
-        h('p', { class: 'field__help', text: `Add the note ${ctx.ref} so we can match your payment.` }))),
-    ref());
+        h('p', { class: 'field__help', text: `Add the note ${ctx.ref} so we can match your payment.` }))));
   } else if (m === 'bank') {
     const b = PAYMENTS.bank;
     const row = (k, v) => h('div', { class: 'co-bank__row' }, h('dt', { text: k }), h('dd', {}, h('span', { text: v }), copyButton(v, k)));
     box.append(h('p', { class: 'co-pay__amount' }, 'Transfer ', h('strong', { text: inr(amt) })),
       h('dl', { class: 'co-bank' }, row('Account name', b.accountName), row('Account number', b.accountNumber), row('IFSC', b.ifsc), b.bankName ? row('Bank', b.bankName) : null),
-      h('p', { class: 'field__help', text: `Use ${ctx.ref} as the payment remark.` }),
-      ref());
+      h('p', { class: 'field__help', text: `Use ${ctx.ref} as the payment remark.` }));
   } else if (m === 'gateway') {
     box.append(h('p', { class: 'co-pay__amount' }, 'Pay ', h('strong', { text: inr(amt) })),
       h('a', { class: 'btn btn--gold', href: PAYMENTS.gatewayLink, target: '_blank', rel: 'noopener' }, 'Open secure payment page'),
-      h('p', { class: 'field__help', text: `Enter ${inr(amt)} and mention ${ctx.ref}. The payment page opens in a new tab.` }),
-      ref());
-  } else {
-    box.append(h('p', { class: 'field__help', text: 'No payment needed now. We confirm your order and the final price on WhatsApp, and you pay when you collect or on delivery.' }));
+      h('p', { class: 'field__help', text: `Enter ${inr(amt)} and mention ${ctx.ref}. The payment page opens in a new tab.` }));
   }
+  return box;
 }
 
 function render() {
@@ -253,7 +264,7 @@ function render() {
   paintTotals();
   couponsAvailable().then((on) => { const box = $('#co-coupon'); if (box) box.hidden = !on; });
   $('#co-status').textContent = '';
-  $('#co-mail').hidden = !SITE.web3formsKey; // shown once an email service is set up in the admin
+  body.hidden = false;
   $('#co-actions').hidden = false;
   $('#co-done').hidden = true;
 }
@@ -284,7 +295,10 @@ function values() {
 function orderMessage(v) {
   const method = methods().find((m) => m.id === dialog().querySelector('input[name="co-method"]:checked')?.value);
   const full = dialog().querySelector('input[name="co-amount"]:checked')?.value === 'full';
-  const out = ['Namaskar Parineeta! I would like to place an order.', '', `Order: ${ctx.ref}`];
+  // Sent only after the order is saved: a copy for pay-at-the-shop orders, the payment note for paid ones.
+  const out = [payLater()
+    ? `Namaskar Parineeta! I have placed order ${ctx.ref} on your website.`
+    : `Namaskar Parineeta! I have paid ${inr(amountNow())} for order ${ctx.ref}. I am sending the payment screenshot.`, ''];
   ctx.lines.forEach((l, i) => out.push(orderLine(l, i)));
   const paying = payLater() ? 'Paying: at the shop or on delivery' : `Paying now: ${full ? 'full estimate' : `${PAYMENTS.advancePercent}% advance`}, ${inr(amountNow())}`;
   out.push('');
@@ -315,9 +329,25 @@ function receiptData(v) {
   };
 }
 
-function done(v) {
-  ctx.receipt = receiptData(v);
-  saveOrder(ctx.receipt);
+/** The order is saved: show the thank-you step. `ref` is the number the database kept. */
+function done(v, ref) {
+  ctx.ref = ref;
+  ctx.receipt = { ...ctx.receipt, ref };
+  ctx.placed = v;
+  const amt = amountNow();
+  const m = dialog().querySelector('input[name="co-method"]:checked')?.value;
+  $('#co-done-next').textContent = payLater()
+    ? 'We will confirm the final price, timing and delivery with you on WhatsApp. Keep your order number handy.'
+    : `Now pay ${inr(amt)} to confirm it. We start making your order once we receive the payment, and confirm on WhatsApp.`;
+  // How to pay, with this order's number as the note, then the payment screenshot (saved on the order and
+  // shared to the shop's WhatsApp). Pay-at-the-shop orders have nothing to pay now.
+  $('#co-done-pay').replaceChildren(...(payLater() ? [] : [payBox(m, amt),
+    paymentProof({ ref, amount: amt, h, client: () => import('../auth/client.js').then((a) => a.getSupabase()) })]));
+  // Paid orders send the note with their screenshot (above); pay-at-the-shop orders can send a copy.
+  $('#co-wa-copy-label').textContent = 'Send us a copy on WhatsApp';
+  $('#co-wa-copy').hidden = !payLater();
+  $('#co-body').hidden = true; // the form is done with; the next step is paying
+  $('#co-title-ref').textContent = ref;
   try {
     const orders = JSON.parse(localStorage.getItem('parineeta:orders') || '[]');
     orders.unshift({ ref: ctx.ref, date: new Date().toISOString(), lines: ctx.lines, amount: amountNow(), name: v.name });
@@ -368,34 +398,35 @@ async function fillFromAccount() {
 }
 
 export function setupCheckout() {
-  $('#co-wa').addEventListener('click', () => {
+  // The only way an order is created: saved first, then the thank-you step. Nothing opens WhatsApp here.
+  $('#co-place').addEventListener('click', async () => {
     const v = values();
     if (!v) return;
-    const url = waLink(orderMessage(v));
+    const btn = $('#co-place');
+    const status = $('#co-status');
+    btn.disabled = true;
+    status.className = 'enq__status is-busy';
+    status.textContent = 'Placing your order…';
+    try {
+      ctx.receipt = receiptData(v);
+      const ref = await placeOrder(ctx.receipt);
+      status.textContent = '';
+      done(v, ref);
+    } catch (err) {
+      status.className = 'enq__status is-error';
+      status.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  // Optional, after the order exists: a copy for the shop's WhatsApp. Creates nothing.
+  $('#co-wa-copy').addEventListener('click', () => {
+    if (!ctx.placed) return;
+    const url = waLink(orderMessage(ctx.placed));
     // 'noopener' would make window.open return null, and this tab would follow to WhatsApp too.
     const win = window.open(url, '_blank');
     if (win) win.opener = null;
     else window.location.href = url;
-    done(v);
-  });
-  $('#co-mail').addEventListener('click', async () => {
-    const v = values();
-    if (!v) return;
-    const btn = $('#co-mail');
-    const status = $('#co-status');
-    btn.disabled = true;
-    status.className = 'enq__status is-busy';
-    status.textContent = 'Sending your order…';
-    try {
-      await postForm({ subject: `Order ${ctx.ref} from ${v.name}`, name: v.name, phone: v.phone, email: v.email || undefined, message: orderMessage(v) });
-      status.textContent = '';
-      done(v);
-    } catch {
-      status.className = 'enq__status is-error';
-      status.textContent = 'We could not send that just now. Please use WhatsApp instead.';
-    } finally {
-      btn.disabled = false;
-    }
   });
   $('#co-close').addEventListener('click', () => closeDialog(dialog()));
   const receiptAction = (btn, fn, fail) => btn.addEventListener('click', async () => {

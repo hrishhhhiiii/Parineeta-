@@ -131,23 +131,24 @@ export async function receiptBlob(r) {
     pair(`Coupon ${r.coupon.code}`, `− ${inr(r.coupon.off)}`);
   }
   pair('Estimated total', inr(r.total), { bold: true, size: 32 });
-  const settled = paid ? r.paidAmount : r.method.id === 'later' ? 0 : r.paidNow;
+  // Until the shop records the money, nothing counts as paid: the receipt says what is due, not what was paid.
+  const settled = paid ? r.paidAmount : 0;
   if (paid) pair('Paid', inr(settled), { bold: true });
-  else if (r.method.id === 'later') pair('Paying now', 'Nothing, pay at the shop');
-  else pair(`Paying now (${r.plan})`, inr(settled));
+  else if (r.method.id === 'later') pair('To pay', 'At the shop or on delivery');
+  else pair(`To pay now (${r.plan})`, inr(r.paidNow));
   pair('Balance due', inr(Math.max(0, r.total - settled)));
 
   heading('Payment');
   pair('Method', r.method.label);
-  if (r.payTo) pair('Paid to', r.payTo);
-  if (r.method.id !== 'later' || paid) pair('Reference (UTR)', r.utr || 'Not given');
+  if (r.payTo) pair(paid ? 'Paid to' : 'Pay to', r.payTo);
+  if (r.utr) pair('Reference (UTR)', r.utr);
 
   // Status box: this receipt is not proof that money arrived until the shop confirms it.
   const status = paid
     ? `Payment of ${inr(r.paidAmount)} received on ${new Date(r.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}. Thank you!`
     : r.method.id === 'later'
     ? 'Nothing paid yet. You pay at the shop or on delivery.'
-    : `Payment of ${inr(r.paidNow)} reported by the customer. Awaiting confirmation from Parineeta.`;
+    : `Awaiting payment of ${inr(r.paidNow)}. Use the order number ${r.ref} as the payment note. We start making your order once we receive it.`;
   y += 50;
   set(28, 600, SANS, C.ink);
   const sLines = wrap(status, W - 2 * PAD - 60);

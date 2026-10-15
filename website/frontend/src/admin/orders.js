@@ -1,6 +1,7 @@
-// Owner: orders from the website's checkout (saved by database/migrations/009_simple_orders.sql).
-// The customer has already sent the same order on WhatsApp; here the owner records the payment
-// and moves the order along until it is delivered.
+// Owner: orders from the website's checkout (saved by database/migrations/009_simple_orders.sql … 021).
+// An order exists only once the customer pressed "Place order" or "I've paid, place my order" (WhatsApp is just
+// an optional copy). Here the owner confirms the payment and moves the order along until it is delivered.
+import { stagesFor, canDelete } from './orderRules.js';
 
 export const ORDER_STATUS = [
   ['placed', 'New: check the payment'],
@@ -43,14 +44,16 @@ export function ordersView(sb, { h, toast, explain }) {
 
   const card = (o) => {
     const digits = String(o.phone || '').replace(/[^\d]/g, '');
+    // Only the stages this order can move to (orderRules.js; the database enforces the same rules, 023_order_safety.sql).
     const status = h('select', { class: 'input', 'aria-label': `Stage of order ${o.ref}` },
-      ...ORDER_STATUS.map(([v, t]) => h('option', { value: v, text: t, selected: v === o.status })));
+      ...stagesFor(o, ORDER_STATUS).map(([v, t]) => h('option', { value: v, text: t, selected: v === o.status })));
     const amount = h('input', { class: 'input', type: 'number', min: 0, step: 1, inputmode: 'numeric', placeholder: 'Amount received ₹',
       value: o.paid_amount ?? '', 'aria-label': `Amount received for ${o.ref}` });
     // Refunds are sent by hand from the bank or UPI app; these boxes record them (016_refunds.sql).
     const r = o.refund || {};
-    const refundAmt = h('input', { class: 'input', type: 'number', min: 1, step: 1, inputmode: 'numeric', placeholder: 'Refund amount ₹',
-      value: r.amount ?? o.paid_amount ?? o.paid_now ?? '', 'aria-label': `Refund amount for ${o.ref}` });
+    // A refund can't be more than the payment recorded (023_order_safety.sql); refund stages are offered only once one is recorded.
+    const refundAmt = h('input', { class: 'input', type: 'number', min: 1, max: o.paid_amount || null, step: 1, inputmode: 'numeric', placeholder: 'Refund amount ₹',
+      value: r.amount ?? o.paid_amount ?? '', 'aria-label': `Refund amount for ${o.ref}` });
     const refundRef = h('input', { class: 'input', maxlength: 60, autocomplete: 'off', spellcheck: 'false', placeholder: 'Refund UPI / bank reference',
       value: r.ref || '', 'aria-label': `Refund reference for ${o.ref}` });
     const refundNote = h('input', { class: 'input', maxlength: 300, placeholder: 'Reason (optional, only you see it)', value: r.note || '', 'aria-label': `Refund reason for ${o.ref}` });
@@ -79,6 +82,7 @@ export function ordersView(sb, { h, toast, explain }) {
       if (REFUND.includes(status.value)) {
         const amt = Math.round(Number(refundAmt.value));
         if (!(amt > 0)) return toast('Enter the amount you are refunding.', 'err');
+        if (amt > (o.paid_amount || 0)) return toast(`The refund can't be more than the ${rupees(o.paid_amount)} received for this order.`, 'err');
         if (status.value === 'refunded' && !refundRef.value.trim() && !confirm('Save the refund as completed without its UPI / bank reference?')) return;
         save.disabled = true;
         ({ error } = await sb.rpc('set_order_refund', { p_ref: o.ref, p_stage: status.value, p_amount: amt, p_refund_ref: refundRef.value, p_note: refundNote.value }));
@@ -108,7 +112,8 @@ export function ordersView(sb, { h, toast, explain }) {
         `${r.doneAt ? 'Refund completed' : 'Refund initiated'}: ${rupees(r.amount)} · ${when(r.doneAt || r.startedAt)}${r.ref ? ` · ref ${r.ref}` : ''}${r.by ? ` (${r.by})` : ''}${r.note ? ` · ${r.note}` : ''}`,
         ...(confirmUrl ? [' · ', h('a', { href: confirmUrl, target: '_blank', rel: 'noopener', text: 'Send confirmation on WhatsApp ↗' })] : []))
       : null;
-    const remove = h('button', { type: 'button', class: 'linkbtn', text: 'Delete (test or spam order)', onclick: async () => {
+    // Only orders with no money recorded and no work started can be deleted; the rest are kept as records.
+    const remove = !canDelete(o) ? null : h('button', { type: 'button', class: 'linkbtn', text: 'Delete (test or spam order)', onclick: async () => {
       if (!confirm(`Delete order ${o.ref} from ${o.name}? This cannot be undone.`)) return;
       const { error } = await sb.rpc('delete_order', { p_ref: o.ref });
       if (error) return toast(explain(error), 'err');
@@ -118,6 +123,59 @@ export function ordersView(sb, { h, toast, explain }) {
     const paidLine = o.method === 'later'
       ? 'Pays at the shop or on delivery'
       : `Customer was asked to pay ${rupees(o.paid_now)}${o.plan ? ` (${o.plan})` : ''} by ${METHOD[o.method] || o.method}${o.utr ? ` · payment ref ${o.utr}` : ''}`;
+    // Placed but not paid yet: the customer pays after placing (UPI or bank, with the order number as the note).
+    // One tap records the money once it shows in the bank or UPI app; nothing is made before that.
+    const awaiting = o.status === 'placed' && o.method !== 'later' && o.paid_now > 0;
+    const days = Math.floor((Date.now() - new Date(o.created_at).getTime()) / 86400000);
+    const remind = awaiting && days >= 2 ? waTo(o.phone, `Namaskar ${o.name}, this is Parineeta about order ${o.ref}. We have not received the payment of ${rupees(o.paid_now)} yet. Please pay to confirm the order, or tell us if you would like to cancel it.`) : '';
+    // The customer's payment screenshot, if they sent one from the website (024_payment_proofs.sql). It is private:
+    // the picture loads through a link that works for an hour.
+    const proof = o.proof || {};
+    const shot = awaiting && proof.path ? h('a', { class: 'proof-shot', target: '_blank', rel: 'noopener', 'aria-label': `Payment screenshot for ${o.ref}, opens full size` },
+      h('img', { alt: `Payment screenshot sent by ${o.name}`, loading: 'lazy' })) : null;
+    if (shot) {
+      Promise.resolve(sb.storage.from('payment-proofs').createSignedUrl(proof.path, 3600)).then(({ data }) => {
+        if (!data?.signedUrl) return;
+        shot.href = data.signedUrl;
+        shot.querySelector('img').src = data.signedUrl;
+      }).catch(() => {});
+    }
+    const proofText = !awaiting ? null
+      : proof.status === 'sent' ? `The customer sent a payment screenshot ${when(proof.at)}. Check the money is in your ${o.method === 'bank' ? 'bank' : 'UPI'} app, then accept or decline.`
+        : proof.status === 'declined' ? `You declined the payment: “${proof.note}”. The customer can pay and send a new screenshot.`
+          : null;
+    const decline = awaiting ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Decline', onclick: async (e) => {
+      const reason = prompt(`Why are you declining the payment for order ${o.ref}? The customer sees this on My orders.`, 'We could not find this payment in our account.');
+      if (reason === null) return;
+      e.currentTarget.disabled = true;
+      const { error } = await sb.rpc('decline_payment', { p_ref: o.ref, p_reason: reason });
+      if (error) { e.currentTarget.disabled = false; return toast(error.hint || explain(error), 'err'); }
+      o.proof = { ...proof, status: 'declined', note: reason.trim() || 'We could not find this payment in our account.' };
+      toast(`Order ${o.ref}: payment declined. Tell the customer on WhatsApp (link on the order).`);
+      paint();
+    } }) : null;
+    // After a decline: a ready-written message for the customer (a link, so the browser doesn't block it).
+    const tellUrl = awaiting && proof.status === 'declined'
+      ? waTo(o.phone, `Namaskar ${o.name}, this is Parineeta about order ${o.ref}. We could not confirm your payment of ${rupees(o.paid_now)}: ${String(proof.note || '').replace(/([^.!?])$/, '$1.')} Please check and send us the payment screenshot again, or reply here if you have any questions.`)
+      : '';
+    const received = awaiting ? h('div', { class: 'card pay-check' },
+      h('p', {}, h('strong', { text: `Awaiting payment: ${rupees(o.paid_now)} by ${METHOD[o.method] || o.method}${days >= 2 ? `, not received after ${days} days` : ''}.` }),
+        ` Look for ${o.utr ? `reference ${o.utr}` : `the note ${o.ref}`} in your ${o.method === 'bank' ? 'bank' : 'UPI'} app, or the customer's screenshot on WhatsApp.`),
+      proofText ? h('p', { class: proof.status === 'declined' ? 'muted' : '' }, proofText,
+        tellUrl ? [' ', h('a', { href: tellUrl, target: '_blank', rel: 'noopener', text: 'Tell the customer on WhatsApp ↗' })] : null) : null,
+      shot,
+      remind ? h('p', {}, h('a', { href: remind, target: '_blank', rel: 'noopener', text: 'Remind the customer on WhatsApp ↗' }), ' · or set the stage to Cancelled.') : null,
+      decline,
+      h('button', { type: 'button', class: 'btn btn--gold btn--sm', text: `Accept: ${rupees(o.paid_now)} received`, onclick: async (e) => {
+        if (!confirm(`Record ${rupees(o.paid_now)} received for order ${o.ref}? Only do this once you can see the money.`)) return;
+        e.currentTarget.disabled = true;
+        const { error } = await sb.rpc('set_order_status', { p_ref: o.ref, p_status: 'paid', p_amount: o.paid_now });
+        if (error) { e.currentTarget.disabled = false; return toast(error.hint || explain(error), 'err'); }
+        Object.assign(o, { status: 'paid', paid_amount: o.paid_now, paid_at: new Date().toISOString(), suspect: false });
+        toast(`Order ${o.ref}: ${rupees(o.paid_now)} received.`);
+        paint();
+      } }),
+      h('span', { class: 'muted', text: ' Start making it only once the money is in.' })) : null;
     return h('article', { class: 'card inbox__item' },
       h('div', { class: 'inbox__head' }, h('strong', { text: `${o.ref} · ${o.name}` }), h('span', { class: 'muted', text: when(o.created_at) })),
       o.suspect ? h('p', { class: 'form-msg', text: 'Many orders came from the same connection within an hour. Check this one is real before making it.' }) : null,
@@ -132,22 +190,24 @@ export function ordersView(sb, { h, toast, explain }) {
       h('ul', {}, ...(o.items || []).map((i) => h('li', { text: `${i.qty} × ${i.title}${i.detail ? ` (${i.detail})` : ''}: ${rupees(i.amount)}${i.clientAmount != null ? ` (their page said ${rupees(i.clientAmount)})` : ''}` }))),
       o.coupon ? h('p', { text: `Coupon ${o.coupon.code}: ${rupees(o.coupon.off)} off (already taken off the total below).` }) : null,
       h('p', { text: `Estimated total ${rupees(o.total)}. ${paidLine}.` }),
+      received,
       o.event_date || o.address ? h('p', { class: 'muted', text: [o.event_date && `Event: ${o.event_date}`, o.address && `Deliver to: ${o.address}`].filter(Boolean).join(' · ') }) : null,
       o.paid_amount ? h('p', { class: 'muted', text: `Received ${rupees(o.paid_amount)}${o.paid_at ? ` on ${when(o.paid_at)}` : ''}${o.paid_by ? ` (${o.paid_by})` : ''}` }) : null,
       refundLine,
       h('div', { class: 'row' }, status, amount, save),
       refundBox,
-      h('p', {}, remove));
+      remove ? h('p', {}, remove) : null);
   };
 
   // Refund details, price checks and coupons come from their own functions, so the Orders list still loads before 016/018/019 are run.
   const optional = (fn) => Promise.resolve(sb.rpc(fn)).catch(() => ({ data: {} }));
-  Promise.all([sb.rpc('list_orders'), optional('list_refunds'), optional('list_total_checks'), optional('list_order_coupons')]).then(([{ data, error }, refunds, checks, coupons]) => {
+  Promise.all([sb.rpc('list_orders'), optional('list_refunds'), optional('list_total_checks'), optional('list_order_coupons'), optional('list_payment_proofs')]).then(([{ data, error }, refunds, checks, coupons, proofs]) => {
     if (error) return body.replaceChildren(h('p', { class: 'form-msg', text: `Could not load orders: ${explain(error)}` }));
     const byRef = (!refunds?.error && refunds?.data) || {};
     const checkByRef = (!checks?.error && checks?.data) || {};
     const couponByRef = (!coupons?.error && coupons?.data) || {};
-    rows = (data || []).map((o) => ({ ...o, ...(byRef[o.ref] ? { refund: byRef[o.ref] } : {}), ...(checkByRef[o.ref] ? { totalCheck: checkByRef[o.ref] } : {}), ...(couponByRef[o.ref] ? { coupon: couponByRef[o.ref] } : {}) }));
+    const proofByRef = (!proofs?.error && proofs?.data) || {};
+    rows = (data || []).map((o) => ({ ...o, ...(byRef[o.ref] ? { refund: byRef[o.ref] } : {}), ...(checkByRef[o.ref] ? { totalCheck: checkByRef[o.ref] } : {}), ...(couponByRef[o.ref] ? { coupon: couponByRef[o.ref] } : {}), ...(proofByRef[o.ref] ? { proof: proofByRef[o.ref] } : {}) }));
     paint();
   });
   return h('div', {}, h('div', { class: 'sec-head' }, h('div', {}, h('h1', { text: 'Orders' }),
