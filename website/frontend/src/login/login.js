@@ -44,8 +44,8 @@ async function route() {
   const sb = await getSupabase();
   const { data: role } = await sb.rpc('admin_role');
   // Staff always go to the admin panel. A customer returns to the page they were on when the shop asked them to sign in.
-  const saved = (() => { try { return sessionStorage.getItem('parineeta:next'); } catch { return null; } })();
-  try { sessionStorage.removeItem('parineeta:next'); } catch { /* storage blocked */ }
+  const saved = (() => { try { return sessionStorage.getItem('parineeta:next') || localStorage.getItem('parineeta:next'); } catch { return null; } })();
+  try { sessionStorage.removeItem('parineeta:next'); localStorage.removeItem('parineeta:next'); } catch { /* storage blocked */ }
   const returnTo = saved && saved.startsWith('/') && !saved.startsWith('//') && !saved.startsWith('/login') ? saved : null;
   const next = role === 'owner' || role === 'editor' ? '/admin.html' : returnTo || '/account.html';
   if (tooManyHops()) {
@@ -59,9 +59,11 @@ async function route() {
   location.replace(next);
 }
 
+const hasPending = (() => { try { return Boolean(localStorage.getItem('parineeta:pending_cart')); } catch { return false; } })();
+
 const TEXT = {
-  signin: ['Welcome back', 'Sign in to see your orders and how they are coming along.'],
-  signup: ['Create your account', 'Optional: it keeps your orders in one place, with their progress. You can always order without one.'],
+  signin: ['Welcome back', hasPending ? 'Sign in to add your piece to the cart and continue.' : 'Sign in to see your orders and how they are coming along.'],
+  signup: ['Create your account', hasPending ? 'Create an account to add your piece to the cart and continue.' : 'Optional: it keeps your orders in one place, with their progress. You can always order without one.'],
   reset: ['Reset your password', 'We will email you a 6-digit code. Enter it with a new password and you are signed in.'],
 };
 

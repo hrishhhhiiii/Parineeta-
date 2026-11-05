@@ -110,7 +110,7 @@ function renderWish() {
         h('p', { class: 'line__meta', text: `from ${inr(fromPrice(p))}` }),
         h('div', { class: 'line__row' },
           set
-            ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => { if (!requireSignIn('add pieces to your cart')) return; store.add({ id, qty: 1 }); toast(`${p.en} added to your enquiry cart.`); } }, 'Add to cart')
+            ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => { const item = { id, qty: 1 }; if (!requireSignIn('add pieces to your cart', item)) return; store.add(item); toast(`${p.en} added to your enquiry cart.`); } }, 'Add to cart')
             : h('a', { class: 'btn btn--ghost btn--sm', href: productHref(id) }, 'View details'))),
       h('button', { type: 'button', class: 'icon-btn line__remove', 'aria-label': `Remove ${p.en} from wishlist`, onclick: () => {
         store.toggleWish(id);

@@ -173,8 +173,9 @@ export function setupProductPanel() {
     }));
   $('#pp-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!requireSignIn('add pieces to your cart')) return;
-    store.add(line());
+    const item = line();
+    if (!requireSignIn('add pieces to your cart', item)) return;
+    store.add(item);
     toast(`${cur.p.en} added to your enquiry cart.`, {
       action: 'View cart',
       onAction: () => {

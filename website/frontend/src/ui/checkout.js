@@ -157,9 +157,17 @@ function amountNow() {
   return choice === 'full' ? total() : advance();
 }
 
-function upiUrl(amount) {
-  const params = new URLSearchParams({ pa: PAYMENTS.upi.id, pn: PAYMENTS.upi.payeeName, am: amount.toFixed(2), cu: 'INR', tn: `Parineeta order ${ctx.ref}` });
-  return `upi://pay?${params.toString()}`;
+export function upiQuery(amount, ref = ctx.ref) {
+  const pa = PAYMENTS.upi.id;
+  const pn = encodeURIComponent(PAYMENTS.upi.payeeName);
+  const am = Number(amount || 0).toFixed(2);
+  const cu = 'INR';
+  const tn = encodeURIComponent(`Parineeta order ${ref || ''}`);
+  return `pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}`;
+}
+
+export function upiUrl(amount, ref = ctx.ref) {
+  return `upi://pay?${upiQuery(amount, ref)}`;
 }
 
 function copyButton(value, label) {
@@ -187,17 +195,60 @@ function renderMethodDetail() {
     : `Press Place order and you will get the details to pay ${inr(amt)}. We start making your order once we receive the payment.` }));
 }
 
+/** Saves the UPI QR as a picture (large, with the amount and order number written under it) for "scan from gallery". */
+async function saveQr(amt, colors) {
+  try {
+    const { default: QR } = await import('qrcode');
+    const size = 720;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size + 150;
+    const g = c.getContext('2d');
+    g.fillStyle = colors.light;
+    g.fillRect(0, 0, c.width, c.height);
+    const code = document.createElement('canvas');
+    await QR.toCanvas(code, upiUrl(amt), { width: size, margin: 2, color: colors });
+    g.drawImage(code, 0, 0);
+    g.fillStyle = colors.dark;
+    g.textAlign = 'center';
+    g.font = '600 44px Arial, sans-serif';
+    g.fillText(`Pay ${inr(amt)} · Parineeta`, size / 2, size + 60);
+    g.font = '32px Arial, sans-serif';
+    g.fillText(`Order ${ctx.ref}`, size / 2, size + 115);
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+    const name = `Parineeta-${ctx.ref}-UPI-QR.png`;
+    // Phones: the share sheet's "Save image" puts it in the gallery; elsewhere a normal download.
+    const file = new File([blob], name, { type: 'image/png' });
+    if (isTouch() && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: `Pay ${inr(amt)} to Parineeta` });
+      return;
+    }
+    const a = h('a', { href: URL.createObjectURL(blob), download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('QR saved. Open your UPI app, tap Scan and choose it from your photos.', { iconName: 'check-circle' });
+  } catch (err) {
+    if (err?.name !== 'AbortError') toast('Could not save the QR. Take a screenshot of it instead.', { iconName: 'x' });
+  }
+}
+
 /** How to pay, shown once the order is placed, with its final order number. m: the payment method; amt: rupees. */
 function payBox(m, amt) {
   const box = h('div', { class: 'co-method-detail' });
   if (m === 'upi') {
+    // QR only, on every device (no upi:// "open app" link: many UPI apps block or warn on those from a website).
+    // A phone can't scan its own screen, so the QR can be saved and opened from the gallery in any UPI app.
+    const colors = { dark: '#1c0508', light: '#fbf4e4' };
     const qr = h('canvas', { class: 'co-qr', width: 220, height: 220, role: 'img', 'aria-label': `UPI QR code to pay ${inr(amt)}` });
-    import('qrcode').then(({ default: QR }) => QR.toCanvas(qr, upiUrl(amt), { width: 220, margin: 1, color: { dark: '#1c0508', light: '#fbf4e4' } })).catch(() => qr.remove());
+    const save = h('button', { type: 'button', class: 'btn btn--ghost btn--sm co-pay__save', onclick: () => saveQr(amt, colors) }, icon('download-simple'), 'Save QR');
+    import('qrcode').then(({ default: QR }) => QR.toCanvas(qr, upiUrl(amt), { width: 220, margin: 1, color: colors })).catch(() => { qr.remove(); save.remove(); });
     box.append(h('div', { class: 'co-pay' },
-      h('div', { class: 'co-pay__qr' }, qr, h('p', { class: 'field__help', text: 'Scan with any UPI app' })),
+      h('div', { class: 'co-pay__qr' }, qr, h('p', { class: 'field__help', text: 'Scan with any UPI app' }), save),
       h('div', { class: 'co-pay__info' },
         h('p', { class: 'co-pay__amount' }, 'Pay ', h('strong', { text: inr(amt) })),
-        isTouch() ? h('a', { class: 'btn btn--gold', href: upiUrl(amt) }, 'Open my UPI app') : null,
+        isTouch() ? h('p', { class: 'field__help', text: 'Paying on this phone? Tap Save QR, then in GPay, PhonePe or Paytm tap Scan and choose the QR from your gallery.' }) : null,
         h('p', { class: 'co-pay__line' }, h('span', { text: `UPI ID: ${PAYMENTS.upi.id}` }), copyButton(PAYMENTS.upi.id, 'UPI ID')),
         h('p', { class: 'field__help', text: `Add the note ${ctx.ref} so we can match your payment.` }))));
   } else if (m === 'bank') {
@@ -363,7 +414,7 @@ function done(v, ref) {
 }
 
 export function openCheckout({ lines, fromCart = false }) {
-  if (!requireSignIn('check out')) return;
+  if (!requireSignIn('check out', lines?.[0])) return;
   prepareToken();
   // Sold-out choices can't be ordered; they stay in the cart and can still be asked about on WhatsApp.
   const sold = lines.filter((l) => lineInfo(l).stock.status === 'out');

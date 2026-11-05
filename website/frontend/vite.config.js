@@ -20,6 +20,16 @@ const noPageBundleImports = () => ({
 });
 
 export default defineConfig(({ mode }) => ({
+  server: {
+    host: true,
+    allowedHosts: true,
+    cors: true,
+  },
+  preview: {
+    host: true,
+    allowedHosts: true,
+    cors: true,
+  },
   plugins: [productPages({ site: loadEnv(mode, import.meta.dirname, 'VITE_').VITE_SITE_URL || '', connect: loadEnv(mode, import.meta.dirname, 'VITE_').VITE_SUPABASE_URL || '' }), noPageBundleImports()],
   build: {
     target: 'es2022',

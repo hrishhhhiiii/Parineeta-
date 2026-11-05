@@ -110,7 +110,7 @@ function configurator(p) {
   }, 'pg');
   refs.stock = h('p', { class: 'field__help pp__stock' });
   refs.add = h('button', { type: 'submit', class: 'btn btn--gold btn--wide' }, icon('shopping-bag-open'), 'Add to cart');
-  refs.book = h('button', { type: 'button', class: 'btn btn--ghost btn--wide', onclick: () => openCheckout({ lines: [line()] }) }, icon('paper-plane-tilt'), 'Buy now');
+  refs.book = h('button', { type: 'button', class: 'btn btn--ghost btn--wide', onclick: () => { const item = line(); if (!requireSignIn('check out', item)) return; openCheckout({ lines: [item] }); } }, icon('paper-plane-tilt'), 'Buy now');
   refs.ask = h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openEnquiry({ lines: [line()] }) }, icon('chat-circle-text'), 'Enquire');
   refs.custom = p.customizable ? h('input', { class: 'input', id: 'pg-custom', type: 'text', maxlength: 80, autocomplete: 'off' }) : null;
   refs.qty = h('output', { class: 'qty__val', 'aria-live': 'polite', text: '1' });
@@ -146,8 +146,9 @@ function configurator(p) {
 
   const form = h('form', { class: 'pp__form', onsubmit: (e) => {
     e.preventDefault();
-    if (!requireSignIn('add pieces to your cart')) return;
-    store.add(line());
+    const item = line();
+    if (!requireSignIn('add pieces to your cart', item)) return;
+    store.add(item);
     toast(`${p.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() });
   } },
   h('fieldset', { class: 'field' }, h('legend', { class: 'field__label', text: 'Colourway' }), styles),
@@ -494,11 +495,12 @@ function builderCard(x) {
     ? [h('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => openEnquiry({ lines: [line()] }) }, icon('chat-circle-text'), 'Ask on WhatsApp')]
     : [
       h('button', { type: 'button', class: 'btn btn--gold btn--sm', 'aria-label': `Add to cart: ${x.en}`, onclick: () => {
-        if (!requireSignIn('add pieces to your cart')) return;
-        store.add(line());
+        const item = line();
+        if (!requireSignIn('add pieces to your cart', item)) return;
+        store.add(item);
         toast(`${x.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() });
       } }, icon('shopping-bag-open'), 'Add to cart'),
-      h('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': `Buy now: ${x.en}`, onclick: () => openCheckout({ lines: [line()] }) }, 'Buy now'),
+      h('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': `Buy now: ${x.en}`, onclick: () => { const item = line(); if (!requireSignIn('check out', item)) return; openCheckout({ lines: [item] }); } }, 'Buy now'),
     ];
   return h('li', { class: 'bcard', 'data-id': x.id }, select, h('div', { class: 'bcard__actions' }, ...actions));
 }

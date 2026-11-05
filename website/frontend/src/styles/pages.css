@@ -743,6 +743,10 @@
   height: 180px;
   border-radius: var(--r-input);
 }
+/* "Save QR": on a phone the QR is saved and scanned from the gallery in the UPI app. */
+.co-pay__save {
+  min-height: 44px;
+}
 .co-pay__info {
   display: grid;
   gap: 10px;
@@ -765,6 +769,35 @@
   margin: 0;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+.co-pay--mobile {
+  flex-direction: column;
+  align-items: stretch;
+}
+.co-pay__apps {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+.co-pay__app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+  gap: 8px;
+}
+.co-app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.co-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.9rem;
 }
 .copy-btn {
   display: inline-flex;

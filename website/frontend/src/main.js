@@ -34,7 +34,7 @@ import { applyPublished } from './cms/published.js';
 import { IS_PREVIEW, receivePreview } from './cms/preview.js';
 import { renderAnnouncement } from './ui/announcement.js';
 import { renderCmsContent } from './ui/cmsContent.js';
-import { requireSignIn } from './ui/signInGate.js';
+import { requireSignIn, restorePendingCart } from './ui/signInGate.js';
 
 // Content published from the admin is baked into the build; preview swaps in the admin's drafts.
 applyPublished();
@@ -48,6 +48,7 @@ if (!IS_PREVIEW && /(?:^|;\s*)__client_uat(?:_[\w-]+)?=[1-9]/.test(document.cook
   const startAccount = () => {
     import('./ui/cartSync.js').then((m) => m.startCartSync()).catch(() => {});
     import('./ui/accountMenu.js').then((m) => m.startAccountMenu()).catch(() => {});
+    restorePendingCart();
   };
   const later = () => ('requestIdleCallback' in window ? requestIdleCallback(startAccount, { timeout: 3000 }) : setTimeout(startAccount, 300));
   if (document.readyState === 'complete') later();
@@ -130,6 +131,7 @@ setupEnquiry();
 setupProductPanel();
 setupDrawers();
 setupCheckout();
+restorePendingCart();
 setupVisitMap();
 initAlpana();
 initInvite();

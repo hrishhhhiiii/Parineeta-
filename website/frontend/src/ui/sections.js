@@ -184,7 +184,7 @@ export function renderSets() {
           h('p', { class: 'price' }, h('span', { class: 'price__from', text: 'from' }), ` ${inr(s.price)}`),
           h('div', { class: 'card__btns' },
             wishButton(s.id, s.en),
-            h('button', { type: 'button', class: 'btn btn--gold btn--sm', onclick: () => { if (!requireSignIn('add pieces to your cart')) return; store.add({ id: s.id, qty: 1 }); toast(`${s.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() }); } }, 'Add to cart'))))));
+            h('button', { type: 'button', class: 'btn btn--gold btn--sm', onclick: () => { const item = { id: s.id, qty: 1 }; if (!requireSignIn('add pieces to your cart', item)) return; store.add(item); toast(`${s.en} added to your enquiry cart.`, { action: 'View cart', onAction: () => document.querySelector('[data-open="cart"]').click() }); } }, 'Add to cart'))))));
   }
   document.querySelectorAll('[data-rail]').forEach((b) =>
     b.addEventListener('click', () => {
