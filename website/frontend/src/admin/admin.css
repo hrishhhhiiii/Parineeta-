@@ -359,3 +359,32 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* Exact prices: one dropdown per choice group, then the price. */
 .exact-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) auto; gap: 8px 12px; align-items: end; padding: 10px; }
 .exact-row .field { margin: 0; }
+
+/* ---------- Collections (collectionsView.js): each collection, the ones inside it, and its products ---------- */
+.col { display: grid; gap: 16px; }
+.col__card { display: grid; gap: 12px; }
+.col__card.is-nested { margin-left: 20px; border-left: 3px solid var(--line-strong); background: var(--surface-2); }
+.col__head { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-start; }
+.col__tile { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; }
+.col__title { flex: 1 1 240px; min-width: 0; }
+.col__title h2 { margin: 0 0 4px; font-size: 1.25rem; }
+.col__title p { margin: 0; }
+.col__line { font-style: italic; }
+.col__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.col__del { color: var(--danger); }
+.col__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.col__item { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.col__item.is-hidden { opacity: 0.6; }
+.col__thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex: none; }
+.col__thumb--none { display: grid; place-items: center; background: var(--surface-2); font-size: 1.3rem; }
+.col__text { display: grid; gap: 4px; flex: 1 1 220px; min-width: 0; }
+.col__name { text-align: left; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.col__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.col__tag { font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--ink-2); }
+.col__tag.is-star { border-color: var(--gold); color: var(--gold-2); }
+.col__tag.is-good { border-color: rgba(120, 200, 140, 0.6); color: #9fe0b0; }
+.col__tag.is-off { border-color: rgba(230, 110, 110, 0.6); color: #f0a0a0; }
+.col__delete { display: grid; gap: 8px; padding: 12px; border: 1px dashed var(--danger); border-radius: 12px; }
+.col__delete p { margin: 0; }
+.col__strays { border-color: var(--danger); }
+.input--sm { min-height: 36px; padding: 4px 10px; font-size: 0.9rem; width: auto; max-width: 100%; }

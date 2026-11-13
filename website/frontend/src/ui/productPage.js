@@ -428,7 +428,7 @@ function detailsSection(p) {
   ];
   return h('section', { class: 'ppage__section', 'aria-labelledby': 'pg-details-title' },
     h('h2', { class: 'h2', id: 'pg-details-title', text: 'The details' }),
-    cat ? h('p', { class: 'field__help', text: `Category: ${cat}` }) : null,
+    cat ? h('p', { class: 'field__help', text: `Collection: ${cat}` }) : null,
     h('ul', { class: 'details-grid' }, ...items.map(([ic, title, body]) =>
       h('li', { class: 'details-grid__item' }, icon(ic), h('strong', { text: title }), h('span', { text: body })))));
 }

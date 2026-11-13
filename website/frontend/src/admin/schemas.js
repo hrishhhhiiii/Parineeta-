@@ -46,7 +46,7 @@ const categoryOptions = (ctx) => {
   return cats.map((c) => [c.id, name(c)]);
 };
 // A sub-category can only sit inside a top-level category (one level).
-const parentOptions = (ctx) => [['', 'None (a main category)'], ...(ctx.data.categories || []).filter((c) => c.id && !c.parent).map((c) => [c.id, c.label || c.id])];
+const parentOptions = (ctx) => [['', 'None (a main collection)'], ...(ctx.data.categories || []).filter((c) => c.id && !c.parent).map((c) => [c.id, c.label || c.id])];
 
 const mediaFields = [
   { key: 'type', label: 'Kind', type: 'select', options: [['photo', 'Photo'], ['reel', 'Film (from the shop\'s film library)']], default: 'photo' },
@@ -113,7 +113,7 @@ export const SECTIONS = [
       { key: 'en', label: 'Name (English)', type: 'text', required: true },
       { key: 'bn', label: 'Name (Bengali)', type: 'text', lang: 'bn' },
       { advanced: true, key: 'id', label: 'Web address name', type: 'slug', from: 'en', required: true, help: 'Used in the page link, e.g. /p/gach-kouto/. Lowercase letters, numbers and dashes. Avoid changing it once shared.' },
-      { key: 'category', label: 'Category', type: 'select', options: categoryOptions, required: true },
+      { key: 'category', label: 'Collection', type: 'select', options: categoryOptions, required: true },
       { key: 'priceFrom', label: 'Price from (₹)', type: 'number', min: 0, required: true },
       { key: 'line', label: 'One-line summary', type: 'text', help: 'Shown under the name in the collection.' },
       { key: 'aliases', label: 'Other names customers use (optional)', type: 'text', help: 'Comma separated, in English or Bengali, e.g. "topar, টোপর, groom crown". The search finds the product by these too.' },
@@ -148,12 +148,13 @@ export const SECTIONS = [
   },
   {
     key: 'categories',
-    title: 'Categories',
+    title: 'Collections',
+    links: [{ text: 'Back to all collections', to: 'categories', heading: '' }],
     icon: '🗂️',
     kind: 'list',
-    intro: 'The groups the collection is organised into. Their order here is the order on the site.',
-    itemTitle: (c) => c.label || 'New category',
-    itemSub: (c) => [c.parent ? 'sub-category' : '', c.bn || ''].filter(Boolean).join(' · '),
+    intro: 'The collections your pieces are grouped into (Crowns, Wedding rituals…). Their order here is the order on the site.',
+    itemTitle: (c) => c.label || 'New collection',
+    itemSub: (c) => [c.parent ? 'inside another collection' : '', c.bn || ''].filter(Boolean).join(' · '),
     defaults: () => clone(CATEGORIES.filter((c) => c.id !== 'all')),
     blank: () => ({ id: '', label: '', bn: '', line: '', about: '', parent: '' }),
     // Categories saved before "About this category" existed show the built-in paragraph, as the website does.
@@ -165,19 +166,19 @@ export const SECTIONS = [
         if (!c.parent) continue;
         const par = cats.find((x) => x.id === c.parent);
         if (c.parent === c.id) problems.push(`"${c.label || c.id}" can't sit inside itself.`);
-        else if (!par) problems.push(`"${c.label || c.id}" sits inside a category that no longer exists. Choose another "Inside category", or None. (To delete a category, move its sub-categories first.)`);
-        else if (par.parent) problems.push(`"${c.label || c.id}" sits inside "${par.label || par.id}", which is itself a sub-category. Only one level is allowed.`);
+        else if (!par) problems.push(`"${c.label || c.id}" sits inside a collection that no longer exists. Choose another "Inside collection", or None. (To delete a collection, move the collections inside it first.)`);
+        else if (par.parent) problems.push(`"${c.label || c.id}" sits inside "${par.label || par.id}", which is itself inside another collection. Only one level is allowed.`);
       }
       return problems;
     },
     fields: [
       { key: 'label', label: 'Name (English)', type: 'text', required: true },
       { key: 'bn', label: 'Name (Bengali)', type: 'text', lang: 'bn' },
-      { advanced: true, key: 'id', label: 'Category code', type: 'slug', from: 'label', required: true, help: 'Products point at this code. Avoid changing it.' },
+      { advanced: true, key: 'id', label: 'Collection code', type: 'slug', from: 'label', required: true, help: 'Products point at this code. Avoid changing it.' },
       { key: 'line', label: 'Short description', type: 'text' },
-      { key: 'about', label: 'About this category (optional)', type: 'textarea', help: 'A short paragraph shown on the category page (e.g. /c/crowns/) under its name: what these pieces are and when they are used. Google reads it, so name the pieces the way customers search for them. Three or four sentences is plenty.' },
-      { key: 'parent', label: 'Inside category (optional)', type: 'select', options: parentOptions, help: 'Make this a sub-category, e.g. "Bridal crowns" inside "Crowns". Customers pick sub-categories in Filters.' },
-      { key: 'image', label: 'Tile picture (optional)', type: 'media', photoOnly: true, help: 'Shown on the category tiles under the homepage photo. Without one, the first product photo in the category is used.' },
+      { key: 'about', label: 'About this collection (optional)', type: 'textarea', help: 'A short paragraph shown on the page for this collection (e.g. /c/crowns/) under its name: what these pieces are and when they are used. Google reads it, so name the pieces the way customers search for them. Three or four sentences is plenty.' },
+      { key: 'parent', label: 'Inside collection (optional)', type: 'select', options: parentOptions, help: 'Put this collection inside another, e.g. "Bridal crowns" inside "Crowns". Customers pick these in Filters.' },
+      { key: 'image', label: 'Tile picture (optional)', type: 'media', photoOnly: true, help: 'Shown on the collection tiles under the homepage photo. Without one, the first product photo in the collection is used.' },
     ],
   },
   {
@@ -416,7 +417,7 @@ export const SECTIONS = [
     title: 'Promo banners',
     icon: '🎉',
     kind: 'list',
-    intro: 'Big pictures under the homepage photo, like a shop app: a new piece, a festive offer, a category. Customers swipe through them; each opens what you choose. Use start and end dates to show one for a while.',
+    intro: 'Big pictures under the homepage photo, like a shop app: a new piece, a festive offer, a collection. Customers swipe through them; each opens what you choose. Use start and end dates to show one for a while.',
     itemTitle: (b) => b.title || 'New banner',
     itemSub: (b) => [b.start || b.end ? `${b.start || '…'} to ${b.end || '…'}` : '', b.hidden ? 'hidden' : ''].filter(Boolean).join(' · '),
     thumbKey: 'photo',
@@ -426,7 +427,7 @@ export const SECTIONS = [
     check: (list) => list.flatMap((b, i) => {
       const where = `"${b.title || `Banner ${i + 1}`}"`;
       if (b.linkType === 'product' && !b.linkProduct) return [`${where}: choose the product it opens.`];
-      if (b.linkType === 'category' && !b.linkCategory) return [`${where}: choose the category it opens.`];
+      if (b.linkType === 'category' && !b.linkCategory) return [`${where}: choose the collection it opens.`];
       if (b.linkType === 'search' && !String(b.linkSearch || '').trim()) return [`${where}: type the search words it opens.`];
       if (b.linkType === 'url' && !/^https:\/\/[^\s]+$/i.test(String(b.linkUrl || '').trim())) return [`${where}: the web address must start with https://`];
       if (b.start && b.end && b.end < b.start) return [`${where}: the end date is before the start date.`];
@@ -436,9 +437,9 @@ export const SECTIONS = [
       { key: 'photo', label: 'Picture', type: 'media', photoOnly: true, required: true, help: 'A wide photo works best (about 2:1).' },
       { key: 'title', label: 'Headline', type: 'text', required: true, help: 'Short, e.g. "Puja collection is here".' },
       { key: 'line', label: 'Small line (optional)', type: 'text' },
-      { key: 'linkType', label: 'Opens', type: 'select', default: 'product', options: [['product', 'A product'], ['category', 'A category'], ['search', 'A search'], ['url', 'A web address']] },
+      { key: 'linkType', label: 'Opens', type: 'select', default: 'product', options: [['product', 'A product'], ['category', 'A collection'], ['search', 'A search'], ['url', 'A web address']] },
       { key: 'linkProduct', label: 'Product (if it opens a product)', type: 'select', options: productOptions },
-      { key: 'linkCategory', label: 'Category (if it opens a category)', type: 'select', options: categoryOptions },
+      { key: 'linkCategory', label: 'Collection (if it opens a collection)', type: 'select', options: categoryOptions },
       { key: 'linkSearch', label: 'Search words (if it opens a search)', type: 'text' },
       { key: 'linkUrl', label: 'Web address (if it opens one)', type: 'text', help: 'Must start with https://' },
       { key: 'start', label: 'Show from (optional)', type: 'date' },

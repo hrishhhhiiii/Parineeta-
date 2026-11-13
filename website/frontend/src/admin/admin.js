@@ -10,6 +10,7 @@ import { ordersView } from './orders.js';
 import { couponsView } from './coupons.js';
 import { reviewsView, newReviewCount } from './reviews.js';
 import { modelsView } from './modelsView.js';
+import { collectionsView } from './collectionsView.js';
 
 const root = document.getElementById('app');
 
@@ -435,19 +436,24 @@ async function save(section) {
 const sectionOf = (key) => SECTIONS.find((s) => s.key === key);
 // A section never saved counts as changed once it differs from the built-in content.
 const changed = (key) => (ctx.saved[key] ? isDirty(key) : JSON.stringify(ctx.data[key]) !== JSON.stringify(defaultsOf(sectionOf(key))));
-async function saveModels() {
-  // Models first: products may point at a model that was just uploaded.
-  for (const key of ['models', 'products']) {
+/** Screens that edit several sections at once save them in this order, and undo them together. */
+async function saveKeys(keys) {
+  for (const key of keys) {
     if (changed(key) && !(await save(sectionOf(key)))) return;
   }
 }
-function undoModels() {
-  for (const key of ['models', 'products']) {
+function undoKeys(keys) {
+  for (const key of keys) {
     ctx.data[key] = ctx.saved[key] ? JSON.parse(ctx.saved[key]) : defaultsOf(sectionOf(key));
     writeBackup(key);
   }
   render();
 }
+// Models first: products may point at a model that was just uploaded.
+const saveModels = () => saveKeys(['models', 'products']);
+const undoModels = () => undoKeys(['models', 'products']);
+// Collections first: products may move into a collection that was just added; banners may point at it.
+const COLLECTION_KEYS = ['categories', 'products', 'banners'];
 
 async function latestHead(key) {
   const { data: rows, error } = await sb.rpc('get_heads');
@@ -726,7 +732,7 @@ const canOpen = (k) => (SCREENS[k] ? !SCREENS[k].ownerOnly || ctx.role === 'owne
 
 // The menu, grouped by how often each part is used. Anything not listed falls under "More".
 const GROUPS = [
-  { title: 'Every day', keys: [ORDERS, 'products', COUPONS] },
+  { title: 'Every day', keys: [ORDERS, 'products', 'categories', COUPONS] },
   { title: 'Your website', keys: ['banners', 'story', 'sets', 'reviews', 'models', 'lookbook', 'announcement', 'homepage'] },
   { title: 'Shop details', keys: ['settings', 'stores', 'socials'] },
 ];
@@ -737,10 +743,11 @@ const TILE_TEXT = {
   [ORDERS]: 'See new orders and mark them paid, made or delivered.',
   [COUPONS]: 'Make a code customers type at checkout for money off, or switch one off.',
   products: 'Add a product, change a price or a photo, or hide one.',
+  categories: 'Your collections and what is in each: bestsellers, hidden pieces, stock and banners. Move pieces between them.',
   sets: 'Bundles sold together at one price.',
   reviews: 'Every review, kept. Choose which ones show on the website.',
   models: 'Every 3D model, where it is used, and your own uploads.',
-  banners: 'Big pictures under the homepage photo that open a product, a category or a search.',
+  banners: 'Big pictures under the homepage photo that open a product, a collection or a search.',
   story: 'The wedding-day chapters visitors scroll through, each with a piece turning in 3D.',
   lookbook: 'The photo gallery on the website.',
   announcement: 'A one-line message across the top of the website.',
@@ -766,6 +773,7 @@ function goToHeading(key, heading) {
 function go(key) {
   ctx.section = key;
   ctx.index = 0;
+  ctx.catDetail = false; // Collections opens on its overview, not one collection's form
   history.replaceState(null, '', key === ORDERS ? '#orders' : location.pathname + location.search);
   render();
   window.scrollTo(0, 0);
@@ -826,6 +834,11 @@ function render() {
 
   root.replaceChildren(top, h('div', { class: 'shell' }, nav, h('main', { class: 'main', id: 'main' }, ctx.section === HOME ? homeView() : ctx.section === ORDERS ? ordersView(sb, { h, toast, explain })
     : ctx.section === COUPONS ? couponsView(sb, { h, toast, explain })
+    : ctx.section === 'categories' && !ctx.catDetail ? collectionsView({ h, toast, ctx, slugify, changed,
+      saveAll: () => saveKeys(COLLECTION_KEYS), undoAll: () => undoKeys(COLLECTION_KEYS),
+      edited: () => { COLLECTION_KEYS.forEach(writeBackup); paintPublishBar(); },
+      openDetails: (i) => { ctx.catDetail = true; ctx.index = Math.max(0, i); render(); window.scrollTo(0, 0); },
+      openProduct: (id) => { go('products'); const i = (ctx.data.products || []).findIndex((p) => p.id === id); if (i > 0) { ctx.index = i; render(); } } })
     : ctx.section === 'models' ? modelsView({ h, toast, sb, ctx, slugify, changed, saveAll: saveModels, undoAll: undoModels,
       edited: () => { writeBackup('models'); writeBackup('products'); paintPublishBar(); } })
     : ctx.section === 'reviews' ? reviewsView(sb, { h, toast, explain, products: () => (ctx.data.products || []).map((p) => [p.id, p.en || p.id]), onCount: setReviewCount })
