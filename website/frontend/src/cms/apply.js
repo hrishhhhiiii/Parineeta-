@@ -88,5 +88,16 @@ export function applyAll(docs) {
       console.warn(`[content] kept defaults for "${key}":`, err);
     }
   }
+  rehomeOrphans();
   return applied;
+}
+
+/** A shown product whose collection no longer exists (deleted in the admin) stays on the storefront under
+ *  "More pieces" instead of silently disappearing from every list, filter and page. */
+export function rehomeOrphans() {
+  const known = new Set(CATEGORIES.map((c) => c.id));
+  const lost = PRODUCTS.filter((p) => !known.has(p.category));
+  if (!lost.length) return;
+  if (!known.has('more')) CATEGORIES.push({ id: 'more', label: 'More pieces', line: 'More pieces painted to order.' });
+  for (const p of lost) p.category = 'more';
 }
