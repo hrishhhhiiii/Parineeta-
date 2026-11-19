@@ -2,10 +2,21 @@
 // frontend/src/data/published.json. Fails loudly so a broken fetch never ships a site full of defaults.
 // Run from the repo root (not from inside frontend/) — every path below is relative to it.
 import { mkdir, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
-const URL_ = process.env.SUPABASE_URL;
-const KEY = process.env.SUPABASE_ANON_KEY;
+let URL_ = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+let KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+if ((!URL_ || !KEY) && existsSync('frontend/.env')) {
+  const envContent = readFileSync('frontend/.env', 'utf8');
+  for (const line of envContent.split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:VITE_)?SUPABASE_URL\s*=\s*(.+?)\s*$/);
+    if (m && !URL_) URL_ = m[1].trim();
+    const k = line.match(/^\s*(?:VITE_)?SUPABASE_ANON_KEY\s*=\s*(.+?)\s*$/);
+    if (k && !KEY) KEY = k[1].trim();
+  }
+}
+
 if (!URL_ || !KEY) {
   console.error('SUPABASE_URL and SUPABASE_ANON_KEY are required');
   process.exit(1);

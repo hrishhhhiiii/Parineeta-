@@ -84,10 +84,10 @@ export const SECTIONS = [
     itemSub: (p) => `${p.bn || ''}${p.priceFrom ? ` · from ₹${p.priceFrom}` : ''}${p.hidden ? ' · hidden' : ''}`,
     defaults: () => clone(PRODUCTS),
     blank: () => ({
-      id: '', en: '', bn: '', category: 'ritual', line: '', story: '', priceFrom: 0,
+      id: '', en: '', bn: '', category: '', line: '', story: '', priceFrom: 0,
       styles: ['sindoor'], variants: [], prices: [], stock: 'made', count: null, aliases: '', addedAt: new Date().toISOString().slice(0, 10),
       // New products start with photos and films only; a 3D model is optional.
-      customizable: true, leadDays: 7, model: { kind: 'none' }, media: [],
+      customizable: true, leadDays: 7, model: { kind: 'none' }, media: [], hidden: false,
     }),
     // Older products keep their options in `combos`; the admin edits them as choice groups (variantsOf)
     // and saves only `variants` from then on.
@@ -234,7 +234,7 @@ export const SECTIONS = [
     defaults: () => ({ site: clone(SITE), payments: clone(PAYMENTS) }),
     fields: [
       { heading: 'Contact' },
-      { key: 'site.whatsapp', label: 'WhatsApp number', type: 'text', help: 'With country code, digits only, e.g. 919064188260.', pattern: '^\\d{10,15}$' },
+      { key: 'site.whatsapp', label: 'WhatsApp number', type: 'text', digits: true, help: 'With country code, e.g. 919064188260. Spaces are removed for you.', pattern: '^\\d{10,15}$' },
       { key: 'site.email', label: 'Shop email', type: 'text' },
       { advanced: true, key: 'site.web3formsKey', label: 'Web3Forms access key', type: 'text', help: 'Turns on the "Send by Email" buttons. Free from web3forms.com.' },
       { key: 'site.deliveryBufferDays', label: 'Days to allow for delivery', type: 'number', min: 0, help: 'Product pages say "Order by …" = wedding date − days to make − these days.' },

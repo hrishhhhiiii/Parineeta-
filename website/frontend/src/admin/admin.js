@@ -256,7 +256,7 @@ function jobText(j) {
   if (!j) return '';
   const t = (x) => new Date(x).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   if (j.status === 'live') return `Live ✓ ${t(j.finished_at || j.requested_at)}`;
-  if (j.status === 'failed') return `Update failed: ${j.error || 'see the run log'}`;
+  if (j.status === 'failed') return `Update failed: ${j.error || 'please retry'}`;
   const mins = (Date.now() - new Date(j.requested_at)) / 60000;
   return mins > 15 ? 'Taking longer than usual…' : 'Updating the website… (about 2 minutes)';
 }
@@ -300,7 +300,6 @@ function paintPublishBar() {
     : 'Your website is up to date ✓';
   bar.replaceChildren(...[
     h('span', { class: `pub__state${j?.status === 'failed' ? ' is-err' : ''}`, role: 'status', title: state, text: state }),
-    j?.run_url && (j.status === 'failed' || busy) ? h('a', { href: j.run_url, target: '_blank', rel: 'noopener', class: 'linkbtn', text: 'Run log' }) : null,
     h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Preview', onclick: openPreview }),
     ctx.role === 'owner' && !busy && (j?.status === 'failed' || (!n && ctx.notLive.size)) ? h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Retry update', onclick: retryDeploy }) : null,
     ctx.role === 'owner'
@@ -336,7 +335,9 @@ function validate(section, value, badItems = []) {
   const check = (item, fields, where) => {
     for (const f of fields) {
       if (!f.key) continue;
-      const v = getPath(item, f.key);
+      let v = getPath(item, f.key);
+      // Phone numbers: spaces, dashes and a leading + are dropped before checking and saving ("+91 90641 88260" → 919064188260).
+      if (f.digits && typeof v === 'string' && /\D/.test(v)) setPath(item, f.key, (v = v.replace(/\D/g, '')));
       const empty = v == null || v === '' || (Array.isArray(v) && !v.length);
       // A code made from another field (web address name ← English name) is filled in on save; when that
       // field is empty too, report only it, not a second error about a field folded under "More options".
@@ -619,7 +620,8 @@ function field(f, item, onChange, rerender) {
     case 'list':
       return h('div', { class: 'field' }, label, help, listEditor(f, getPath(item, f.key) || (setPath(item, f.key, []), getPath(item, f.key)), onChange, rerender));
     default:
-      control = h('input', { class: 'input', id, value: value ?? '', lang: f.lang, oninput: (e) => set(e.target.value) });
+      control = h('input', { class: 'input', id, value: value ?? '', lang: f.lang, inputmode: f.digits ? 'tel' : null,
+        oninput: (e) => set(f.digits ? e.target.value.replace(/\D/g, '') : e.target.value) });
   }
   return h('div', { class: 'field' }, label, control, help);
 }
