@@ -12,7 +12,7 @@ import { waLink, photoSrc, reelStill } from './data/site.js';
 import { HOMEPAGE } from './data/homepage.js';
 import { $, $$, reduceMotion, inr, icon } from './ui/dom.js';
 import { hydrateIcons } from './ui/icons.js';
-import { store, droppedLines, onDropped } from './ui/store.js';
+import { store, droppedLines, onDropped, recheckSaved } from './ui/store.js';
 import { toast } from './ui/toast.js';
 import { fromPrice } from './data/pricing.js';
 import { initCatalogue, setCatalogue, catalogueState, syncUrl, isRefined, renderResults, showCollection, emptyState } from './ui/catalogue.js';
@@ -39,6 +39,7 @@ import { requireSignIn, restorePendingCart } from './ui/signInGate.js';
 // Content published from the admin is baked into the build; preview swaps in the admin's drafts.
 applyPublished();
 if (IS_PREVIEW) await receivePreview();
+recheckSaved();
 renderAnnouncement();
 renderCmsContent();
 // Signed-in customers: the header icon becomes their account menu, and the cart and wishlist follow them

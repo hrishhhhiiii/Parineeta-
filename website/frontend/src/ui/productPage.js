@@ -221,7 +221,7 @@ function reviewForm(p, onDone) {
         h('select', { class: 'input', id: 'rv-style', name: 'style' }, h('option', { value: '', text: 'Not sure' }), ...p.styles.map((s) => h('option', { value: s, text: PALETTES[s].label })))),
       h('div', { class: 'field' }, h('label', { class: 'field__label', for: 'rv-phone' }, 'Phone ', h('span', { class: 'field__opt', text: '(optional, never shown)' })), h('input', { class: 'input', id: 'rv-phone', name: 'phone', type: 'tel', inputmode: 'tel', maxlength: 20, autocomplete: 'tel' }))),
     h('div', { class: 'field' }, h('label', { class: 'field__label', for: 'rv-title' }, 'Headline ', h('span', { class: 'field__opt', text: '(optional)' })), h('input', { class: 'input', id: 'rv-title', name: 'title', maxlength: 80, autocomplete: 'off' })),
-    h('div', { class: 'field' }, h('label', { class: 'field__label', for: 'rv-text', text: 'Your review' }), h('textarea', { class: 'input input--area', id: 'rv-text', name: 'text', rows: 4, maxlength: 1000, required: true, autocomplete: 'off' }), err('rv-text')),
+    h('div', { class: 'field' }, h('label', { class: 'field__label', for: 'rv-text', text: 'Your review' }), h('textarea', { class: 'input input--area', id: 'rv-text', name: 'text', rows: 4, required: true, autocomplete: 'off' }), err('rv-text')),
     status,
     h('div', { class: 'enq__actions' },
       h('button', { type: 'button', class: 'btn btn--gold', 'data-send': 'save' }, icon('pencil-simple-line'), 'Submit review'),
@@ -257,8 +257,8 @@ function reviewForm(p, onDone) {
     let ok = true;
     setErr('rv-rating', v.rating ? '' : 'Please choose a star rating.');
     setErr('rv-name', v.name.length >= 2 ? '' : 'Please tell us your name.');
-    setErr('rv-text', v.text.length >= 20 ? '' : 'Please write at least a sentence or two (20 characters).');
-    if (!v.rating || v.name.length < 2 || v.text.length < 20) ok = false;
+    setErr('rv-text', v.text ? '' : 'Please write your review.');
+    if (!v.rating || v.name.length < 2 || !v.text) ok = false;
     return ok ? v : null;
   }
 

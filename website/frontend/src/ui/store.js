@@ -65,6 +65,17 @@ function commit() {
 
 const validWish = (ids) => [...new Set((Array.isArray(ids) ? ids : []).filter((id) => byId(id)))];
 
+/** The saved cart is read before the admin's published products are applied, so a line for a piece that has
+ *  since been removed or hidden can slip in. Run again once the published list is in place (main.js). */
+export function recheckSaved() {
+  const cart = readLines(state.cart);
+  const wish = validWish(state.wish);
+  if (cart.length === state.cart.length && wish.length === state.wish.length) return;
+  state.cart = cart;
+  state.wish = wish;
+  save();
+}
+
 /** Signed-in cart sync: replace the contents without counting it as a local edit. */
 export function replaceState(next) {
   state.cart = readLines(next.cart).map((l) => ({ ...l, qty: Math.max(1, Math.min(MAX_QTY, l.qty)) }));
@@ -85,7 +96,8 @@ export function mergeCarts(a, b) {
 
 export const store = {
   get cart() {
-    return state.cart;
+    // Never hand out a line whose piece has gone: one missing product must not break the cart or the page.
+    return state.cart.filter((l) => byId(l.id));
   },
   get wish() {
     return state.wish;
